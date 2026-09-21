@@ -17,11 +17,21 @@ public static class AppPlatformIngress
         if (token.Length < 43 || token.Length > 200 || token.Any(char.IsWhiteSpace))
             throw new InvalidOperationException("App Platform requires a private shared internal proxy token.");
         var expected = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        var diagnostics = configuration["ReverseProxy:Diagnostics"] == "true"
+            ? app.ApplicationServices.GetService<ILoggerFactory>()?.CreateLogger("TideCasa.Hosting.Ingress") : null;
         return app.Use(async (context, next) =>
         {
+            void Reject(string reason)
+            {
+                // Opt-in deployment diagnostics: no credentials, cookies, bodies or client header values.
+                diagnostics?.LogWarning("Ingress rejected: {Reason}; transport peer {Peer}; client header count {ClientCount}; protocol header count {ProtocolCount}; protocol is HTTPS {IsHttps}",
+                    reason, context.Connection.RemoteIpAddress, context.Request.Headers["do-connecting-ip"].Count,
+                    context.Request.Headers["X-Forwarded-Proto"].Count, context.Request.Headers["X-Forwarded-Proto"] == "https");
+                context.Response.StatusCode = 400;
+            }
             if (context.Request.Path == "/health") { await next(); return; }
             var peer = context.Connection.RemoteIpAddress;
-            if (peer is null || !PrivatePeer(peer)) { context.Response.StatusCode = 400; return; }
+            if (peer is null || !PrivatePeer(peer)) { Reject("transport_peer"); return; }
             IPAddress? client;
             if (api && context.Request.Headers.TryGetValue(TokenHeader, out var supplied) && supplied.Count == 1
                 && supplied[0] is { Length: <= 200 } presented
@@ -30,7 +40,7 @@ public static class AppPlatformIngress
                 // Only our Web component knows this token. Caller-supplied forwarding
                 // headers are never enough to impersonate the internal forwarding hop.
                 client = ReadAddress(context.Request.Headers[ClientHeader]);
-                if (client is null) { context.Response.StatusCode = 400; return; }
+                if (client is null) { Reject("internal_client"); return; }
             }
             else
             {
@@ -39,7 +49,7 @@ public static class AppPlatformIngress
                 client = ReadAddress(context.Request.Headers["do-connecting-ip"]);
                 var protocol = context.Request.Headers["X-Forwarded-Proto"];
                 if (client is null || protocol.Count != 1 || protocol[0] != "https")
-                { context.Response.StatusCode = 400; return; }
+                { Reject(client is null ? "edge_client" : "edge_protocol"); return; }
             }
             context.Request.Headers.Remove(TokenHeader);
             context.Request.Headers.Remove(ClientHeader);

@@ -53,7 +53,9 @@ services:
     instance_count: 1
     http_port: 8080
     health_check:
-      http_path: /health
+      # TCP avoids provider probes whose Host is not an approved application host.
+      # Verify /health and public HTTPS separately after each deployment.
+      port: 8080
       initial_delay_seconds: 30
       period_seconds: 10
       timeout_seconds: 5
@@ -239,7 +241,7 @@ services:
     instance_count: 1
     http_port: 8080
     health_check:
-      http_path: /health
+      port: 8080
       initial_delay_seconds: 30
       period_seconds: 10
       timeout_seconds: 5
