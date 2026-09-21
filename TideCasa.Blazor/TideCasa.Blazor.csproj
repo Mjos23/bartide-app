@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>TideCasa-Blazor-Development</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\SharedHosting\AppPlatformIngress.cs" Link="Hosting\AppPlatformIngress.cs" />
+    <ProjectReference Include="..\TideCasa.Contracts\TideCasa.Contracts.csproj" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <!-- Preserve the paused simulation work locally without publishing its routes. -->
+    <Content Remove="Components\Pages\RestaurantShowcase.razor;Components\Pages\RestaurantShowcaseGallery.razor;wwwroot\restaurant-showcase.css" />
+    <RazorComponent Remove="Components\Pages\RestaurantShowcase.razor;Components\Pages\RestaurantShowcaseGallery.razor" />
+  </ItemGroup>
+</Project>

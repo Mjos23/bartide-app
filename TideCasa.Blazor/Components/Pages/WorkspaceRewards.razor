@@ -1,0 +1,87 @@
+@page "/workspace/{TenantId}/rewards"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.Rewards
+@using TideCasa.Blazor.Components.Rewards
+@inject RewardsClient Api
+@inject RestaurantManagementClient MenuApi
+<PageTitle>Customer and team rewards | Tide Casa</PageTitle>
+<div class="bt-unified rewards-page"><header class="rewards-nav"><a href="/account">← Your account</a><span>BarTide · Rewards</span></header><main class="rewards-main">
+<p class="bt-one-kicker">GIVE PEOPLE A REASON TO RETURN</p><h1>@(workspace?.Name ?? "Rewards")</h1>
+@if (RewardsFlow.Notice(Notice) is { } notice) { <p class="rewards-notice" role="status">@notice</p> }
+@if (workspace is null) { <p role="alert">Your rewards workspace could not be loaded. Confirm you have owner access and try again.</p> }
+else
+{
+    <p>Set your own rewards for customers and recognize your employees with a separate points balance.</p><p><a href="@($"/rewards/{Uri.EscapeDataString(workspace.Slug)}")">Open the customer rewards page →</a></p>
+    <section class="rewards-panel"><h2>Rewards ready to give</h2>
+    @if (!workspace.Rewards.Any(r => r.Reward.State == "requested")) { <p>No customers are waiting to use a reward.</p> }
+    @foreach (var entry in workspace.Rewards.Where(r => r.Reward.State == "requested"))
+    {
+        <article class="rewards-row"><h3>@entry.MemberName · @entry.Reward.Title</h3><p>@entry.Reward.Reward</p>
+        <form method="post" action="@Action("resolve")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><input type="hidden" name="reward_id" value="@entry.Reward.Id" />
+        <label>Result<select name="resolution"><option value="fulfill">Reward given to the customer</option><option value="cancel">Cancel request and return reward or points</option></select></label><label>Staff note<textarea name="note" maxlength="500" required rows="2"></textarea></label><label class="rewards-check"><input type="checkbox" name="confirmed" value="true" required /> I verified this customer and the result above.</label><button type="submit">Record result</button></form></article>
+    }</section>
+    <section class="rewards-panel"><h2>Your reward rules</h2><p>Purchase rewards can be as simple as “buy nine, get the tenth free.” Choose the offer and threshold that suit your business.</p>
+    @if (menuError) { <p role="alert">Menu items could not be loaded. Refresh before creating a purchase reward.</p> }
+    @foreach (var rule in workspace.Rules)
+    {
+        <article class="rewards-row"><h3>@rule.Title</h3><p>@rule.Reward · @(rule.Active ? "Active" : "Paused")</p>
+        <details><summary>Edit rule</summary><form method="post" action="@Action("rule")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><RewardRuleFields Rule="rule" MenuItems="items" /><button type="submit">Save new rule version</button></form></details>
+        @if (rule.Active && rule.Kind != "points" && workspace.Members.Count > 0)
+        {
+            <details><summary>Record a verified @(rule.Kind == "monthly-visits" ? "visit" : "purchase")</summary>
+            <form method="post" action="@Action("qualify")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><input type="hidden" name="rule_id" value="@rule.Id" /><input type="hidden" name="item_id" value="@rule.ItemId" /><input type="hidden" name="source" value="@(rule.Kind == "monthly-visits" ? "verified-visit" : "verified-purchase")" />
+            <label>Customer<select name="member_id" required>@foreach (var member in workspace.Members) { <option value="@member.Id">@member.Name</option> }</select></label>
+            @if (rule.Kind == "monthly-visits") { <input type="hidden" name="units" value="1" /> }
+            else { <label>Paid quantity of @ItemName(rule.ItemId)<input name="units" type="number" min="1" max="100" value="1" required /></label> }
+            <label>Receipt or visit reference<input name="reference" maxlength="100" required /></label><label>Verification note<textarea name="note" maxlength="500" rows="2" required></textarea></label>
+            <label class="rewards-check"><input type="checkbox" name="confirmed" value="true" required /> I verified this visit or paid purchase. Free items are excluded.</label><button type="submit">Record verified activity</button></form></details>
+            @if (rule.Kind == "punch-card" && orders.Any(o => o.Order.Receipt.PaymentStatus is "paid" or "paid_in_person" && o.Order.Receipt.Quote.Lines.Any(l => l.ItemId == rule.ItemId && l.UnitCents > 0)))
+            {
+                <details><summary>Credit a paid online order</summary><form method="post" action="@Action("qualify")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><input type="hidden" name="rule_id" value="@rule.Id" /><input type="hidden" name="item_id" value="@rule.ItemId" /><input type="hidden" name="source" value="paid-order" /><input type="hidden" name="units" value="1" />
+                <label>Customer<select name="member_id" required>@foreach (var member in workspace.Members) { <option value="@member.Id">@member.Name</option> }</select></label>
+                <label>Paid order<select name="reference" required>@foreach (var order in orders.Where(o => o.Order.Receipt.PaymentStatus is "paid" or "paid_in_person" && o.Order.Receipt.Status != "cancelled" && o.Order.Receipt.Quote.Lines.Any(l => l.ItemId == rule.ItemId && l.UnitCents > 0))) { <option value="@order.Order.Receipt.OrderId">@order.Order.Receipt.Number · @order.Order.CustomerName</option> }</select></label><label>Verification note<textarea name="note" maxlength="500" rows="2" required></textarea></label><label class="rewards-check"><input type="checkbox" name="confirmed" value="true" required /> I verified that this order belongs to the selected customer.</label><button type="submit">Credit paid order</button></form></details>
+            }
+        }</article>
+    }
+    <details><summary>Add a reward rule</summary><form method="post" action="@Action("rule")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><RewardRuleFields MenuItems="items" /><button type="submit" disabled="@menuError">Create reward rule</button></form></details></section>
+    <section class="rewards-panel"><h2>Customer points</h2><p>Customers join through your rewards page. Record points only for a verified activity.</p>
+    @if (workspace.Members.Count == 0) { <p>No customers have joined yet.</p> }
+    else
+    {
+        <form method="post" action="@Action("points")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><label>Customer<select name="member_id" required>@foreach (var member in workspace.Members) { <option value="@member.Id">@member.Name · @member.Points points</option> }</select></label><label>Points to award<input name="points" type="number" min="1" max="10000" value="1" required /></label><label>Receipt or activity reference<input name="reference" maxlength="100" required /></label><label>Reason<textarea name="reason" maxlength="500" rows="2" required></textarea></label><label class="rewards-check"><input type="checkbox" name="confirmed" value="true" required /> I verified this activity and points award.</label><button type="submit">Award customer points</button></form>
+    }</section>
+    <section class="rewards-panel"><h2>Employee rewards</h2><p>Award points for your team’s achievements. Use a negative amount when recording points spent on a reward you have given them. This does not send money or change payroll.</p>
+    @if (!workspace.Employees.Any(e => e.Active)) { <p>Add an active employee in your team workspace first.</p> }
+    else
+    {
+        <form method="post" action="@Action("employee")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><label>Employee<select name="member_id" required>@foreach (var member in workspace.Employees.Where(e => e.Active)) { <option value="@member.MemberId">@member.Name · @member.Points points</option> }</select></label><label>Points change<input name="delta" type="number" min="-10000" max="10000" value="1" required /></label><label>Activity reference<input name="reference" maxlength="100" required /></label><label>Reason<textarea name="reason" maxlength="500" rows="2" required></textarea></label><label class="rewards-check"><input type="checkbox" name="confirmed" value="true" required /> I verified this award or the reward already given.</label><button type="submit">Record team points</button></form>
+    }</section>
+    <section class="rewards-panel"><h2>Recent verified activity</h2>@foreach (var activity in workspace.Qualifications)
+    {
+        <details class="rewards-row"><summary>@MemberName(activity.MemberId) · @activity.Units @(activity.Kind == "verified-visit" ? "visit" : "items") · @(activity.State == "void" ? "Reversed" : "Recorded")</summary><p>@activity.Description</p>
+        @if (activity.State == "eligible") { <form method="post" action="@Action("void")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><input type="hidden" name="qualification_id" value="@activity.Id" /><label>Reason for reversal<textarea name="reason" maxlength="500" rows="2" required></textarea></label><label class="rewards-check"><input type="checkbox" name="confirmed" value="true" required /> Reverse this activity and any unused rewards it no longer supports.</label><button type="submit">Reverse activity</button></form> }</details>
+    }</section>
+}
+</main></div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name="notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private RewardsWorkspace? workspace;
+    private IReadOnlyList<RestaurantMenuItem> items = [];
+    private IReadOnlyList<RestaurantOperationOrder> orders = [];
+    private bool menuError;
+    private string Action(string action) => "/rewards/forms/owner/" + Uri.EscapeDataString(TenantId) + "/" + action;
+    private string ItemName(string? id) => items.FirstOrDefault(i => i.Id == id)?.Name ?? "the qualifying item";
+    private string MemberName(string id) => workspace?.Members.FirstOrDefault(m => m.Id == id)?.Name ?? "Customer";
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) return;
+        var result = await Api.SendAsync<RewardsWorkspace>(RewardsClient.Owner(TenantId), token, null, HttpContext.RequestAborted);
+        if (!result.Succeeded) { HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; return; }
+        workspace = result.Value;
+        var menu = await MenuApi.GetMenuAsync(TenantId, token, HttpContext.RequestAborted); items = menu.Value?.Items ?? []; menuError = !menu.Succeeded;
+        var operations = await MenuApi.GetOperationsAsync(TenantId, token, HttpContext.RequestAborted); orders = operations.Value?.Orders ?? [];
+    }
+}

@@ -1,0 +1,54 @@
+@page "/owner/launch-review"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.LaunchReview
+@inject LaunchReviewClient Reviews
+<PageTitle>App launch review | Tide Casa</PageTitle>
+<div class="bt-unified restaurant-ordering rewards-page">
+    <header class="ordering-nav"><a href="/account">← Your account</a><span>Tide Casa · Owner review</span></header>
+    <main class="ordering-main"><p class="bt-one-kicker">REVIEW BEFORE PUBLISHING</p><h1>App launch review</h1>
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error</p> }
+        @if (workspace is not null)
+        {
+            <p>Approve a finished app after its seven-day build period and a review with the customer. Publishing changes its availability in this app; it does not deploy a website or change billing.</p>
+            @if (LaunchReviewFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+            @if (workspace.Projects.Count == 0) { <p>No projects are available on this page.</p> }
+            @foreach (var project in workspace.Projects)
+            {
+                <section class="ordering-panel"><h2>@project.Name</h2><p><strong>@Status(project.Status)</strong> · @(project.Vertical == "bartide" ? "Restaurant app" : "Business app")</p>
+                    <p>@project.FinishedItemCount finished menu or service items</p>
+                    @if (project.Status == "building") { <p>Build began: @Date(project.EnrolledAt)<br />Ready for review: @Date(project.BuildReadyAt)</p> }
+                    @if (project.LaunchBlockReason is not null) { <p class="ordering-note">@project.LaunchBlockReason</p> }
+                    <p><a href="@($"/workspace/{Uri.EscapeDataString(project.Id)}/menu")">Review the app's menu or services →</a></p>
+                    @if (project.CanLaunch || project.Status is "active" or "paused")
+                    {
+                        <form action="@($"/owner/launch-review/{Uri.EscapeDataString(project.Id)}/transition")" method="post" data-enhance="false"><AntiforgeryToken />
+                            <input type="hidden" name="version" value="@project.Version" /><input type="hidden" name="status" value="@(project.Status == "active" ? "paused" : "active")" />
+                            @if (project.CanLaunch) { <label class="desk-field"><span><input type="checkbox" name="reviewed" value="true" required /> I reviewed the finished app with the customer and approve publishing it.</span></label> }
+                            <button class="bt-one-button" type="submit">@(project.CanLaunch ? "Approve app publication" : project.Status == "active" ? "Pause app" : "Resume app")</button>
+                        </form>
+                    }
+                </section>
+            }
+            @if (workspace.NextCursor is not null) { <p><a href="@($"/owner/launch-review?after={Uri.EscapeDataString(workspace.NextCursor)}")">Next projects →</a></p> }
+            @if (!string.IsNullOrEmpty(After)) { <p><a href="/owner/launch-review">Back to first projects</a></p> }
+        }
+    </main>
+</div>
+@code {
+    [SupplyParameterFromQuery(Name = "after")] public string? After { get; set; }
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private LaunchReviewWorkspace? workspace;
+    private string? error;
+    protected override async Task OnInitializedAsync()
+    {
+        if ((HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.User.IsPlatformOwner != true) { HttpContext.Response.StatusCode = 403; error = "Platform owner access is required."; return; }
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { HttpContext.Response.StatusCode = 401; error = "Sign in again to review app launches."; return; }
+        var result = await Reviews.ListAsync(After, token, HttpContext.RequestAborted);
+        if (result.Succeeded) workspace = result.Value;
+        else { HttpContext.Response.StatusCode = (int)result.Status == 403 ? 403 : 503; error = "The project list could not be loaded. Please try again."; }
+    }
+    private static string Date(string? value) => DateTimeOffset.TryParse(value, out var date) ? date.ToUniversalTime().ToString("MMM d, yyyy 'at' HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture) : "Needs review";
+    private static string Status(string value) => value switch { "draft" => "Awaiting enrollment", "building" => "Build in progress", "active" => "Published", "paused" => "Paused", _ => "Needs review" };
+}

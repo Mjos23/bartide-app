@@ -1,0 +1,108 @@
+@page "/enhanced-demo"
+<PageTitle>Explore the restaurant app | BarTide</PageTitle>
+<div class="bt-unified rewards-page"><SiteHeader /><main class="rewards-main">
+    <p class="bt-one-kicker">A LITTLE LOOK INSIDE</p><h1>Coastal Kitchen.</h1>
+    <p>Explore an illustrative restaurant. Names, prices, shifts and events are examples. Your selections stay in this visit; nothing is charged, sent to a restaurant or dispatched.</p>
+    <p class="rewards-note">Tap a feature to try it, or <a href="/enhanced-demo#feature-flow">read through all six below</a>.</p>
+    <nav class="sample-tabs" id="sample-features" aria-label="Restaurant features">@foreach (var item in Tabs) { <button type="button" class="@(tab == item.Key ? "selected" : "")" aria-pressed="@(tab == item.Key)" @onclick="() => tab = item.Key">@item.Value</button> }</nav>
+    @if (tab == "rewards")
+    {
+        <section class="rewards-panel"><p class="bt-one-kicker">YOUR NEXT VISIT HAS A LITTLE EXTRA</p><h2>Buy nine coffees. Enjoy the tenth on us.</h2><div class="sample-stamps" aria-label="@($"{stamps} of 9 coffees collected")">@for (var index = 0; index < 9; index++) { <span class="@(index < stamps ? "earned" : "")" aria-hidden="true">☕</span> }</div><p>@stamps of 9 collected</p>
+        @if (stamps < 9) { <button @onclick="() => stamps++">Try adding a coffee</button> } else { <p role="status"><strong>Your next coffee is ready to claim.</strong></p><button @onclick="() => stamps = 0">Try claiming your reward</button> }
+        <p class="rewards-note">Your restaurant chooses the items, visit goals and rewards. Real rewards require a verified purchase or visit.</p></section>
+        <section class="rewards-panel"><h2>More reasons to return.</h2><p>Visit five times in a month and enjoy a treat chosen by your restaurant.</p><progress max="5" value="3" aria-label="Three of five monthly visits"></progress><p>3 of 5 visits this month</p></section>
+    }
+    else if (tab == "menu")
+    {
+        <section class="rewards-panel"><h2>Fresh from the kitchen.</h2><p>Open a dish, add it to your example order and explore checkout.</p>
+        @foreach (var item in Dishes) { <article class="sample-dish"><img src="@item.Image" alt="@item.Name" width="180" height="120" /><div><h3>@item.Name</h3><p>@item.Description</p><strong>@Money(item.Price)</strong><p><button @onclick="() => Add(item.Id)">Add @item.Name</button></p></div></article> }
+        <button @onclick="ShowOrders">View example order (@quantities.Values.Sum())</button></section>
+    }
+    else if (tab == "orders")
+    {
+        <section class="rewards-panel"><h2>Your order.</h2>
+        @if (quantities.Values.Sum() == 0) { <p>Add something from the menu to try checkout.</p><button @onclick="ShowMenu">Browse menu</button> }
+        else
+        {
+            @foreach (var item in Dishes.Where(d => quantities[d.Id] > 0)) { <div class="sample-order-line"><span>@quantities[item.Id] × @item.Name</span><strong>@Money(quantities[item.Id] * item.Price)</strong><button aria-label="@($"Remove one {item.Name}")" @onclick="() => quantities[item.Id]--">−</button></div> }
+            <label>Order type<select @bind="fulfillment"><option value="dine-in">Dine in · Table 4</option><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></label>
+            <label>Payment<select @bind="payment"><option value="phone">Pay on my phone</option><option value="staff">Pay staff</option></select></label>
+            <label>Optional tip<select @bind="tip"><option value="0">No tip</option><option value="15">15%</option><option value="20">20%</option><option value="25">25%</option></select></label>
+            <dl class="tide-price-breakdown"><div><dt>Food</dt><dd>@Money(Subtotal)</dd></div><div><dt>Example tax · 7%</dt><dd>@Money(Tax)</dd></div>@if (DeliveryFee > 0) { <div><dt>Example delivery fee</dt><dd>@Money(DeliveryFee)</dd></div> }<div><dt>Tip</dt><dd>@Money(Tip)</dd></div><div><dt>Example total</dt><dd>@Money(Subtotal + Tax + DeliveryFee + Tip)</dd></div></dl>
+            <button @onclick="() => orderShown = true">Preview order confirmation</button>
+            @if (orderShown) { <p role="status">Your example order is received. In your restaurant app, the kitchen tracks progress and customers see their order status. No payment or real order was created here.</p> }
+        }
+        <p class="rewards-note">A table QR code identifies the table automatically. Restaurant payments go to the business’s own connected Stripe account.</p></section>
+    }
+    else if (tab == "team")
+    {
+        <section class="rewards-panel"><h2>One team. A clearer day.</h2><p>Example Friday schedule</p><div class="sample-order-line"><strong>Mia · Kitchen</strong><span>11 am – 7 pm</span></div><div class="sample-order-line"><strong>Chris · Delivery</strong><span>4 pm – 10 pm</span></div></section>
+        <section class="rewards-panel"><h2>Keep the team in the loop.</h2><blockquote>“Fresh specials are ready for tonight. Check the menu before your shift.”</blockquote><p>Messages and schedules stay inside your team’s private workspace.</p></section>
+        <section class="rewards-panel"><h2>A little recognition.</h2><p><strong>@teamPoints employee reward points</strong></p><button @onclick="() => teamPoints += 10">Try recognizing a helpful shift · +10</button><p class="rewards-note">Employee points are separate from customer rewards. Real awards come from an authorized business owner.</p></section>
+    }
+    else if (tab == "training")
+    {
+        <section class="rewards-panel"><h2>A thoughtful first day.</h2><p>Example course · Welcome to Coastal Kitchen</p><ol><li>Meet the team · Welcome video</li><li>Know the menu · Video lesson</li><li>Get ready for your first shift · Workplace guidance</li></ol><button @onclick="() => lessonDone = !lessonDone">@(lessonDone ? "Reset example progress" : "Try completing a lesson")</button><p role="status">@(lessonDone ? "1 of 3 lessons complete" : "Ready to begin")</p><p class="rewards-note">Businesses upload their own private training videos and assign courses to active team members.</p></section>
+    }
+    else
+    {
+        <section class="rewards-panel"><p class="bt-one-kicker">MAKE AN EVENING OF IT</p><h2>Friday acoustic night.</h2><p>Example event · 7–9 pm on the patio</p><p>Live music, familiar faces and a little coastal company.</p><p>Reserve one place with your signed-in account.</p><button @onclick="() => reserved = !reserved">@(reserved ? "Cancel example RSVP" : "Try an RSVP")</button>@if (reserved) { <p role="status">Your example RSVP is saved for one guest. The real app checks remaining capacity before confirming a reservation.</p> }<p class="rewards-note">Real guest lists are private to the restaurant. An RSVP is separate from ticket sales.</p></section>
+    }
+    <section class="sample-feature-flow" id="feature-flow" aria-labelledby="feature-flow-title">
+        <p class="bt-one-kicker">THE WHOLE APP, AT A GLANCE</p>
+        <h2 id="feature-flow-title">Six tools. One connected business.</h2>
+        <p class="sample-flow-intro">A reason to come back. An easier way to order. A team that’s ready for the night. Here’s how it all fits together.</p>
+        <ol class="sample-flow-list" role="list">
+            <li><span class="sample-flow-number" aria-hidden="true">01</span><div>
+                <h3>Customer rewards</h3>
+                <p>Give guests a reason to choose you again. Offer a free favorite after nine purchases, or a thank-you for visiting five times in a month. You choose the reward and how customers earn it.</p>
+                <p class="sample-flow-detail">Your regulars see their progress and know what they’re working toward.</p>
+            </div></li>
+            <li><span class="sample-flow-number" aria-hidden="true">02</span><div>
+                <h3>Menu display</h3>
+                <p>Put your food, drinks and late-night favorites in their pocket. Add your own photos, descriptions and prices, and keep availability current from your login.</p>
+                <p class="sample-flow-detail">A menu that feels like your place, ready whenever a guest opens the app.</p>
+            </div></li>
+            <li><span class="sample-flow-number" aria-hidden="true">03</span><div>
+                <h3>Ordering, delivery &amp; payments</h3>
+                <p>Guests scan a table QR code, order, add an optional tip and pay on their phone—or choose to pay your staff. Offer pickup and delivery when they suit your business.</p>
+                <p class="sample-flow-detail">The table is selected automatically. Card payments go to your own connected Stripe account.</p>
+            </div></li>
+            <li><span class="sample-flow-number" aria-hidden="true">04</span><div>
+                <h3>Employee schedules, messages &amp; rewards</h3>
+                <p>Keep the next shift organized with schedules and private team messages. Recognize a helpful teammate with employee rewards you choose.</p>
+                <p class="sample-flow-detail">Your team’s workspace stays separate from what customers see.</p>
+            </div></li>
+            <li><span class="sample-flow-number" aria-hidden="true">05</span><div>
+                <h3>Employee onboarding video courses</h3>
+                <p>Give new hires a familiar place to learn your routines. Upload private welcome videos, menu guidance and training, then assign the right courses to each person.</p>
+                <p class="sample-flow-detail">Employees follow their lessons and keep track of their progress.</p>
+            </div></li>
+            <li><span class="sample-flow-number" aria-hidden="true">06</span><div>
+                <h3>Live events &amp; RSVP</h3>
+                <p>Give people their next night out to look forward to. Share live music, trivia and special events, accept RSVPs and keep a private guest list for your team.</p>
+                <p class="sample-flow-detail">Keep the conversation going: publish app updates that customers who opt in can receive as phone notifications on supported devices.</p>
+            </div></li>
+        </ol>
+    </section>
+    <p><a class="bt-one-button" href="/book-a-demo">See what this could look like for your business</a></p>
+</main><SiteFooter /></div>
+@code {
+    private string tab = "rewards", fulfillment = "dine-in", payment = "phone";
+    private int stamps = 7, teamPoints = 40, tip;
+    private bool orderShown, lessonDone, reserved;
+    private static readonly Dictionary<string,string> Tabs = new() { ["rewards"]="Rewards", ["menu"]="Menu", ["orders"]="Order", ["team"]="Team", ["training"]="Training", ["events"]="Events" };
+    private sealed record Dish(string Id, string Name, string Description, int Price, string Image);
+    private static readonly Dish[] Dishes = [new("tacos","Gulf fish tacos","Citrus slaw, fresh lime and coastal flavor.",1600,"/demo/assets/menu/gulf-tacos.webp"),
+        new("burger","Sunset burger","A coastal classic with crisp lettuce and fries.",1800,"/demo/assets/menu/sunset-burger.webp"),
+        new("tea","Iced tea","Freshly brewed and served over ice.",350,"/demo/assets/menu/iced-tea.webp")];
+    private Dictionary<string,int> quantities = Dishes.ToDictionary(d => d.Id, _ => 0);
+    private void Add(string id) { if (quantities[id] < 10) quantities[id]++; orderShown = false; }
+    private void ShowOrders() => tab = "orders";
+    private void ShowMenu() => tab = "menu";
+    private int Subtotal => Dishes.Sum(d => d.Price * quantities[d.Id]);
+    private int DeliveryFee => fulfillment == "delivery" ? 500 : 0;
+    private int Tax => (int)decimal.Round((Subtotal + DeliveryFee) * .07m, 0, MidpointRounding.AwayFromZero);
+    private int Tip => (int)decimal.Round(Subtotal * tip / 100m, 0, MidpointRounding.AwayFromZero);
+    private static string Money(int cents) => (cents / 100m).ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+}

@@ -1,0 +1,186 @@
+@page "/workspace/{TenantId}/menu"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.Globalization
+@using TideCasa.Blazor.Features.RestaurantManagement
+@inject RestaurantManagementClient Api
+<PageTitle>Menu and ordering settings | Tide Casa</PageTitle>
+<div class="bt-unified restaurant-ordering restaurant-management">
+    <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Menu and settings</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">MAKE IT YOURS</p><h1>@(editor?.Profile.Name ?? "Menu and settings")</h1>
+        <nav class="rm-workspace-nav" aria-label="Workspace"><a aria-current="page" href="@PagePath">Menu and settings</a><a href="@WorkspacePath("operations")">Orders</a><a href="@WorkspacePath("ordering")">Table QR codes</a></nav>
+        @if (RestaurantManagementFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <div class="ordering-notice" role="alert"><p>@error</p><a href="@PagePath">Try loading again</a></div> }
+        @if (editor is not null)
+        {
+            <p>Update the details guests see, organize your menu and choose how your restaurant accepts orders. Save one section at a time.</p>
+            <p><a href="@WorkspacePath("media")">Upload and preview menu photos in Files →</a></p>
+            <p><a class="bt-one-link" href="@($"/order/{Uri.EscapeDataString(editor.Slug)}")" target="_blank" rel="noopener">View your guest ordering page →</a></p>
+            <section class="ordering-panel" aria-labelledby="profile-title">
+                <h2 id="profile-title">Restaurant details</h2>
+                <form method="post" action="@FormPath("profile")" data-enhance="false">
+                    <AntiforgeryToken /><input type="hidden" name="version" value="@editor.Version" />
+                    <div class="rm-field-grid">
+                        <label class="desk-field">Restaurant name<input name="name" value="@editor.Profile.Name" maxlength="160" required /></label>
+                        <label class="desk-field">Area or neighborhood<input name="area" value="@editor.Profile.Area" maxlength="160" /></label>
+                    </div>
+                    <label class="desk-field">Tagline<input name="tagline" value="@editor.Profile.Tagline" maxlength="250" /></label>
+                    <div class="rm-field-grid">
+                        <label class="desk-field">Opening hours<textarea name="hours" rows="3" maxlength="500" placeholder="For example, Tue–Sun 11 am–10 pm">@editor.Profile.Hours</textarea></label>
+                        <label class="desk-field">Website<input name="website" type="url" value="@editor.Profile.Website" maxlength="2048" placeholder="https://example.com" /></label>
+                    </div>
+                    <label class="desk-field">Guest service note<textarea name="service_note" rows="3" maxlength="1000">@editor.Profile.ServiceNote</textarea></label>
+                    <button class="bt-one-button" type="submit">Save restaurant details</button>
+                </form>
+            </section>
+            <div class="rm-editor-grid">
+                <section class="ordering-panel" aria-labelledby="categories-title">
+                    <h2 id="categories-title">Menu categories</h2><p class="ordering-note">Group your dishes and drinks so guests can find what they want.</p>
+                    @foreach (var category in editor.Categories)
+                    {
+                        var itemCount = editor.Items.Count(item => item.CategoryId == category.Id);
+                        <details class="rm-entry">
+                            <summary>@category.Name <small>@itemCount item@(itemCount == 1 ? "" : "s")</small></summary>
+                            <form method="post" action="@FormPath("categories")" data-enhance="false">
+                                <AntiforgeryToken /><input type="hidden" name="version" value="@editor.Version" /><input type="hidden" name="id" value="@category.Id" />
+                                <label class="desk-field">Category name<input name="name" value="@category.Name" maxlength="80" required /></label>
+                                <button class="ordering-secondary" type="submit">Save category</button>
+                            </form>
+                            @if (itemCount > 0 || editor.Categories.Count <= 1)
+                            {
+                                <p class="ordering-note">@(itemCount > 0 ? "Move this category’s items to another category before removing it." : "Keep at least one menu category.")</p>
+                            }
+                            else
+                            {
+                                <form method="post" action="@RemovePath("categories", category.Id)" data-enhance="false" class="rm-remove-form">
+                                    <AntiforgeryToken /><input type="hidden" name="version" value="@editor.Version" />
+                                    <label class="rm-check"><input type="checkbox" name="confirm_remove" value="true" required /><span>Remove the @category.Name category.</span></label>
+                                    <button class="ordering-secondary rm-danger" type="submit">Remove category</button>
+                                </form>
+                            }
+                        </details>
+                    }
+                    @if (editor.Categories.Count < 20)
+                    {
+                        <form method="post" action="@FormPath("categories")" data-enhance="false" class="rm-add-form">
+                            <AntiforgeryToken /><input type="hidden" name="version" value="@editor.Version" /><input type="hidden" name="id" value="@newCategoryId" />
+                            <label class="desk-field">New category<input name="name" maxlength="80" required placeholder="For example, Small plates" /></label>
+                            <button class="bt-one-button" type="submit">Add category</button>
+                        </form>
+                    }
+                    else { <p class="ordering-note">You have reached the 20-category limit.</p> }
+                </section>
+                <section class="ordering-panel" aria-labelledby="items-title">
+                    <h2 id="items-title">Your menu items</h2>
+                    <p class="ordering-note">Guests can order available items with a numeric price. A display-only price, such as “Market price,” appears on the menu but cannot be ordered online.</p>
+                    @if (editor.Items.Count == 0) { <p>Your menu is ready for its first item.</p> }
+                    @foreach (var item in editor.Items)
+                    {
+                        <details class="rm-entry">
+                            <summary>@item.Name <small>@(item.Available ? "Available" : "Unavailable") · @(item.PriceCents is { } price ? Money(price) : item.PriceLabel)</small></summary>
+                            <form method="post" action="@FormPath("items")" data-enhance="false">
+                                <AntiforgeryToken /><input type="hidden" name="version" value="@editor.Version" /><input type="hidden" name="id" value="@item.Id" />
+                                <label class="desk-field">Item name<input name="name" value="@item.Name" maxlength="160" required /></label>
+                                <label class="desk-field">Category<select name="category_id" required>@foreach (var category in editor.Categories) { <option value="@category.Id" selected="@(item.CategoryId == category.Id)">@category.Name</option> }</select></label>
+                                <label class="desk-field">Description<textarea name="description" rows="3" maxlength="1000">@item.Description</textarea></label>
+                                <label class="desk-field">Menu photo<select name="photo_id"><option value="">No photo</option>@foreach (var photo in editor.Photos ?? []) { <option value="@photo.Id" selected="@(item.PhotoId == photo.Id)">@PhotoLabel(photo)</option> }</select></label>
+                                @if (item.PhotoId is not null) { <img class="ordering-item-photo" src="@($"/private-media/{Uri.EscapeDataString(TenantId)}/photo/{item.PhotoId}")" alt="@item.Name" width="160" height="120" loading="lazy" /> }
+                                <div class="rm-field-grid">
+                                    <label class="desk-field">Price (USD)<input name="price" type="number" inputmode="decimal" value="@Amount(item.PriceCents)" min="0" max="10000" step="0.01" /></label>
+                                    <label class="desk-field">Display-only price label<input name="price_label" value="@item.PriceLabel" maxlength="160" placeholder="For example, Market price" /></label>
+                                </div>
+                                <label class="rm-check"><input type="checkbox" name="available" value="true" checked="@item.Available" /><span>Available to order</span></label>
+                                <button class="ordering-secondary" type="submit">Save item</button>
+                            </form>
+                            <form method="post" action="@RemovePath("items", item.Id)" data-enhance="false" class="rm-remove-form">
+                                <AntiforgeryToken /><input type="hidden" name="version" value="@editor.Version" />
+                                <label class="rm-check"><input type="checkbox" name="confirm_remove" value="true" required /><span>Remove @item.Name from the menu.</span></label>
+                                <button class="ordering-secondary rm-danger" type="submit">Remove item</button>
+                            </form>
+                        </details>
+                    }
+                    @if (editor.Items.Count < 100 && editor.Categories.Count > 0)
+                    {
+                        <details class="rm-entry rm-add-form">
+                            <summary>Add a menu item</summary>
+                            <form method="post" action="@FormPath("items")" data-enhance="false">
+                                <AntiforgeryToken /><input type="hidden" name="version" value="@editor.Version" /><input type="hidden" name="id" value="@newItemId" />
+                                <label class="desk-field">Item name<input name="name" maxlength="160" required /></label>
+                                <label class="desk-field">Category<select name="category_id" required>@foreach (var category in editor.Categories) { <option value="@category.Id">@category.Name</option> }</select></label>
+                                <label class="desk-field">Description<textarea name="description" rows="3" maxlength="1000"></textarea></label>
+                                <label class="desk-field">Menu photo<select name="photo_id"><option value="">No photo</option>@foreach (var photo in editor.Photos ?? []) { <option value="@photo.Id">@PhotoLabel(photo)</option> }</select></label>
+                                <div class="rm-field-grid"><label class="desk-field">Price (USD)<input name="price" type="number" inputmode="decimal" min="0" max="10000" step="0.01" /></label><label class="desk-field">Display-only price label<input name="price_label" maxlength="160" placeholder="For example, Market price" /></label></div>
+                                <label class="rm-check"><input type="checkbox" name="available" value="true" checked /><span>Available to order</span></label>
+                                <button class="bt-one-button" type="submit">Add item</button>
+                            </form>
+                        </details>
+                    }
+                    else if (editor.Items.Count >= 100) { <p class="ordering-note">You have reached the 100-item limit.</p> }
+                </section>
+            </div>
+            <section class="ordering-panel" aria-labelledby="settings-title">
+                <h2 id="settings-title">How you accept orders</h2>
+                @if (settingsError is not null) { <p class="ordering-notice" role="alert">@settingsError</p> }
+                @if (settings is not null)
+                {
+                    <form method="post" action="@FormPath("settings")" data-enhance="false">
+                        <AntiforgeryToken /><input type="hidden" name="version" value="@settings.Version" />
+                        <div class="rm-toggle-grid">
+                            <label class="rm-check"><input type="checkbox" name="accepting_orders" value="true" checked="@settings.AcceptingOrders" /><span><strong>Accept online orders</strong><small>Uncheck to pause new orders while keeping your menu visible.</small></span></label>
+                            <label class="rm-check"><input type="checkbox" name="pickup_enabled" value="true" checked="@settings.PickupEnabled" /><span>Offer pickup</span></label>
+                            <label class="rm-check"><input type="checkbox" name="delivery_enabled" value="true" checked="@settings.DeliveryEnabled" /><span>Offer delivery</span></label>
+                            <label class="rm-check"><input type="checkbox" name="pay_staff_enabled" value="true" checked="@settings.PayStaffEnabled" /><span>Let guests pay staff directly</span></label>
+                            <label class="rm-check"><input type="checkbox" name="tips_enabled" value="true" checked="@settings.TipsEnabled" /><span>Offer optional tips</span></label>
+                        </div>
+                        <p class="ordering-note">Dine-in is managed through your table QR codes. Phone payments remain unavailable until the Stripe connection is ready.</p>
+                        <label class="desk-field rm-short-field">Sales tax rate (%)<input name="tax_percent" type="number" inputmode="decimal" value="@Amount(settings.TaxBasisPoints)" min="0" max="25" step="0.01" placeholder="Not configured" /></label>
+                        <p class="ordering-note">Set the correct rate for your restaurant before accepting orders. The current calculation applies this rate to food, drinks and the delivery fee; optional tips are separate.</p>
+                        <div class="rm-field-grid rm-three-fields">
+                            <label class="desk-field">Delivery fee (USD)<input name="delivery_fee" type="number" inputmode="decimal" value="@Amount(settings.DeliveryFeeCents)" min="0" max="50" step="0.01" required /></label>
+                            <label class="desk-field">Delivery minimum (USD)<input name="delivery_minimum" type="number" inputmode="decimal" value="@Amount(settings.DeliveryMinimumCents)" min="0" max="1000" step="0.01" required /></label>
+                            <label class="desk-field">Delivery capacity<input name="delivery_capacity" type="number" inputmode="numeric" value="@settings.DeliveryCapacity" min="1" max="30" step="1" required /></label>
+                        </div>
+                        <label class="desk-field">Delivery ZIP codes<textarea name="delivery_zips" rows="2" maxlength="500" placeholder="For example, 33101, 33102">@string.Join(", ", settings.DeliveryZips)</textarea></label>
+                        <p class="ordering-note">List up to 50 five-digit ZIP codes. Delivery capacity limits how many delivery orders can be open at once.</p>
+                        <div class="rm-field-grid"><label class="desk-field">Pickup instructions<textarea name="pickup_instructions" rows="3" maxlength="500">@settings.PickupInstructions</textarea></label><label class="desk-field">Payment instructions<textarea name="payment_instructions" rows="3" maxlength="500">@settings.PaymentInstructions</textarea></label></div>
+                        <button class="bt-one-button" type="submit">Save ordering settings</button>
+                    </form>
+                }
+            </section>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private RestaurantMenuEditor? editor;
+    private RestaurantOrderingSettings? settings;
+    private string? error, settingsError;
+    private readonly string newCategoryId = "category-" + Guid.NewGuid().ToString("N");
+    private readonly string newItemId = "item-" + Guid.NewGuid().ToString("N");
+    private string PagePath => WorkspacePath("menu");
+    private string WorkspacePath(string page) => "/workspace/" + Uri.EscapeDataString(TenantId) + "/" + page;
+    private string FormPath(string action) => "/restaurant-management/" + Uri.EscapeDataString(TenantId) + "/" + action;
+    private string RemovePath(string kind, string id) => FormPath(kind) + "/" + Uri.EscapeDataString(id) + "/remove";
+    private static string Amount(int? cents) => cents is { } value ? (value / 100m).ToString("0.00", CultureInfo.InvariantCulture) : "";
+    private static string Money(int cents) => (cents / 100m).ToString("C2", CultureInfo.GetCultureInfo("en-US"));
+    private string PhotoLabel(RestaurantPhotoOption photo) => "Photo " + ((editor?.Photos?.ToList().FindIndex(p => p.Id == photo.Id) ?? 0) + 1)
+        + (DateTimeOffset.TryParse(photo.CreatedAt, out var date) ? " · " + date.ToString("MMM d, yyyy", CultureInfo.GetCultureInfo("en-US")) : "");
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to manage this menu."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.GetMenuAsync(TenantId, token, HttpContext.RequestAborted);
+        if (!result.Succeeded || result.Value is null)
+        {
+            HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403;
+            error = result.Uncertain ? "The menu editor could not be loaded. Please try again shortly." : "This menu editor is not available to your current account.";
+            return;
+        }
+        editor = result.Value;
+        var settingsResult = await Api.GetSettingsAsync(TenantId, token, HttpContext.RequestAborted);
+        if (settingsResult.Succeeded) settings = settingsResult.Value;
+        else settingsError = settingsResult.Uncertain ? "Ordering settings could not be loaded. Refresh this page to try again." : "Ordering settings are not available for this workspace yet.";
+    }
+}

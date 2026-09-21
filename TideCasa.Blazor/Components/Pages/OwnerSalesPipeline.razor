@@ -1,0 +1,84 @@
+@page "/owner/sales"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.SalesPipeline
+@inject SalesPipelineClient Api
+<PageTitle>Sales pipeline | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/sales-pipeline.css" /></HeadContent>
+<div class="bt-unified rewards-page sales-page"><header class="rewards-nav"><a href="/account">← Your account</a><a href="/owner/demo-requests">Demo requests</a></header><main class="rewards-main">
+    <p class="bt-one-kicker">YOUR NEXT CLIENT. YOUR NEXT STEP.</p><h1>Sales pipeline.</h1>
+    <p>Track who needs a pitch, who you have pitched and who needs a follow-up. Give each conversation one clear next action.</p>
+    @if (SalesPipelineFlow.Notice(Notice) is { } notice) { <p class="rewards-notice" role="status">@notice</p> }
+    @if (error is not null) { <p role="alert">@error</p> }
+    @if (pipeline is not null)
+    {
+        @if (pipeline.Summary is { } summary)
+        {
+            <nav class="sales-queues" aria-label="Sales work lists">
+                <a href="/owner/sales?queue=to-pitch" aria-current="@(Queue == "to-pitch" ? "page" : null)"><strong>@summary.ToPitch</strong><span>To pitch</span></a>
+                <a href="/owner/sales?queue=pitched" aria-current="@(Queue == "pitched" ? "page" : null)"><strong>@summary.Pitched</strong><span>Pitched</span></a>
+                <a href="/owner/sales?queue=follow-up" aria-current="@(Queue == "follow-up" ? "page" : null)"><strong>@summary.FollowUp</strong><span>Follow-up due</span></a>
+                <a href="/owner/sales?queue=unplanned" aria-current="@(Queue == "unplanned" ? "page" : null)"><strong>@summary.Unplanned</strong><span>Needs a next step</span></a>
+            </nav>
+            <p class="rewards-note">Work-list totals cover all prospects. To pitch includes new prospects and contacts who have not had a pitch recorded. Follow-up due includes today and overdue dates; agreed and closed prospects are excluded from follow-up lists.</p>
+        }
+        <form method="get" action="/owner/sales" class="sales-filters" data-enhance="false">
+            <input type="hidden" name="queue" value="@Queue" />
+            <label>Search<input name="search" value="@Search" maxlength="120" placeholder="Business, person or email" /></label>
+            <label>Stage<select name="stage"><option value="">All stages</option>@foreach (var item in SalesPipelineFlow.Stages) { <option value="@item.Key" selected="@(Stage == item.Key)">@item.Value</option> }</select></label>
+            <label>Follow-up<select name="due">@foreach (var item in DueOptions) { <option value="@item.Key" selected="@(Due == item.Key)">@item.Value</option> }</select></label>
+            <button type="submit">Find prospects</button><a href="/owner/sales">Clear filters</a>
+        </form>
+        <p class="rewards-note">Follow-up filters use calendar dates in UTC. Agreement recorded is a sales stage; it does not confirm payment or launch an app.</p>
+        <details class="rewards-panel"><summary>Add a prospect</summary><p>Save a business you plan to contact. This does not send a message or subscribe anyone to marketing.</p>
+            <form method="post" action="/owner/sales/create" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="requestKey" value="@requestKey" />
+                <div class="sales-two"><label>Contact name<input name="name" maxlength="120" required /></label><label>Business name<input name="business" maxlength="150" required /></label></div>
+                <div class="sales-two"><label>Email (optional)<input name="email" type="email" maxlength="254" /></label><label>Phone (optional)<input name="phone" maxlength="40" /></label></div>
+                <div class="sales-two"><label>City<input name="city" maxlength="120" /></label><label>Business type<select name="vertical"><option value="bartide">Bar or restaurant</option><option value="tide-casa">Other business</option></select></label></div>
+                <div class="sales-two"><label>Original source<input name="source" value="manual" maxlength="80" placeholder="Personal introduction, flyer…" required /></label><label>Referral code (optional)<input name="referralCode" maxlength="32" /></label></div>
+                <label>Private notes<textarea name="privateNote" rows="3" maxlength="4000"></textarea></label><p class="rewards-note">Original source and referral attribution stay with this record. Use an existing sales engineer’s code, or leave it blank. Search first if the business may already be here.</p>
+                <button type="submit">Save prospect</button>
+            </form>
+        </details>
+        <h2>@QueueTitle · @pipeline.Total @(pipeline.Total == 1 ? "prospect" : "prospects")</h2>
+        @if (pipeline.Leads.Count == 0) { <p>No prospects match this view. New demo requests appear here automatically.</p> }
+        <ul class="sales-leads">@foreach (var lead in pipeline.Leads)
+        {
+            <li class="rewards-panel"><div class="sales-card-title"><h3><a href="@SalesPipelineFlow.Detail(lead.Id)">@lead.Business</a></h3><span class="sales-stage">@SalesPipelineFlow.Stage(lead.Stage)</span></div>
+                <p>@lead.Name@if (lead.City.Length > 0) { <span> · @lead.City</span> }</p>
+                <p><strong>Next:</strong> @(lead.NextAction.Length == 0 ? "Choose a next action" : lead.NextAction)</p>
+                <p class="rewards-note">Follow-up: @(lead.FollowUpDate.Length == 0 ? "Not set" : lead.FollowUpDate) · Responsible: @(lead.Assignee.Length == 0 ? "Not assigned" : lead.Assignee)</p>
+                <a href="@SalesPipelineFlow.Detail(lead.Id)">Open conversation and history →</a>
+            </li>
+        }</ul>
+        <nav class="sales-pagination" aria-label="Sales pages">@if (pipeline.Page > 1) { <a href="@PageUrl(pipeline.Page - 1)">← Previous</a> }<span>Page @pipeline.Page of @Math.Max(1, (int)Math.Ceiling(pipeline.Total / (double)pipeline.PageSize))</span>@if ((long)pipeline.Page * pipeline.PageSize < pipeline.Total) { <a href="@PageUrl(pipeline.Page + 1)">Next →</a> }</nav>
+    }
+</main></div>
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "stage")] public string? Stage { get; set; }
+    [SupplyParameterFromQuery(Name = "due")] public string? Due { get; set; }
+    [SupplyParameterFromQuery(Name = "queue")] public string? Queue { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public string? Page { get; set; }
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    private SalesPipelinePage? pipeline;
+    private string? error;
+    private readonly string requestKey = Guid.NewGuid().ToString();
+    private static readonly IReadOnlyDictionary<string, string> DueOptions = new Dictionary<string, string> { ["all"] = "Any date", ["overdue"] = "Overdue", ["today"] = "Today", ["upcoming"] = "Upcoming", ["unscheduled"] = "No date yet" };
+    private string QueueTitle => Queue switch { "to-pitch" => "To pitch", "pitched" => "Pitched", "follow-up" => "Follow-up due", "unplanned" => "Needs a next step", _ => "All prospects" };
+    private string Query(int page) => "?search=" + Uri.EscapeDataString(Search ?? "") + "&stage=" + Uri.EscapeDataString(Stage ?? "") + "&due=" + Uri.EscapeDataString(Due ?? "all") + "&queue=" + Uri.EscapeDataString(Queue ?? "all") + "&page=" + page + "&pageSize=25";
+    private string PageUrl(int page) => "/owner/sales" + Query(page);
+    protected override async Task OnInitializedAsync()
+    {
+        if ((HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.User.IsPlatformOwner != true) { HttpContext.Response.StatusCode = 403; error = "This pipeline requires Tide Casa owner access."; return; }
+        if (Search?.Length > 120 || Stage?.Length > 40 || Due?.Length > 20 || Queue?.Length > 20 || Page?.Length > 8) { error = "Choose valid search filters."; return; }
+        var page = int.TryParse(Page, out var parsed) && parsed > 0 ? parsed : 1;
+        if (HttpContext.Items[AuthFlow.TokenItem] is string token)
+        {
+            var result = await Api.SendAsync<SalesPipelinePage>(Query(page), HttpMethod.Get, null, token, HttpContext.RequestAborted);
+            if (result.Succeeded && result.Value is not null) pipeline = result.Value;
+            else { error = (int)result.Status == 400 ? "Choose valid search filters." : "The pipeline could not be loaded. Please refresh shortly."; if ((int)result.Status >= 500) HttpContext.Response.StatusCode = 503; }
+        }
+    }
+}

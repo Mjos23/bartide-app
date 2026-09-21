@@ -1,0 +1,16 @@
+@namespace TideCasa.Blazor.Features.Authentication
+@using Microsoft.AspNetCore.Components
+@using TideCasa.Blazor.Components.Marketing
+<div class="bt-unified" data-enhance-nav="false">
+    <SiteHeader IsBarTide="false" />
+    <main class="bt-contact-main">
+        <section class="bt-contact-copy"><p class="bt-one-kicker">YOUR TIDE CASA ACCOUNT</p><h1>@Title</h1><p class="bt-one-lead">@Description</p></section>
+        <aside class="bt-contact-aside"><section class="bt-community-form">@ChildContent</section></aside>
+    </main>
+    <SiteFooter IsBarTide="false" />
+</div>
+@code {
+    [Parameter] public string Title { get; set; } = "Welcome back.";
+    [Parameter] public string Description { get; set; } = "A little closer to your business.";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

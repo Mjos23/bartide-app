@@ -1,0 +1,15 @@
+@inject OrderingRequestContext OrderingContext
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Page not found | Tide Casa</PageTitle>
+        <main class="bt-contact-main"><section><h1>Page not found.</h1><p><a href="/">Return to Tide Casa</a></p></section></main>
+    </NotFound>
+</Router>
+@code {
+    [Parameter] public string? ProtectedOrderingContext { get; set; }
+    protected override void OnInitialized() => OrderingContext.RestoreForCircuit(ProtectedOrderingContext);
+}

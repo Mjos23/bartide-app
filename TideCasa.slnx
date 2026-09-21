@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="TideCasa.Contracts/TideCasa.Contracts.csproj" />
+  <Project Path="TideCasa.Api/TideCasa.Api.csproj" />
+  <Project Path="TideCasa.Blazor/TideCasa.Blazor.csproj" />
+  <Project Path="TideCasa.Domain/TideCasa.Domain.csproj" />
+  <Project Path="TideCasa.Domain.Checks/TideCasa.Domain.Checks.csproj" />
+  <Project Path="TideCasa.MigrationTool/TideCasa.MigrationTool.csproj" />
+  <Project Path="TideCasa.Persistence.Checks/TideCasa.Persistence.Checks.csproj" />
+</Solution>

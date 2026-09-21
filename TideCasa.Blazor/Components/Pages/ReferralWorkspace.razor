@@ -1,0 +1,65 @@
+@page "/account/referrals"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@inject ReferralsClient Api
+<PageTitle>Sales engineer workspace | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/referrals.css" /></HeadContent>
+<div class="bt-unified"><SiteHeader IsBarTide="false" /><main class="referral-public referral-workspace"><h1>Sales engineer workspace</h1>
+@if (Notice is not null) { <p class="referral-alert" role="status">@Message(Notice)</p> }
+@if (dashboard is null) { <p role="alert">Your workspace could not be loaded. <a href="/account/referrals">Refresh to try again.</a></p> }
+else
+{
+    @if (dashboard.Owner)
+    {
+        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Sales engineer applications</h2><p>Approve profiles and choose their customer discount. Discounts apply only to initial setup and the optional app-store package. Maintenance stays $50/month.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
+        @if (dashboard.Applications.Count == 0) { <p>No applications yet.</p> }
+        @if (dashboard.Applications.Count == 200) { <p>The latest 200 applications are shown, with pending applications first.</p> }
+        @foreach (var application in dashboard.Applications)
+        {
+            var profile = application.Profile;
+            <form class="referral-review" method="post" action="@($"/account/referrals/{profile.Id}/review")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="reviewToken" value="@application.ReviewToken" />
+            <div><h3>@profile.Name</h3><p>@application.Email</p><p class="referral-introduction">@profile.Introduction</p><p>@Money(application.NetSalesCents) net sales · @Money(application.CommissionCents) commission accrued</p><p class="referral-note">Terms @profile.TermsVersion accepted @Date(profile.TermsAcceptedAt).</p></div>
+            <div class="referral-fields"><label>Status<select name="status">@foreach (var status in Statuses) { <option value="@status.Key" selected="@(status.Key == profile.Status)">@status.Value</option> }</select></label><label>Referral code<input name="code" value="@profile.Code" readonly="@(profile.Code is not null)" minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9-]{2,31}" /><span>An assigned code stays with this profile. An approved profile requires a code.</span></label><label>Initial-sale discount (%)<input name="discountPercent" type="number" min="0" max="100" step="1" required value="@profile.DiscountPercent" /><span>0 tracks the referral without a customer discount. Maintenance is not discounted.</span></label><button class="button" type="submit">Save review</button></div></form>
+        }
+        </section>
+    }
+    @if (dashboard.Profile is not { } own)
+    {
+        <section class="editor-card"><h2>Tell us a little about yourself.</h2><p>Have a love for tech? Help onboard clients and earn 20% of eligible initial sales plus 10% of recurring maintenance.</p><form class="referral-application" method="post" action="/account/referrals/apply" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="termsVersion" value="@dashboard.TermsVersion" /><label>Your name<input name="name" required maxlength="100" autocomplete="name" /></label><label>Why would you like to be a sales engineer?<textarea name="introduction" required minlength="20" maxlength="1500" rows="5" placeholder="Tell us about your interest in technology, the businesses you know, or how you would help new clients."></textarea></label><label class="referral-consent"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I understand the <a href="/careers#commission-terms" target="_blank" rel="noreferrer">commission terms</a>: 20% of collected initial sales and 10% of collected maintenance, after discounts and refunds, excluding tax. Approval is required, self-referrals do not qualify, and payout arrangements are confirmed separately.</span></label><button class="button" type="submit">Send my application</button></form></section>
+    }
+    else
+    {
+        <section class="editor-card"><p class="eyebrow">@Statuses.GetValueOrDefault(own.Status, "Awaiting review")</p><h2>@own.Name</h2>
+        @if (own.Status == "pending") { <p>Your application is saved. Tide Casa will review it and set up your code. Check this workspace for your status.</p> }
+        @if (own.Status == "declined") { <p>Your application has been reviewed and is not approved at this time. <a href="/book-a-demo">Get in touch with Tide Casa</a> for questions.</p> }
+        @if (own.Status == "paused") { <p>Your code is paused for new purchases. Existing sales and maintenance attribution remain visible below.</p> }
+        @if (own.Code is not null)
+        {
+            <div class="referral-code"><span>Your referral code</span><strong>@own.Code</strong><p>@(own.DiscountPercent > 0 ? $"{own.DiscountPercent}% off initial setup and the optional app-store package. Monthly maintenance is not discounted." : "This code tracks your referral. No customer discount is currently attached.")</p>
+            @if (own.Status == "active") { <label>Your share link<input readonly value="@ShareLink(own.Code)" /></label><p>Copy this link into your flyer or personal introduction. The customer reviews the code and exact price before paying. A shared link alone does not confirm a discount.</p><a href="@ShareLink(own.Code)">Open my referral link →</a> }
+            </div>
+        }
+        </section>
+        <section class="editor-card"><h2>Your sales &amp; commissions</h2><div class="referral-totals"><div><strong>@dashboard.Totals.SaleCount</strong><span>commission entries</span></div><div><strong>@Money(dashboard.Totals.NetSalesCents)</strong><span>sales after refunds</span></div><div><strong>@Money(dashboard.Totals.CommissionCents)</strong><span>commission accrued</span></div></div><p class="referral-note">Live payments only. These figures show accrual, not payouts. Taxes are excluded; refunds reduce commissions. Payment arrangements are confirmed directly with Tide Casa.</p>
+        @if (dashboard.Sales.Count == 0) { <p>No verified sales yet. Eligible paid sales will appear here once confirmed.</p> }
+        else { <div class="referral-table-wrap"><table><caption>Your latest 100 verified sales and maintenance payments</caption><thead><tr><th scope="col">Paid</th><th scope="col">Sale</th><th scope="col">Collected</th><th scope="col">Refunded</th><th scope="col">Commission</th></tr></thead><tbody>@foreach (var sale in dashboard.Sales) { <tr><td>@Date(sale.PaidAt)</td><td>@(sale.Kind == "initial" ? "Initial sale · 20%" : "Maintenance · 10%")</td><td>@Money(sale.GrossCents)</td><td>@Money(sale.RefundedCents)</td><td>@Money(sale.CommissionCents)</td></tr> }</tbody></table></div> }
+        </section>
+    }
+    <p><a href="/careers#commission-terms">How commissions work</a> · <a href="/account">My account</a></p>
+}
+</main><SiteFooter IsBarTide="false" /></div>
+@code {
+    [SupplyParameterFromQuery(Name="notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private ReferralDashboard? dashboard;
+    private static readonly Dictionary<string,string> Statuses = new() { ["pending"]="Awaiting review", ["active"]="Approved", ["paused"]="Paused for new referrals", ["declined"]="Not approved" };
+    private static string Money(long cents) => (cents / 100m).ToString("C", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+    private static string Date(string value) => DateTimeOffset.TryParse(value, out var date) ? date.UtcDateTime.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture) : "Date unavailable";
+    private static string ShareLink(string code) => "/purchase/restaurant?ref=" + Uri.EscapeDataString(code);
+    private static string Message(string value) => value switch { "saved" => "Your changes are saved.", "changed" => "This application or code changed. Review the current details before trying again.", "invalid" => "Check the form, referral code and current terms before submitting again.", "expired" => "The form expired. Review it and submit again.", _ => "The change was not confirmed. Refresh before trying again." };
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is string token) dashboard = await Api.ReadAsync(token, HttpContext.RequestAborted);
+        if (dashboard is null) HttpContext.Response.StatusCode = 503;
+    }
+}

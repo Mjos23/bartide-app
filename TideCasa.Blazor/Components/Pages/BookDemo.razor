@@ -1,0 +1,108 @@
+@page "/book-a-demo"
+@page "/contact"
+@using System.ComponentModel.DataAnnotations
+@inject TideCasaApiClient Api
+
+<PageTitle>Book a demo | Tide Casa</PageTitle>
+<div class="bt-unified">
+    <SiteHeader />
+    <main class="bt-contact-main">
+        <section class="bt-contact-copy">
+            <p class="bt-one-kicker">SEE WHAT IT COULD DO FOR YOUR BUSINESS</p>
+            <h1>Book a demo.<br />Make it personal.</h1>
+            <p class="bt-one-lead">See how customer rewards bring people back, and explore the menu, ordering and team tools that fit your business.</p>
+            <p>Share a few details and the times that work for you. We’ll contact you to confirm a time together.</p>
+            <p><a class="bt-one-link" href="mailto:hello@tide.casa">hello@tide.casa</a></p>
+        </section>
+        <section class="bt-contact-process">
+            <h2>A look at your kind of app.</h2>
+            <ol class="bt-contact-steps">
+                <li><strong>Start with your customers.</strong><p>Tell us how you would like to reward regulars and give them a reason to return.</p></li>
+                <li><strong>Explore the tools together.</strong><p>Walk through your menu, ordering, team tools, onboarding videos and events.</p></li>
+                <li><strong>Choose the right next step.</strong><p>Ask questions and agree on the scope. Requesting a demo does not enroll or charge you.</p></li>
+            </ol>
+        </section>
+        <aside class="bt-contact-aside">
+            <section class="bt-community-form">
+                <p class="bt-one-kicker">LET’S FIND A TIME</p>
+                <h2>Book a demo.</h2>
+                @if (receipt is not null)
+                {
+                    <div role="status" aria-live="polite"><h3>Your demo request is saved.</h3><p>@receipt.Message</p><p>You don’t need to submit it again.</p></div>
+                }
+                else
+                {
+                    <EditForm Model="form" OnValidSubmit="SubmitAsync" FormName="book-demo">
+                        <DataAnnotationsValidator /><ValidationSummary />
+                        <p>No account is needed. We’ll use your details to arrange your demo; this does not subscribe you to marketing.</p>
+                        <fieldset disabled="@busy" class="booking-fields">
+                            <div class="loyalty-two">
+                                <label class="desk-field">Your name<InputText @bind-Value="form.Name" maxlength="120" autocomplete="name" /></label>
+                                <label class="desk-field">Business name<InputText @bind-Value="form.Business" maxlength="150" autocomplete="organization" /></label>
+                            </div>
+                            <div class="loyalty-two">
+                                <label class="desk-field">Email address<InputText @bind-Value="form.Email" type="email" maxlength="254" autocomplete="email" /></label>
+                                <label class="desk-field">@(form.CanText ? "Phone number for texts" : "Phone number (optional)")<InputText @bind-Value="form.Phone" type="tel" maxlength="40" autocomplete="tel" /></label>
+                            </div>
+                            <div class="booking-text-choice">
+                                <label><InputCheckbox @bind-Value="form.CanText" aria-describedby="demo-text-help" /><span>Can we text you? <small>(optional)</small></span></label>
+                                <p id="demo-text-help">If your requested time doesn’t work, we can text this number to arrange another time. For demo scheduling only. Leave this unchecked and we’ll email you.</p>
+                            </div>
+                            <div class="loyalty-two">
+                                <label class="desk-field">Location (optional)<InputText @bind-Value="form.City" maxlength="120" autocomplete="address-level2" /></label>
+                                <label class="desk-field">Business type<InputSelect @bind-Value="form.BusinessType"><option value="bartide">Restaurant, bar, or nightlife</option><option value="tide-casa">Other business or service</option></InputSelect></label>
+                            </div>
+                            <label class="desk-field">When works for you?<InputText @bind-Value="form.PreferredTimes" maxlength="240" placeholder="For example, Tuesday afternoon or Thursday morning" /></label>
+                            <label class="desk-field">Your time zone<InputText @bind-Value="form.TimeZone" maxlength="80" /></label>
+                            <label class="desk-field">What would you like to see? (optional)<InputTextArea @bind-Value="form.Goals" rows="4" maxlength="1600" placeholder="Rewards for regulars, delivery orders, helping your team…" /></label>
+                            <div class="booking-honeypot" aria-hidden="true"><label>Leave this field empty<input @bind="form.Website" tabindex="-1" autocomplete="off" maxlength="200" /></label></div>
+                            <p class="bt-contact-note">This is a request. Your demo time is confirmed only after we reply.</p>
+                            <button class="bt-one-button" type="submit" disabled="@busy">@(busy ? "Saving your request…" : "Request my demo")</button>
+                        </fieldset>
+                        @if (error is not null) { <p role="alert">@error</p> }
+                    </EditForm>
+                }
+            </section>
+        </aside>
+    </main>
+    <SiteFooter />
+</div>
+
+@code {
+    private readonly Guid requestId = Guid.NewGuid();
+    private readonly DemoForm form = new();
+    private bool busy;
+    private string? error;
+    private DemoRequestReceipt? receipt;
+    private async Task SubmitAsync()
+    {
+        if (busy || receipt is not null) return;
+        busy = true; error = null;
+        try
+        {
+            receipt = await Api.RequestDemoAsync(new DemoRequest { Id = requestId, Name = form.Name, Business = form.Business, Email = form.Email, Phone = form.Phone, CanText = form.CanText, City = form.City, BusinessType = form.BusinessType, PreferredTimes = form.PreferredTimes, TimeZone = form.TimeZone, Goals = form.Goals, ContactWebsite = form.Website });
+        }
+        catch (ApiRequestException ex) { error = ex.Message; }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { error = "We could not confirm your request. Your details are still here. Please try again or email hello@tide.casa."; }
+        finally { busy = false; }
+    }
+    private sealed class DemoForm : IValidatableObject
+    {
+        [Required, StringLength(120)] public string Name { get; set; } = "";
+        [Required, StringLength(150)] public string Business { get; set; } = "";
+        [Required, EmailAddress, StringLength(254)] public string Email { get; set; } = "";
+        [StringLength(40)] public string Phone { get; set; } = "";
+        public bool CanText { get; set; }
+        [StringLength(120)] public string City { get; set; } = "";
+        public string BusinessType { get; set; } = "bartide";
+        [Required, StringLength(240)] public string PreferredTimes { get; set; } = "";
+        [Required, StringLength(80)] public string TimeZone { get; set; } = "Eastern Time";
+        [StringLength(1600)] public string Goals { get; set; } = "";
+        public string Website { get; set; } = "";
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (CanText && !DemoTextPreference.IsUsablePhone(Phone))
+                yield return new ValidationResult(DemoTextPreference.PhoneError, [nameof(Phone)]);
+        }
+    }
+}

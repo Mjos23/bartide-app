@@ -1,0 +1,47 @@
+@page "/workspace/{TenantId}/payments"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.MerchantPayments
+@inject MerchantPaymentsClient Payments
+<PageTitle>Restaurant card payments | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/merchant-payments.css" /></HeadContent>
+<div class="bt-unified restaurant-ordering merchant-payments">
+    <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Card payments</span></header>
+    <main class="ordering-main"><p class="bt-one-kicker">YOUR ORDERS. YOUR PAYMENTS.</p><h1>Get paid at your restaurant</h1>
+        @if (MerchantPaymentsFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error</p> }
+        @if (status is not null)
+        {
+            <section class="ordering-panel"><p class="merchant-test-label">Test setup · No real charges</p><h2>@status.Name</h2><p>@status.Message</p>
+                <dl class="merchant-status"><div><dt>Connection</dt><dd>@State(status.State)</dd></div><div><dt>Pay on phone</dt><dd>@(status.PhoneCheckoutAvailable ? "Available for testing" : "Not available yet")</dd></div></dl>
+                <p>Guest card payments go directly to your restaurant’s connected Stripe account. You keep access to your Stripe Dashboard for payment records and refunds.</p>
+                <p class="ordering-note">Tide Casa setup and monthly maintenance are billed separately. This connection is for your restaurant’s orders.</p>
+                @if (status.OnboardingAvailable && status.State != "review")
+                {
+                    <form action="@($"/merchant-payments/{Uri.EscapeDataString(TenantId)}/onboarding")" method="post" data-enhance="false"><AntiforgeryToken />
+                        <input type="hidden" name="request_key" value="@Guid.NewGuid().ToString("D")" />
+                        <label class="merchant-confirm"><input type="checkbox" name="confirm_us" value="true" required /><span>This restaurant is a US business, and I am authorized to manage its payment setup.</span></label>
+                        <button class="bt-one-button" type="submit">@(status.State == "unconnected" ? "Set up with Stripe" : "Continue Stripe setup")</button>
+                    </form>
+                    <p class="ordering-note">Stripe collects bank and business details securely. Never paste an API key or card details into this page.</p>
+                }
+                <a class="bt-one-link" href="@MerchantPaymentsFlow.Page(TenantId)">Refresh connection status →</a>
+            </section>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private MerchantPaymentStatus? status;
+    private string? error;
+    private static string State(string value) => value switch { "ready" => "Setup complete", "onboarding" => "Setup in progress", "restricted" or "review" => "Needs attention", "creating" => "Connecting", "unconnected" => "Not connected", _ => "Being prepared" };
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { HttpContext.Response.StatusCode = 401; error = "Sign in again to manage payments."; return; }
+        var result = await Payments.StatusAsync(TenantId, token, HttpContext.RequestAborted);
+        if (result.Succeeded) status = result.Value;
+        else { HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; error = result.Uncertain ? "Payment setup could not be checked. Please try again shortly." : "This payment workspace is not available to your account."; }
+    }
+}

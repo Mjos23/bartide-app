@@ -1,0 +1,80 @@
+@page "/workspace/{TenantId}/posts"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.BusinessPosts
+@inject BusinessPostsClient Api
+<PageTitle>Posts and phone updates | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/business-posts.css" /></HeadContent>
+<div class="bt-unified restaurant-ordering business-posts">
+    <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Keep your regulars close</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">FROM YOUR BAR TO THEIR PHONE</p><h1>Posts and phone updates</h1>
+        @if (BusinessPostsFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-error" role="alert">@error</p> }
+        @if (workspace is not null)
+        {
+            <p>Give your regulars a reason to stop by @workspace.Feed.Name. Share tonight’s music, a new menu item or a quick hello.</p>
+            <p><a class="bt-one-link" href="@BusinessPostsFlow.Public(workspace.Feed.Slug)">View your public updates →</a></p>
+            <section class="ordering-panel posts-overview" aria-label="Notification availability">
+                <div><h2>@(workspace.Feed.PushAvailable ? "Reach your followers." : "Your public updates are ready.")</h2>
+                    <p>@workspace.SubscriberCount opted-in device@(workspace.SubscriberCount == 1 ? "" : "s").</p></div>
+                @if (workspace.Feed.PushAvailable) { <p>Publishing queues a phone notification for customers who follow this business. Delivery depends on their device, browser and notification settings.</p> }
+                else { <p>Phone alerts still need to be enabled for this app. Published updates appear in your feed now; they won’t send old notifications when alerts become available.</p> }
+            </section>
+            <section class="ordering-panel">
+                <h2>Write an update</h2><p>Save a draft, review it, then publish. Up to four updates an hour and eight a day keeps things useful for your regulars.</p>
+                @if (!workspace.CanPublish) { <p class="ordering-notice">Posting is available once this business’s app is active.</p> }
+                <form action="@(BusinessPostsFlow.Manage(TenantId) + "/create")" method="post" data-enhance="false">
+                    <fieldset disabled="@(!workspace.CanPublish)">
+                    <AntiforgeryToken /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" />
+                    <label class="desk-field">Headline<input name="title" maxlength="120" required placeholder="Live music starts at 9 tonight" /></label>
+                    <label class="desk-field">Your update<textarea name="body" maxlength="2000" rows="5" required placeholder="Tell your customers what’s happening."></textarea></label>
+                    <p class="ordering-note">Your headline and a short preview may appear on a customer’s lock screen. Keep this public and leave out private information.</p>
+                    <button class="bt-one-button" type="submit">Save draft</button>
+                    </fieldset>
+                </form>
+            </section>
+            <section aria-labelledby="posts-list-title">
+                <h2 id="posts-list-title">Your updates</h2>
+                @if (workspace.Feed.Posts.Count == 0) { <p>No posts yet. Start with what’s happening at your place tonight.</p> }
+                @foreach (var post in workspace.Feed.Posts)
+                {
+                    <article class="ordering-panel" id="@("post-" + post.Id)">
+                        <div class="posts-heading"><h3>@post.Title</h3><span class="posts-state">@State(post.State)</span></div>
+                        <p class="posts-body">@post.Body</p><p class="ordering-note">@BusinessPostsFlow.When(post.PublishedAt ?? post.CreatedAt)</p>
+                        @if (workspace.CanPublish && post.State == "draft")
+                        {
+                            <form action="@(BusinessPostsFlow.Manage(TenantId) + "/" + post.Id + "/publish")" method="post" data-enhance="false">
+                                <AntiforgeryToken /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" /><input name="version" type="hidden" value="@post.Version" />
+                                <label class="posts-check"><input type="checkbox" name="confirm_publish" value="true" required /><span>Publish this update. Notify customers who opted in when phone alerts are available.</span></label>
+                                <button class="bt-one-button" type="submit">Publish update</button>
+                            </form>
+                        }
+                        @if (workspace.CanPublish && (post.State is "draft" or "published"))
+                        {
+                            <form class="posts-hide" action="@(BusinessPostsFlow.Manage(TenantId) + "/" + post.Id + "/hide")" method="post" data-enhance="false">
+                                <AntiforgeryToken /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" /><input name="version" type="hidden" value="@post.Version" />
+                                <button class="ordering-secondary" type="submit">@(post.State == "draft" ? "Discard this draft" : "Hide this update")</button>
+                            </form>
+                        }
+                    </article>
+                }
+            </section>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private BusinessPostWorkspace? workspace;
+    private string? error;
+    private static string State(string state) => state switch { "draft" => "Draft", "published" => "Published", "hidden" => "Hidden", _ => "Unavailable" };
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Please sign in again to see your posts."; HttpContext.Response.StatusCode = 401; return; }
+        var response = await Api.SendAsync<BusinessPostWorkspace>(BusinessPostsClient.OwnerPath(TenantId), HttpMethod.Get, null, token, HttpContext.RequestAborted);
+        if (response.Succeeded && response.Value is not null) workspace = response.Value;
+        else { error = response.Uncertain ? "Your posts could not be loaded. Please try again shortly." : "Only this business’s owner can manage its posts."; HttpContext.Response.StatusCode = response.Uncertain ? 503 : (int)response.Status; }
+    }
+}

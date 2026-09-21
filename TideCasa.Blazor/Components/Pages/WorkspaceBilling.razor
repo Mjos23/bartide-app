@@ -1,0 +1,152 @@
+@page "/workspace/{TenantId}/billing"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.Globalization
+@using TideCasa.Blazor.Features.ServiceBilling
+@inject ServiceBillingClient Api
+<PageTitle>Billing and maintenance | Tide Casa</PageTitle>
+@if (ShouldRefresh)
+{
+    <HeadContent><meta http-equiv="refresh" content="@($"8;url={CurrentPath}?checkout=returned&poll={Poll + 1}")" /></HeadContent>
+}
+<div class="bt-unified billing-workspace">
+    <header class="billing-nav"><a href="/account">← Your account</a><span>Tide Casa · Billing and maintenance</span></header>
+    <main class="billing-main">
+        <p class="bt-one-kicker">YOUR BUSINESS</p><h1>Billing and maintenance</h1>
+        @if (error is not null)
+        {
+            <p class="billing-notice" role="alert">@error <a href="@CurrentPath">Try again</a></p>
+        }
+        else if (workspace is not null)
+        {
+            <p class="billing-intro">@workspace.Name · Your Tide Casa service payments, invoices and monthly renewal.</p>
+            @if (workspace.Environment == "sandbox") { <p class="billing-notice">Payment testing is separate from live billing. Sandbox payments do not start a live build.</p> }
+            @if (ServiceBillingFlow.Notice(NoticeCode) is { } notice) { <p class="billing-notice" role="status">@notice</p> }
+            @if (Checkout == "returned") { <p class="billing-notice" role="status">Your saved payment status is shown below. If confirmation is still pending, this page checks again for a short time. Returning from checkout alone does not confirm payment. <a href="@CurrentPath">Refresh billing</a></p> }
+            @if (workspace.CanPurchase)
+            {
+                <section class="billing-panel" aria-labelledby="service-options">
+                    <h2 id="service-options">Choose your setup</h2>
+                    <form method="get" action="@CurrentPath" data-enhance="false" class="billing-options">
+                        <label class="billing-choice"><input type="checkbox" name="appStores" value="true" checked="@AppStores" /><span>Add app-store submission support · $300 one time</span></label>
+                        <p class="billing-note">Support for eligible stores. Store approval and separate developer-account fees still apply.</p>
+                        <label class="desk-field">Referral code, if you have one<input name="referralCode" value="@ReferralCode" maxlength="32" autocomplete="off" /></label>
+                        <button class="bt-one-button secondary" type="submit">Review my total</button>
+                    </form>
+                    @if (quoteError is not null) { <p class="billing-notice" role="alert">@quoteError</p> }
+                    @if (quote is not null)
+                    {
+                        <dl class="billing-total">
+                            <div><dt>App setup · one time</dt><dd>@Money(quote.SetupCents)</dd></div>
+                            @if (quote.AppStores) { <div><dt>App-store submission support · one time</dt><dd>@Money(quote.StoresCents)</dd></div> }
+                            <div><dt>First month of maintenance</dt><dd>$50.00</dd></div>
+                            @if (quote.DiscountCents > 0) { <div class="billing-discount"><dt>Referral savings included</dt><dd>@Money(quote.DiscountCents)</dd></div> }
+                            <div class="billing-grand"><dt>First payment</dt><dd>@Money(quote.FirstPaymentCents)</dd></div>
+                        </dl>
+                        <p class="billing-renewal">Then <strong>$50 each month</strong> for hosting and basic app upkeep, until you cancel renewal.</p>
+                        <form method="post" action="@($"/service-billing/{TenantId}/checkout")" data-enhance="false" class="billing-consent">
+                            <AntiforgeryToken /><input type="hidden" name="requestId" value="@RequestId" />
+                            <input type="hidden" name="appStores" value="@(quote.AppStores ? "true" : "false")" />
+                            <input type="hidden" name="referralCode" value="@(quote.ReferralCode ?? "")" />
+                            <input type="hidden" name="quoteFingerprint" value="@quote.Fingerprint" /><input type="hidden" name="termsVersion" value="@quote.TermsVersion" />
+                            <label class="billing-choice"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I agree to pay @Money(quote.FirstPaymentCents) now, followed by an automatic $50 monthly renewal until canceled. I have reviewed the <a href="/service-terms" target="_blank" rel="noopener">service terms</a>.</span></label>
+                            <button class="bt-one-button" type="submit" disabled="@(!workspace.CheckoutAvailable)">Continue to secure checkout</button>
+                        </form>
+                        @if (!workspace.CheckoutAvailable) { <p class="billing-note">@workspace.AvailabilityMessage</p> }
+                    }
+                </section>
+            }
+            @foreach (var order in workspace.Orders)
+            {
+                <section class="billing-panel" aria-labelledby="@("purchase-" + order.Id)">
+                    <div class="billing-heading"><h2 id="@("purchase-" + order.Id)">Your setup and maintenance</h2><span class="billing-badge">@(order.Environment == "sandbox" ? "Sandbox" : "Live") · @Status(order.Status)</span></div>
+                    <p>@Money(order.FirstPaymentCents) first payment · @Money(order.MonthlyCents) monthly maintenance</p>
+                    @if (order.AppStores) { <p class="billing-note">Includes the one-time app-store submission support package.</p> }
+                    @if (order.CancelAtPeriodEnd) { <p class="billing-notice">Renewal canceled. The current paid period continues@(Period(order.PeriodEnd) is { } period ? " through " + period : "").</p> }
+                    else if (order.SubscriptionStatus == "canceled") { <p>Maintenance has ended. Refunds are shown separately below.</p> }
+                    else if (order.SubscriptionStatus is "past_due" or "unpaid") { <p class="billing-notice">The latest maintenance payment needs attention. Open its invoice or contact <a href="mailto:hello@tide.casa">hello@tide.casa</a>.</p> }
+                    else if (Period(order.PeriodEnd) is { } end && order.Status == "paid") { <p class="billing-note">Current period ends @end. Your next maintenance payment is @Money(order.MonthlyCents).</p> }
+                        @if (workspace.CheckoutAvailable && order.Environment == workspace.Environment && order.Status is "pending" or "processing")
+                        {
+                            <form method="post" action="@($"/service-billing/{TenantId}/orders/{order.Id}/resume-checkout")" data-enhance="false" class="billing-action">
+                                <AntiforgeryToken /><input type="hidden" name="requestId" value="@Guid.NewGuid().ToString("D")" />
+                                <label class="billing-choice"><input type="checkbox" name="confirmed" value="true" required /><span>Continue my saved @Money(order.FirstPaymentCents) checkout, then $50/month until renewal is canceled.</span></label>
+                                <button class="bt-one-button" type="submit">Continue saved checkout</button>
+                            </form>
+                        }
+                    @if (order.CanDiscard)
+                    {
+                        <details><summary>Choose different setup options</summary><form method="post" action="@($"/service-billing/{TenantId}/orders/{order.Id}/discard-checkout")" data-enhance="false" class="billing-action">
+                            <AntiforgeryToken /><input type="hidden" name="requestId" value="@Guid.NewGuid().ToString("D")" />
+                            <label class="billing-choice"><input type="checkbox" name="confirmed" value="true" required /><span>Close this unpaid checkout before reviewing new options.</span></label><button type="submit" class="billing-secondary">Discard unpaid checkout</button>
+                        </form></details>
+                    }
+                    @if (order.CanCancel)
+                    {
+                        <details><summary>Cancel monthly renewal</summary><form method="post" action="@($"/service-billing/{TenantId}/orders/{order.Id}/cancel-renewal")" data-enhance="false" class="billing-action">
+                            <AntiforgeryToken /><input type="hidden" name="requestId" value="@Guid.NewGuid().ToString("D")" />
+                            <label class="billing-choice"><input type="checkbox" name="confirmed" value="true" required /><span>Cancel future monthly renewals after the current paid period. This does not request a refund.</span></label><button type="submit" class="billing-secondary">Cancel renewal</button>
+                        </form></details>
+                    }
+                    <h3>Invoices</h3>
+                    @if (order.Invoices.Count == 0) { <p class="billing-note">No verified invoice has been recorded yet. <a href="@CurrentPath">Refresh billing</a> after checkout.</p> }
+                    @foreach (var invoice in order.Invoices)
+                    {
+                        <article class="billing-invoice">
+                            <div><strong>@(invoice.Kind == "initial" ? "Setup and first month" : "Monthly maintenance")</strong><p>@Status(invoice.Status) · @Money(invoice.AmountCents)</p></div>
+                            @if (invoice.Url is not null) { <a href="@invoice.Url" target="_blank" rel="noopener noreferrer">Open invoice ↗</a> }
+                            @if (invoice.RefundedCents > 0) { <p class="billing-note">Refunded: @Money(invoice.RefundedCents)</p> }
+                            @if (invoice.RefundPendingCents > 0) { <p class="billing-note">Refund pending: @Money(invoice.RefundPendingCents)</p> }
+                            @if (invoice.RefundFailedCents > 0) { <p class="billing-note">Refund needs attention: @Money(invoice.RefundFailedCents)</p> }
+                        </article>
+                    }
+                </section>
+            }
+            @if (workspace.HistoricalOrders.Count > 0)
+            {
+                <section class="billing-panel"><h2>Earlier one-time purchases</h2><p class="billing-note">These records keep their original price. They do not automatically start a monthly subscription.</p>
+                    @foreach (var historical in workspace.HistoricalOrders)
+                    {
+                        <article class="billing-invoice"><div><strong>@Money(historical.AmountCents) · @Status(historical.Status)</strong><p>@(historical.Environment == "sandbox" ? "Sandbox" : "Live") · Earlier one-time purchase</p></div>
+                            @if (historical.Url is not null) { <a href="@historical.Url" target="_blank" rel="noopener noreferrer">Open payment record ↗</a> }
+                            @if (historical.RefundedCents > 0) { <p class="billing-note">Refunded: @Money(historical.RefundedCents)</p> }
+                            @if (historical.RefundPendingCents > 0) { <p class="billing-note">Refund pending: @Money(historical.RefundPendingCents)</p> }
+                        </article>
+                    }
+                </section>
+            }
+            @if (!workspace.CanPurchase && workspace.Orders.Count == 0 && workspace.HistoricalOrders.Count == 0) { <p class="billing-notice">No payments are recorded for this workspace. Contact us if you need help with your setup or maintenance.</p> }
+            <p class="billing-note">Pausing an app does not cancel billing. To stop future monthly charges, use Cancel monthly renewal above. For billing help, email <a href="mailto:hello@tide.casa">hello@tide.casa</a>.</p>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "appStores")] public bool AppStores { get; set; }
+    [SupplyParameterFromQuery(Name = "referralCode")] public string? ReferralCode { get; set; }
+    [SupplyParameterFromQuery(Name = "notice")] public string? NoticeCode { get; set; }
+    [SupplyParameterFromQuery(Name = "checkout")] public string? Checkout { get; set; }
+    [SupplyParameterFromQuery(Name = "poll")] public int Poll { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private ServiceBillingWorkspace? workspace; private ServiceBillingQuote? quote; private string? error, quoteError;
+    private string RequestId { get; } = Guid.NewGuid().ToString("D");
+    private string CurrentPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/billing";
+    private bool ShouldRefresh => Checkout == "returned" && Poll is >= 0 and < 10 && workspace is not null && workspace.Orders.Any(x => x.Status is "pending" or "processing");
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open billing."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.WorkspaceAsync(TenantId, token, HttpContext.RequestAborted);
+        if (!result.Succeeded || result.Value is null) { HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; error = result.Uncertain ? "Billing could not be loaded. Please try again shortly." : "This billing workspace is not available to this account."; return; }
+        workspace = result.Value;
+        if (workspace.CanPurchase)
+        {
+            if (ReferralCode?.Length > 32) { quoteError = "Check your referral code."; return; }
+            var quoted = await Api.QuoteAsync(TenantId, token, new(AppStores, ReferralCode), HttpContext.RequestAborted);
+            if (quoted.Succeeded) quote = quoted.Value;
+            else quoteError = quoted.Code == "referral_unavailable" ? "That referral code is unavailable. Check it or remove it to review your total." : "Your quote could not be confirmed. Please try again.";
+        }
+    }
+    private static string Money(long cents) => "$" + (cents / 100m).ToString("0.00", CultureInfo.InvariantCulture);
+    private static string? Period(long? epoch) { try { return epoch is > 0 ? DateTimeOffset.FromUnixTimeSeconds(epoch.Value).ToString("MMMM d, yyyy", CultureInfo.GetCultureInfo("en-US")) : null; } catch (ArgumentOutOfRangeException) { return null; } }
+    private static string Status(string status) => status switch { "paid" => "Paid", "processing" => "Confirming payment", "pending" => "Awaiting payment", "expired" => "Expired", "failed" => "Payment not completed", "open" => "Payment due", "draft" => "Draft", "void" => "Voided", "uncollectible" => "Needs attention", "refunded" => "Refunded", "partially_refunded" => "Partially refunded", _ => "Review billing" };
+}

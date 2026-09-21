@@ -1,0 +1,65 @@
+@page "/rewards/{Slug}"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.Rewards
+@inject RewardsClient Api
+<PageTitle>Your rewards | BarTide</PageTitle>
+<div class="bt-unified rewards-page"><header class="rewards-nav"><a href="@($"/order/{Uri.EscapeDataString(Slug)}")">← Menu and ordering</a><a href="/account">Your account</a></header><main class="rewards-main">
+<p class="bt-one-kicker">COME BACK FOR MORE</p><h1>@(wallet?.Name ?? "Your rewards")</h1>
+@if (RewardsFlow.Notice(Notice) is { } notice) { <p class="rewards-notice" role="status">@notice</p> }
+@if (error is not null) { <p role="alert">@error</p> }
+@if (wallet is not null)
+{
+    @if (wallet.MemberId is null)
+    {
+        <section class="rewards-panel"><h2>Make every visit count.</h2><p>Join this restaurant’s rewards program to track your purchases, visits and earned perks.</p>
+        <form method="post" action="@Action("join")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><label>Your name<input name="name" maxlength="80" required /></label><button type="submit">Join rewards</button></form></section>
+    }
+    else
+    {
+        <section class="rewards-panel"><h2>@wallet.Points reward points</h2><p>Staff verify eligible purchases and visits. Free reward items do not earn another purchase credit.</p></section>
+    }
+    <div class="rewards-grid">@foreach (var rule in wallet.Rules)
+    {
+        var progress = wallet.Progress.FirstOrDefault(p => p.RuleId == rule.Id);
+        <section class="rewards-panel"><h2>@rule.Title</h2><p class="rewards-preserve">@rule.Reward</p>
+        @if (rule.Kind == "points")
+        {
+            <p><strong>@rule.Threshold points</strong></p>
+            @if (wallet.MemberId is not null) { <form method="post" action="@Action("points")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><input type="hidden" name="rule_id" value="@rule.Id" /><button type="submit" disabled="@(wallet.Points < rule.Threshold)">Request this reward</button></form> }
+        }
+        else
+        {
+            <p>@rule.Threshold @(rule.Kind == "monthly-visits" ? "visits in one calendar month" : "paid item purchases") to earn this reward.</p>
+            @if (progress is not null) { <p><strong>@progress.QualifiedUnits recorded</strong> · @(progress.UnitsNeeded == 0 ? "This month’s reward is earned" : $"{progress.UnitsNeeded} more to the next reward")</p> }
+        }
+        </section>
+    }</div>
+    @if (wallet.Rules.Count == 0) { <p>This restaurant is preparing its rewards. Check back soon.</p> }
+    @if (wallet.MemberId is not null)
+    {
+        <section class="rewards-panel"><h2>Your earned rewards</h2><p>Request a reward when you are ready, then show it to staff. Staff confirm when it has been given to you.</p>
+        @if (wallet.Rewards.Count == 0) { <p>Your first reward will appear here.</p> }
+        @foreach (var reward in wallet.Rewards)
+        {
+            <article class="rewards-row"><h3>@reward.Title</h3><p class="rewards-preserve">@reward.Reward</p><strong>@RewardsFlow.State(reward.State)</strong>
+            @if (reward.State == "available") { <form method="post" action="@Action("request")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><input type="hidden" name="reward_id" value="@reward.Id" /><button type="submit">Use this reward</button></form> }
+            </article>
+        }</section>
+    }
+}
+</main></div>
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [SupplyParameterFromQuery(Name="notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private RewardWallet? wallet; private string? error;
+    private string Action(string action) => "/rewards/forms/customer/" + Uri.EscapeDataString(Slug) + "/" + action;
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to see your rewards."; return; }
+        var result = await Api.SendAsync<RewardWallet>(RewardsClient.Customer(Slug), token, null, HttpContext.RequestAborted);
+        if (result.Succeeded) wallet = result.Value;
+        else { HttpContext.Response.StatusCode = result.Uncertain ? 503 : 404; error = "These rewards are unavailable right now. Please try again shortly."; }
+    }
+}

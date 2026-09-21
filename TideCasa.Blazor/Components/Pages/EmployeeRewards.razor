@@ -1,0 +1,20 @@
+@page "/workspace/{TenantId}/my-rewards"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@inject RewardsClient Api
+<PageTitle>Your team rewards | Tide Casa</PageTitle>
+<div class="bt-unified rewards-page"><header class="rewards-nav"><a href="/account">← Your account</a></header><main class="rewards-main"><p class="bt-one-kicker">YOUR TEAM</p><h1>Your rewards</h1>
+@if (wallet is null) { <p role="alert">Your team rewards could not be loaded. Confirm you have active team access and try again.</p> }
+else { <section class="rewards-panel"><h2>@wallet.Name</h2><p class="rewards-balance">@wallet.Points points</p><p>Your manager awards points and records any rewards you receive. These are separate from customer rewards.</p></section><section class="rewards-panel"><h2>Recent activity</h2>@if (wallet.Ledger.Count == 0) { <p>No points have been recorded yet.</p> }@foreach (var entry in wallet.Ledger) { <article class="rewards-row"><strong>@(entry.Delta > 0 ? "+" : "")@entry.Delta points</strong><p>@entry.Reason</p></article> }</section> }
+</main></div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private EmployeeRewardsWallet? wallet;
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) return;
+        var result = await Api.SendAsync<EmployeeRewardsWallet>(RewardsClient.Owner(TenantId) + "/employee", token, null, HttpContext.RequestAborted);
+        wallet = result.Value; if (!result.Succeeded) HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403;
+    }
+}

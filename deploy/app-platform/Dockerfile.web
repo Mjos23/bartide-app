@@ -1,0 +1,23 @@
+# App Platform source_dir must be the reviewed repository root.
+# Final source selection belongs to the release owner, not this Dockerfile.
+ARG DOTNET_SDK_VERSION=10.0.401
+ARG DOTNET_RUNTIME_VERSION=10.0
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_SDK_VERSION}-noble AS build
+ARG RELEASE_SOURCE_REVIEWED=false
+RUN test "$RELEASE_SOURCE_REVIEWED" = "true" || (echo "Use only the final reviewed source with unfinished work excluded." >&2; exit 1)
+WORKDIR /src
+COPY . .
+RUN dotnet restore TideCasa.Blazor/TideCasa.Blazor.csproj --nologo
+RUN dotnet publish TideCasa.Blazor/TideCasa.Blazor.csproj -c Release -o /out --no-restore --nologo /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_RUNTIME_VERSION}-noble AS runtime
+WORKDIR /app
+COPY --from=build /out/ ./
+# No local /keys volume: the integrated application must use durable key storage.
+RUN mkdir -p /tmp/bartide && chown "$APP_UID:$APP_UID" /tmp/bartide && chmod 0700 /tmp/bartide
+ENV ASPNETCORE_URLS=http://+:8080 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_ENVIRONMENT=Production
+EXPOSE 8080
+USER $APP_UID
+ENTRYPOINT ["dotnet", "TideCasa.Blazor.dll"]

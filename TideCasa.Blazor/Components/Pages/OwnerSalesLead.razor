@@ -1,0 +1,70 @@
+@page "/owner/sales/{Id}"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.SalesPipeline
+@inject SalesPipelineClient Api
+<PageTitle>Prospect and follow-up | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/sales-pipeline.css" /></HeadContent>
+<div class="bt-unified rewards-page sales-page"><header class="rewards-nav"><a href="/owner/sales">← Sales pipeline</a><a href="/account">Your account</a></header><main class="rewards-main">
+    @if (SalesPipelineFlow.Notice(Notice) is { } notice) { <p class="rewards-notice" role="status">@notice</p> }
+    @if (error is not null) { <h1>Prospect unavailable.</h1><p role="alert">@error</p> }
+    @if (detail is not null)
+    {
+        var lead = detail.Lead;
+        <p class="bt-one-kicker">ONE CONVERSATION. A CLEAR NEXT STEP.</p><h1>@lead.Business</h1>
+        <p>@lead.Name@if (lead.City.Length > 0) { <span> · @lead.City</span> }</p>
+        <div class="sales-contact">@if (lead.Email.Length > 0) { <p><strong>Email:</strong> @lead.Email</p> }@if (lead.Phone.Length > 0) { <p><strong>Phone:</strong> @lead.Phone</p> }</div>
+        <p class="rewards-note">Original source: @lead.Source · Referral: @(lead.ReferralCode.Length == 0 ? "None recorded" : lead.ReferralCode)</p>
+        <section class="rewards-panel"><h2>Plan the next step.</h2>
+            <p>After you deliver the pitch, choose Pitched and record their response. Add the next action and a date so the conversation stays on your work list.</p>
+            <form method="post" action="@(SalesPipelineFlow.Detail(Id) + "/save")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="requestKey" value="@requestKey" /><input type="hidden" name="version" value="@lead.Version" />
+                <div class="sales-two"><label>Stage<select name="stage">@if (!SalesPipelineFlow.Stages.ContainsKey(lead.Stage)) { <option value="@lead.Stage" selected>@SalesPipelineFlow.Stage(lead.Stage)</option> }@foreach (var item in SalesPipelineFlow.Stages) { <option value="@item.Key" selected="@(lead.Stage == item.Key)">@item.Value</option> }</select></label>
+                <label>Responsible person<input name="assignee" value="@lead.Assignee" maxlength="100" placeholder="Who will follow up?" /></label></div>
+                <label>Next action<input name="nextAction" value="@lead.NextAction" maxlength="240" placeholder="For example, agree a demo time" /></label>
+                <label>Follow-up date<input name="followUpDate" type="date" value="@lead.FollowUpDate" /></label>
+                <label>Private conversation notes<textarea name="privateNote" rows="5" maxlength="4000">@lead.PrivateNote</textarea></label>
+                <label>Related client workspace<select name="workspaceId"><option value="">No workspace linked yet</option>@foreach (var workspace in detail.Workspaces) { <option value="@workspace.Id" selected="@(workspace.Id == lead.WorkspaceId)">@workspace.Name</option> }</select></label>
+                @if (detail.WorkspaceChoicesLimited) { <p class="rewards-note">Showing the first 200 workspaces and your current linked workspace.</p> }
+                <p class="rewards-note">Saving records your follow-up. It does not send a message, book an appointment, charge a card or grant workspace access. “Agreement recorded” is your sales note; verify payment in billing.</p>
+                <button type="submit">Save next step</button>
+            </form>
+        </section>
+        @if (lead.DemoRequestCount > 0)
+        {
+            <section class="rewards-panel"><h2>Demo requests</h2><p class="rewards-note">@lead.DemoRequestCount received. Showing the latest @detail.DemoRequests.Count. Confirm a time with the person before marking a demo agreed.</p>
+                @foreach (var demo in detail.DemoRequests)
+                {
+                    <article class="sales-history-item"><h3>@demo.PreferredTimes · @demo.TimeZone</h3><p class="rewards-note">@SalesPipelineFlow.When(demo.CreatedAt) · Request status: @DemoStatus(demo.Status)</p>
+                        <p><strong>Demo scheduling texts:</strong> @(demo.CanText ? "Allowed for this request at " + demo.Phone : "Not opted in for this request. Use email.")</p>
+                        <p class="sales-preserve">@demo.Goals</p>
+                    </article>
+                }
+                <a href="/owner/demo-requests">Open demo inbox →</a>
+            </section>
+        }
+        <section class="rewards-panel"><h2>Conversation history</h2><p class="rewards-note">Latest @detail.History.Count of @detail.HistoryCount entries.</p>
+            @if (detail.History.Count == 0) { <p>This imported record has no new activity yet.</p> }
+            @foreach (var item in detail.History) { <article class="sales-history-item"><p class="rewards-note">@SalesPipelineFlow.When(item.CreatedAt)</p><p>@item.Summary</p>@if (item.PrivateNote.Length > 0) { <p class="sales-preserve">@item.PrivateNote</p> }</article> }
+        </section>
+    }
+</main></div>
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private SalesLeadDetail? detail;
+    private string? error;
+    private readonly string requestKey = Guid.NewGuid().ToString();
+    private static string DemoStatus(string status) => status switch { "requested" => "New request", "contacted" => "Contacted", "scheduled" => "Time agreed", "closed" => "Closed", _ => status };
+    protected override async Task OnInitializedAsync()
+    {
+        if ((HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.User.IsPlatformOwner != true) { HttpContext.Response.StatusCode = 403; error = "This prospect requires Tide Casa owner access."; return; }
+        if (Id.Length > 200 || Id.Any(char.IsControl)) { error = "That prospect could not be found."; return; }
+        if (HttpContext.Items[AuthFlow.TokenItem] is string token)
+        {
+            var result = await Api.SendAsync<SalesLeadDetail>("/" + Uri.EscapeDataString(Id), HttpMethod.Get, null, token, HttpContext.RequestAborted);
+            if (result.Succeeded && result.Value is not null) detail = result.Value;
+            else { error = (int)result.Status == 404 ? "That prospect could not be found." : "The prospect could not be loaded. Please refresh shortly."; if ((int)result.Status >= 500) HttpContext.Response.StatusCode = 503; }
+        }
+    }
+}

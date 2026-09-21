@@ -1,0 +1,28 @@
+@page "/"
+@attribute [ExcludeFromInteractiveRouting]
+@namespace TideCasa.Blazor.Components.Pages
+@using TideCasa.Blazor.Components.Marketing
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsBarTide ? "BarTide — Your bar. Their kind of night." : "Tide Casa — Your business. Right at home.")</PageTitle>
+
+@if (IsBarTide)
+{
+    <BarTideHome />
+}
+else
+{
+    <TideCasaHome />
+}
+
+@code {
+    private bool IsBarTide
+    {
+        get
+        {
+            var uri = new Uri(Navigation.Uri);
+            return uri.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase)
+                || uri.AbsolutePath.TrimEnd('/').Equals("/restaurant", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}

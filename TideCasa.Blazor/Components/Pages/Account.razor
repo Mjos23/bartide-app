@@ -1,0 +1,79 @@
+@page "/account"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+<PageTitle>Your account | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/account-workspaces.css" /></HeadContent>
+<AuthFrame Title="Your account." Description="Your business workspaces, together.">
+    @if (account is null)
+    {
+        <p role="alert">We couldn’t confirm your account right now. Please try again shortly.</p>
+    }
+    else
+    {
+        <h2>@account.User.DisplayName</h2>
+        <p>@account.User.Email</p>
+        <p><a class="bt-one-link" href="/account/referrals">Sales engineer profile and referrals →</a></p>
+        @if (account.User.IsPlatformOwner)
+        {
+            <section class="account-platform"><h3>Your Tide Casa business</h3><p>Find the next sales follow-up, review demo requests and prepare client launches.</p>
+                <nav aria-label="Tide Casa owner tools"><a class="bt-one-link" href="/owner/sales">Sales pipeline →</a><a class="bt-one-link" href="/owner/demo-requests">Demo requests →</a><a class="bt-one-link" href="/owner/launch-review">Build review and launch approval →</a></nav>
+            </section>
+        }
+        <h3>Your workspaces</h3>
+        @if (account.Workspaces.Count == 0)
+        {
+            <p>No business workspace is connected to this account yet.</p>
+            <p><a class="bt-one-link" href="/purchase/restaurant">Get started with BarTide →</a></p>
+            <p><a class="bt-one-link" href="/book-a-demo">Book a demo</a></p>
+        }
+        else
+        {
+            <ul class="account-workspaces">
+                @foreach (var workspace in account.Workspaces)
+                {
+                    <li class="account-workspace"><h4>@workspace.Name</h4><p>@workspace.Status</p>
+                        @if (!string.IsNullOrWhiteSpace(workspace.StaffRole)) { <p>Team role: @workspace.StaffRole</p> }
+                        <div class="account-tool-groups">
+                            @if (workspace.CanPrepare || workspace.CanEdit || workspace.IsOwner)
+                            {
+                                <section><h5>Setup &amp; care</h5>
+                                    @if (workspace.CanPrepare) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/menu")">Menu and business details →</a></p><p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/media")">Files, photos and videos →</a></p> }
+                                    @if (workspace.CanEdit) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/ordering")">Table QR codes and order settings →</a></p> }
+                                    @if (workspace.CanEdit && workspace.IsOwner) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/payments")">Customer card payments →</a></p><p class="account-tool-note">Money your customers pay your business.</p> }
+                                    @if (workspace.IsOwner) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/billing")">Tide Casa plan and maintenance →</a></p><p class="account-tool-note">Your app’s setup and monthly service plan.</p> }
+                                </section>
+                            }
+                            @if (workspace.CanEdit || workspace.StaffMemberId is not null || workspace.StaffRole is "kitchen" or "driver")
+                            {
+                                <section><h5>Daily work</h5>
+                                    @if (workspace.CanEdit || workspace.StaffRole is "kitchen" or "driver") { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/operations")">Orders and fulfillment →</a></p> }
+                                    @if (workspace.CanEdit || workspace.StaffMemberId is not null) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/team")">Team, schedule and training →</a></p> }
+                                    @if (workspace.StaffMemberId is not null) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/my-rewards")">Your team rewards →</a></p> }
+                                </section>
+                            }
+                            @if (workspace.CanEdit || workspace.IsOwner)
+                            {
+                                <section><h5>Bring people back</h5>
+                                    @if (workspace.CanEdit) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/rewards")">Customer and employee rewards →</a></p><p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/events")">Events and reservations →</a></p> }
+                                    @if (workspace.IsOwner) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/posts")">Posts and phone updates →</a></p> }
+                                </section>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+            <p>Choose a workspace tool to get started.</p>
+        }
+        <form method="post" action="/auth/session/signout" data-enhance="false"><AntiforgeryToken /><button class="bt-one-button" type="submit">Sign out</button></form>
+    }
+</AuthFrame>
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private AccountOverview? account;
+    protected override void OnInitialized()
+    {
+        // Populated only by the fresh API validation in the cookie event for this HTTP request.
+        account = HttpContext.Items[AuthFlow.AccountItem] as AccountOverview;
+        if (account is null) HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+    }
+}

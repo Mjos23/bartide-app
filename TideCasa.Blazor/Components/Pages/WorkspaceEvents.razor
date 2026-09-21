@@ -1,0 +1,115 @@
+@page "/workspace/{TenantId}/events"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.Events
+@inject EventsClient Api
+<PageTitle>Events and guest lists | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/events.css" /></HeadContent>
+<div class="bt-unified restaurant-ordering tide-events">
+    <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Live events</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">BRING PEOPLE TOGETHER</p><h1>Events and guest lists</h1>
+        @if (EventsFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error</p> }
+        @if (workspace is not null)
+        {
+            <p>Plan a special night at @workspace.Name. Each signed-in guest reserves one place; you can see reservations and check guests in here.</p>
+            <a class="bt-one-link" href="@EventsFlow.Public(workspace.Slug)">View your public events →</a>
+            <section class="ordering-panel">
+                <h2>Create an event</h2>
+                <form action="@SavePath" method="post" data-enhance="false">
+                    <AntiforgeryToken /><input name="event_id" type="hidden" value="" /><input name="version" type="hidden" value="0" /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" />
+                    <label class="desk-field">Event name<input name="title" maxlength="160" required placeholder="For example, Thursday live jazz" /></label>
+                    <label class="desk-field">What guests should know<textarea name="details" rows="4" maxlength="4000" placeholder="Tell guests what’s happening and anything they should bring."></textarea></label>
+                    <label class="desk-field">Location<input name="location" maxlength="300" required placeholder="Venue name and address" /></label>
+                    <div class="events-fields"><label class="desk-field">Starts<input name="starts_at" type="datetime-local" required /></label><label class="desk-field">Ends<input name="ends_at" type="datetime-local" required /></label></div>
+                    <div class="events-fields"><label class="desk-field">Time zone<select name="time_zone">@foreach (var zone in EventsFlow.TimeZones) { <option value="@zone">@zone.Replace('_', ' ')</option> }</select></label><label class="desk-field">Guest capacity<input name="capacity" type="number" value="50" min="1" max="500" required /></label></div>
+                    <label class="events-check"><input name="published" value="true" type="checkbox" /><span>Publish now and accept RSVPs</span></label>
+                    <button class="bt-one-button" type="submit">Create event</button>
+                </form>
+            </section>
+            <section aria-labelledby="events-list-title">
+                <h2 id="events-list-title">Your events</h2>
+                @if (workspace.Events.Count == 0) { <p>No events yet. Start with something your regulars will love.</p> }
+                @foreach (var item in workspace.Events)
+                {
+                    <article class="ordering-panel events-owner-card">
+                        <div class="events-heading"><div><h3>@item.Title</h3><p>@EventsFlow.When(item)</p></div><span class="events-state">@State(item.State)</span></div>
+                        <p>@item.Reserved of @item.Capacity places reserved · @item.Location</p>
+                        <a class="bt-one-link" href="@(EventsFlow.Owner(TenantId) + "?event=" + item.Id + "#guest-list")">View guest list →</a>
+                        @if (item.State != "cancelled" && DateTimeOffset.Parse(item.StartsAt) > DateTimeOffset.UtcNow)
+                        {
+                            <details class="events-edit"><summary>Edit event</summary>
+                                <form action="@SavePath" method="post" data-enhance="false">
+                                    <AntiforgeryToken /><input name="event_id" type="hidden" value="@item.Id" /><input name="version" type="hidden" value="@item.Version" /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" />
+                                    <label class="desk-field">Event name<input name="title" value="@item.Title" maxlength="160" required /></label>
+                                    <label class="desk-field">What guests should know<textarea name="details" rows="4" maxlength="4000">@item.Details</textarea></label>
+                                    <label class="desk-field">Location<input name="location" value="@item.Location" maxlength="300" required /></label>
+                                    <div class="events-fields"><label class="desk-field">Starts<input name="starts_at" type="datetime-local" value="@EventsFlow.Local(item.StartsAt, item.TimeZone)" required /></label><label class="desk-field">Ends<input name="ends_at" type="datetime-local" value="@EventsFlow.Local(item.EndsAt, item.TimeZone)" required /></label></div>
+                                    <div class="events-fields"><label class="desk-field">Time zone<select name="time_zone">@foreach (var zone in EventsFlow.TimeZones.Append(item.TimeZone).Distinct()) { <option value="@zone" selected="@(zone == item.TimeZone)">@zone.Replace('_', ' ')</option> }</select></label><label class="desk-field">Guest capacity<input name="capacity" type="number" value="@item.Capacity" min="1" max="500" required /></label></div>
+                                    <label class="events-check"><input name="published" value="true" type="checkbox" checked="@(item.State == "published")" /><span>Published and accepting RSVPs</span></label>
+                                    <p class="ordering-note">Guests see updated details here. No email notification is sent. Contact your guests directly if the time or location changes.</p>
+                                    <button class="bt-one-button" type="submit">Save event</button>
+                                </form>
+                            </details>
+                        }
+                        @if (item.State != "cancelled")
+                        {
+                            <details class="events-edit"><summary>Cancel event</summary>
+                                <form action="@ActionPath(item.Id, "cancel")" method="post" data-enhance="false">
+                                    <AntiforgeryToken /><input name="version" type="hidden" value="@item.Version" /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" />
+                                    <p>Cancellation closes RSVPs and removes the event from the public list. Existing reservations stay in your records. Contact guests directly to let them know.</p>
+                                    <label class="events-check"><input name="confirm_cancel" value="true" type="checkbox" required /><span>Cancel @item.Title</span></label><button class="ordering-secondary" type="submit">Cancel event</button>
+                                </form>
+                            </details>
+                        }
+                    </article>
+                }
+            </section>
+            @if (guestList is not null)
+            {
+                <section class="ordering-panel" id="guest-list" aria-labelledby="guest-list-title"><h2 id="guest-list-title">Guest list · @guestList.Event.Title</h2>
+                    <p>Private to the business owner. Check-in opens four hours before the event starts.</p>
+                    @if (guestList.Guests.Count == 0) { <p>No reservations yet.</p> }
+                    @foreach (var guest in guestList.Guests)
+                    {
+                        <article class="events-guest"><div><strong>@guest.DisplayName</strong><p>@guest.Email</p><span>@State(guest.State)</span></div>
+                            @if (guest.State == "confirmed" && EventsFlow.CheckInOpen(guestList.Event))
+                            {
+                                <form action="@ActionPath(guestList.Event.Id, "check-in")" method="post" data-enhance="false">
+                                    <AntiforgeryToken /><input name="version" type="hidden" value="@guest.Version" /><input name="user_id" type="hidden" value="@guest.UserId" /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" />
+                                    <label class="events-check"><input name="confirm_present" value="true" type="checkbox" required /><span>Guest is here</span></label><button class="ordering-secondary" type="submit">Check in</button>
+                                </form>
+                            }
+                        </article>
+                    }
+                </section>
+            }
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [SupplyParameterFromQuery(Name = "event")] public string? SelectedEvent { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private TideCasa.Contracts.RestaurantEvents? workspace;
+    private EventGuestList? guestList;
+    private string? error;
+    private string SavePath => "/event-management/" + Uri.EscapeDataString(TenantId) + "/save";
+    private string ActionPath(string eventId, string action) => "/event-management/" + Uri.EscapeDataString(TenantId) + "/" + Uri.EscapeDataString(eventId) + "/" + action;
+    private static string State(string state) => state switch { "draft" => "Draft", "published" => "Published", "cancelled" => "Cancelled", "confirmed" => "Reserved", "checked_in" => "Checked in", _ => "Unavailable" };
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to manage events."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.ListAsync(TenantId, true, token, HttpContext.RequestAborted);
+        if (!result.Succeeded || result.Value is null) { error = result.Uncertain ? "Events could not be loaded. Please try again shortly." : "Events are not available to this account."; HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; return; }
+        workspace = result.Value;
+        if (!string.IsNullOrEmpty(SelectedEvent))
+        {
+            var guests = await Api.GuestsAsync(TenantId, SelectedEvent, token, HttpContext.RequestAborted);
+            if (guests.Succeeded) guestList = guests.Value;
+            else { error = "That guest list could not be loaded."; HttpContext.Response.StatusCode = guests.Uncertain ? 503 : 404; }
+        }
+    }
+}

@@ -1,0 +1,18 @@
+@namespace TideCasa.Blazor.Components.Marketing
+<div class="tc-install tc-install--site" data-install-control>
+    <button type="button" class="tc-install-trigger" data-install-open aria-haspopup="dialog" aria-controls="home-screen-dialog">
+        <svg width="16" height="18" viewBox="0 0 16 20" fill="none" aria-hidden="true"><rect x="3" y="1" width="10" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 15h4M8 5v6M5 8h6" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span>Add to home screen</span>
+    </button>
+</div>
+<dialog id="home-screen-dialog" class="tc-install-dialog" aria-labelledby="home-screen-title">
+    <button type="button" class="tc-install-close" data-install-close aria-label="Close home screen instructions">×</button>
+    <img class="tc-install-logo" src="@(IsBarTide ? "/app-icons/icon-180.png" : "/tide-casa/app-icons/icon-180.png")" alt="" width="64" height="64" />
+    <h2 id="home-screen-title">Keep @(IsBarTide ? "BarTide" : "Tide Casa") one tap away.</h2>
+    <p>Add our app icon to your phone or computer. It opens the website in its own window on supported devices.</p>
+    <button type="button" class="tc-install-primary" data-install-prompt hidden>Add to home screen</button>
+    <ol class="tc-install-instructions"><li><strong>iPhone or iPad</strong><span>Open this page in Safari. Tap Share, then Add to Home Screen. If shown, turn on Open as Web App, then tap Add.</span></li><li><strong>Android</strong><span>Open this page in Chrome. Tap the browser menu, then Add to home screen or Install app.</span></li><li><strong>Computer</strong><span>Choose Install app in your browser’s address bar or menu. In Safari on Mac, choose File → Add to Dock.</span></li></ol>
+    <p class="tc-install-note">An internet connection is needed. Available options depend on your device and browser.</p>
+    <p class="tc-install-note" data-install-message role="status"></p>
+</dialog>
+@code { [Parameter] public bool IsBarTide { get; set; } }

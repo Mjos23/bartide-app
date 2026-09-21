@@ -1,0 +1,83 @@
+@page "/workspace/{TenantId}/media"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.Media
+@inject MediaClient Api
+<PageTitle>Photos and files | Tide Casa</PageTitle>
+<div class="bt-unified media-workspace">
+    <header class="media-nav"><a href="/account">← Your account</a><span>BarTide · Photos and files</span></header>
+    <main class="media-main">
+        <p class="bt-one-kicker">YOUR RESTAURANT</p><h1>@(workspace?.Name ?? "Photos and files")</h1>
+        @if (error is not null)
+        {
+            <p class="media-notice" role="alert">@error <a href="@CurrentPath">Try again</a></p>
+        }
+        else if (workspace is not null)
+        {
+            @if (MediaFlow.Notice(Notice) is { } notice) { <p class="media-notice" role="status">@notice</p> }
+            <p>Keep your menu photos, original menus and employee training videos together.</p>
+            <p class="media-note">Original menus and training videos stay private. Photos appear on your active menu when you add them to an item. Your team can watch a training video when it belongs to a published course assigned to them.</p>
+            @if (!workspace.StorageReady) { <p class="media-notice" role="status">Private uploads are being connected. Your saved file list is available below.</p> }
+            @foreach (var section in Sections)
+            {
+                <section class="media-panel" aria-labelledby="@("media-" + section.Kind)">
+                    <h2 id="@("media-" + section.Kind)">@section.Title</h2><p>@section.Help</p>
+                    <form method="post" enctype="multipart/form-data" action="@($"/private-media/manage/{Uri.EscapeDataString(TenantId)}/{section.Kind}/upload")" data-enhance="false" class="media-upload">
+                        <AntiforgeryToken /><input type="hidden" name="requestId" value="@section.RequestId" />
+                        <label class="desk-field">Choose a file<input type="file" name="file" accept="@section.Accept" required disabled="@(!workspace.StorageReady)" /></label>
+                        <button type="submit" class="bt-one-button" disabled="@(!workspace.StorageReady)">Upload @section.Label</button>
+                    </form>
+                    <div class="media-files">
+                        @foreach (var file in workspace.Files.Where(file => file.Kind == section.Kind))
+                        {
+                            <article class="media-file">
+                                <h3>@file.Name</h3><p>@Size(file.ByteSize) · @Status(file.Status)</p>
+                                @if (file.Status == "ready")
+                                {
+                                    @if (file.Kind == "photo") { <img class="media-photo" src="@FilePath(file)" alt="Uploaded menu photo" loading="lazy" /> }
+                                    @if (file.Kind == "video") { <video class="media-video" controls preload="none" src="@FilePath(file)">Your browser does not support this video. Open the file below.</video> }
+                                    <p><a href="@FilePath(file)" target="_blank" rel="noopener">Open @section.Label</a></p>
+                                    @if (file.Kind == "video") { <p class="media-note">Choose this video when adding or editing a training lesson.</p> }
+                                }
+                                @if (file.Referenced) { <p class="media-note">Used by a menu item or lesson. Remove that connection before deleting this file.</p> }
+                                else
+                                {
+                                    <form method="post" action="@($"/private-media/manage/{Uri.EscapeDataString(TenantId)}/{file.Kind}/{file.Id}/delete")" data-enhance="false">
+                                        <AntiforgeryToken /><button type="submit" class="media-remove" disabled="@(!workspace.StorageReady)">Remove file</button>
+                                    </form>
+                                }
+                            </article>
+                        }
+                        @if (!workspace.Files.Any(file => file.Kind == section.Kind)) { <p class="media-note">No @section.Empty yet.</p> }
+                    </div>
+                </section>
+            }
+            <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/menu")">Edit your menu →</a></p>
+            <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/team")">Go to your team and training →</a></p>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private MediaWorkspace? workspace;
+    private string? error;
+    private string CurrentPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/media";
+    private sealed record Section(string Kind, string Title, string Help, string Accept, string Label, string Empty, string RequestId);
+    private readonly Section[] Sections = [
+        new("photo", "Menu photos", "JPG images up to 2 MB and 1600 × 1600 pixels. Photos are optimized when uploaded.", ".jpg,.jpeg,image/jpeg", "photo", "photos", Guid.NewGuid().ToString("D")),
+        new("menu", "Original menus", "PDF or JPG files up to 10 MB. JPG images must be 1600 × 1600 pixels or smaller. Keep up to 10 original menus here.", ".pdf,.jpg,.jpeg,application/pdf,image/jpeg", "menu", "menus", Guid.NewGuid().ToString("D")),
+        new("video", "Training videos", "MP4 videos up to 50 MB. Use H.264 video with AAC audio for broad device support.", ".mp4,video/mp4", "video", "videos", Guid.NewGuid().ToString("D"))];
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open your files."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.WorkspaceAsync(TenantId, token, HttpContext.RequestAborted);
+        if (result.Succeeded && result.Value is { } value) { workspace = value; return; }
+        HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403;
+        error = result.Uncertain ? "Your files could not be loaded. Please try again shortly." : "This file workspace is not available to this account.";
+    }
+    private string FilePath(MediaFile file) => "/private-media/" + Uri.EscapeDataString(TenantId) + "/" + file.Kind + "/" + file.Id;
+    private static string Size(long bytes) => bytes < 1024 * 1024 ? (bytes / 1024m).ToString("0.#") + " KB" : (bytes / (1024m * 1024)).ToString("0.#") + " MB";
+    private static string Status(string value) => value switch { "ready" => "Ready", "deleting" => "Removal needs another attempt", _ => "Finishing or awaiting cleanup" };
+}

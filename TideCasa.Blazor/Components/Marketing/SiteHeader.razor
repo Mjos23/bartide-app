@@ -1,0 +1,21 @@
+@namespace TideCasa.Blazor.Components.Marketing
+
+<header class="bt-one-nav">
+    <a href="@(IsBarTide ? "/restaurant" : "/")" aria-label="@(IsBarTide ? "BarTide home" : "Tide Casa home")">
+        <img src="@(IsBarTide ? "/assets/bartide-logo.png" : "/tide-casa/assets/tide-casa-logo.png")" alt="@(IsBarTide ? "BarTide" : "Tide Casa")" width="170" height="57" />
+    </a>
+    <nav aria-label="Main navigation">
+        @if (!IsBarTide)
+        {
+            <a class="bartide-header-link" href="/restaurant" aria-label="Explore BarTide for bars and restaurants"><img src="/assets/bartide-logo.png" width="170" height="57" alt="BarTide" /></a>
+        }
+        <a class="bt-nav-demo" href="/book-a-demo">Book a demo</a>
+        <a class="bt-nav-login" href="/account">Log in</a>
+        <a class="bt-nav-careers" href="/careers">Careers</a>
+        <a class="bt-one-button small" href="@(IsBarTide ? "/purchase/restaurant" : "/purchase/business")">Purchase now</a>
+    </nav>
+</header>
+
+@code {
+    [Parameter] public bool IsBarTide { get; set; } = true;
+}

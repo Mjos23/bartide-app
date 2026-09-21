@@ -1,0 +1,89 @@
+{
+  "formatVersion": 1,
+  "migrations": [
+    {
+      "version": 1,
+      "resourceName": "TideCasa.Api.Migrations.0001_drizzle_0000_optimal_shaman.sql",
+      "source": "drizzle/0000_optimal_shaman.sql",
+      "sha256": "dd4118b9acb228bd0d6891e2366980662042fce23b6930094a80e3e2ed047375"
+    },
+    {
+      "version": 2,
+      "resourceName": "TideCasa.Api.Migrations.0002_drizzle_0001_wooden_wendell_rand.sql",
+      "source": "drizzle/0001_wooden_wendell_rand.sql",
+      "sha256": "334b1a3b39706797f57fc73092b403f1081227b65a3e1552c3217694369f3fbf"
+    },
+    {
+      "version": 3,
+      "resourceName": "TideCasa.Api.Migrations.0003_drizzle_0002_closed_rumiko_fujikawa.sql",
+      "source": "drizzle/0002_closed_rumiko_fujikawa.sql",
+      "sha256": "f6c8985722489afbe4957d95a50fa5f622bdae3cea4e9e9a6b9e79fc8af79e09"
+    },
+    {
+      "version": 4,
+      "resourceName": "TideCasa.Api.Migrations.0004_drizzle_0003_jittery_epoch.sql",
+      "source": "drizzle/0003_jittery_epoch.sql",
+      "sha256": "b84a03cf24c74960e75c5478907af9ebb4f642570f8cab6d60179412bdf9d323"
+    },
+    {
+      "version": 5,
+      "resourceName": "TideCasa.Api.Migrations.0005_drizzle_0004_even_sally_floyd.sql",
+      "source": "drizzle/0004_even_sally_floyd.sql",
+      "sha256": "f44b7f616a094784a30e4b8ed73de923309008e5e79849fecacb034336967e20"
+    },
+    {
+      "version": 6,
+      "resourceName": "TideCasa.Api.Migrations.0006_drizzle_0005_acoustic_ego.sql",
+      "source": "drizzle/0005_acoustic_ego.sql",
+      "sha256": "f05123c0476db1d755450bbf5a173db377f5d233a2683eca9bdf58e515f7cd2c"
+    },
+    {
+      "version": 7,
+      "resourceName": "TideCasa.Api.Migrations.0007_drizzle_0006_perfect_union_jack.sql",
+      "source": "drizzle/0006_perfect_union_jack.sql",
+      "sha256": "04c008c230acc6e82109f75457ac00404689cff06d249191b3809a7b9d29239a"
+    },
+    {
+      "version": 8,
+      "resourceName": "TideCasa.Api.Migrations.0008_drizzle_0007_spicy_vulcan.sql",
+      "source": "drizzle/0007_spicy_vulcan.sql",
+      "sha256": "9d9aaccb9482bf9a0c5bb3501e40d46af3f9c62641c16df09ae6dcdec85c7515"
+    },
+    {
+      "version": 9,
+      "resourceName": "TideCasa.Api.Migrations.0009_drizzle_0008_yielding_elektra.sql",
+      "source": "drizzle/0008_yielding_elektra.sql",
+      "sha256": "0ca8c4f7b0ea46a9296c42eeb21e6d1d81005a6fff14464e0138235cfdc1be78"
+    },
+    {
+      "version": 10,
+      "resourceName": "TideCasa.Api.Migrations.0010_independent_0001_auth.sql",
+      "source": "db/independent/0001_auth.sql",
+      "sha256": "5965a2f52a067a9027d88da2af873f4aa5b13c627e09366f1776da59327e419c"
+    },
+    {
+      "version": 11,
+      "resourceName": "TideCasa.Api.Migrations.0011_independent_0002_stripe.sql",
+      "source": "db/independent/0002_stripe.sql",
+      "sha256": "ea83927c6e2a136eb0e5220cce77381433c546a8e541b2c4bf6a3ccf0b2d8ea2"
+    },
+    {
+      "version": 12,
+      "resourceName": "TideCasa.Api.Migrations.0012_independent_0003_contact.sql",
+      "source": "db/independent/0003_contact.sql",
+      "sha256": "b051ab8b92a45a03bdda8679dd79781c5d028252ca0d90d7948948ca3efb92c7"
+    },
+    {
+      "version": 13,
+      "resourceName": "TideCasa.Api.Migrations.0013_independent_0004_maintenance.sql",
+      "source": "db/independent/0004_maintenance.sql",
+      "sha256": "392f645a5a685d62efc3847a34a7868580690caccaca610b6e3bbeb8e298b62c"
+    },
+    {
+      "version": 14,
+      "resourceName": "TideCasa.Api.Migrations.0014_independent_0005_referrals.sql",
+      "source": "db/independent/0005_referrals.sql",
+      "sha256": "a6cd1e757ff26a6a35e0b05eb4e111295fccdc0d7d762b32bfe3734a0b17733b"
+    }
+  ]
+}

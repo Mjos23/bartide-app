@@ -1,0 +1,102 @@
+@page "/workspace/{TenantId}/ordering"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.Ordering
+@inject RestaurantOrderingClient Api
+<PageTitle>Tables and orders | Tide Casa</PageTitle>
+<div class="bt-unified restaurant-ordering">
+    <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Tables and orders</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">YOUR RESTAURANT</p><h1>@(workspace?.Name ?? "Tables and orders")</h1>
+        @if (error is not null)
+        {
+            <div class="ordering-notice" role="alert"><p>@error</p><a href="@CurrentPath">Try loading again</a></div>
+        }
+        else if (workspace is not null)
+        {
+            @if (RestaurantOrderingFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+            <p>Give each table a QR code. Guests can scan, choose their food, add an optional tip and send their order to your team.</p>
+            <p class="ordering-note">Orders placed with “Pay staff” are unpaid and await your team’s acceptance. Phone payments will become available after your business’s Stripe connection is ready.</p>
+            <p><a class="bt-one-link" href="@($"/order/{Uri.EscapeDataString(workspace.Slug)}")">Open your ordering page →</a></p>
+            <section class="ordering-panel" aria-labelledby="tables-title">
+                <h2 id="tables-title">Your tables</h2>
+                @if (workspace.CanManage)
+                {
+                    <form method="post" action="@($"/ordering/manage/{Uri.EscapeDataString(TenantId)}/tables")" data-enhance="false" class="ordering-table-form">
+                        <AntiforgeryToken /><input type="hidden" name="version" value="@workspace.ConfigVersion" />
+                        <label class="desk-field">Table name<input type="text" name="label" required maxlength="40" placeholder="For example, Patio 3" /></label>
+                        <button class="bt-one-button" type="submit" disabled="@(workspace.Tables.Count >= 100)">Create table QR</button>
+                    </form>
+                    @if (workspace.Tables.Count >= 100) { <p>You have reached the 100-table limit.</p> }
+                }
+                @if (workspace.Tables.Count == 0) { <p>No tables have been added yet.</p> }
+                <div class="ordering-tables">
+                    @foreach (var table in workspace.Tables)
+                    {
+                        <article class="ordering-table-card">
+                            <h3>@table.Label</h3><p>@(table.Enabled ? "Ready for guests" : "QR link disabled")</p>
+                            @if (table.Enabled)
+                            {
+                                <img class="ordering-qr" src="@QrPath(table)" width="200" height="200" alt="@($"Scan to order at {table.Label}")" />
+                                <p><a href="@OrderPath(table)">Open this table’s order page</a></p>
+                                <p><a href="@QrPath(table)" target="_blank" rel="noopener">Open QR image to save or print</a></p>
+                            }
+                            @if (workspace.CanManage)
+                            {
+                                <form method="post" action="@($"/ordering/manage/{Uri.EscapeDataString(TenantId)}/tables/{Uri.EscapeDataString(table.Id)}")" data-enhance="false">
+                                    <AntiforgeryToken /><input type="hidden" name="version" value="@workspace.ConfigVersion" />
+                                    <input type="hidden" name="enabled" value="@(!table.Enabled ? "true" : "false")" />
+                                    <button class="ordering-secondary" type="submit">@(table.Enabled ? "Disable QR link" : "Enable QR link")</button>
+                                </form>
+                            }
+                        </article>
+                    }
+                </div>
+                <p class="ordering-note">A QR link identifies the table. It does not verify that a guest is physically at the venue. Disabling a table prevents new orders through its link.</p>
+            </section>
+            <section class="ordering-panel" aria-labelledby="orders-title">
+                <div class="ordering-section-heading"><h2 id="orders-title">Recent orders</h2><a href="@CurrentPath">Refresh</a></div>
+                @if (workspace.Orders.Count == 0) { <p>No orders have been received yet.</p> }
+                <div class="ordering-orders">
+                    @foreach (var order in workspace.Orders)
+                    {
+                        <article class="ordering-recent-order">
+                            <div class="ordering-section-heading"><h3>Order @order.Receipt.Number</h3><strong>@Money(order.Receipt.Quote.TotalCents, order.Receipt.Quote.Currency)</strong></div>
+                            <p>@Fulfillment(order.Receipt.Quote) · @Payment(order.Receipt.Quote.PaymentMethod)</p>
+                            <p>Status: <strong>@order.Receipt.Status</strong> · Payment: <strong>@order.Receipt.PaymentStatus</strong></p>
+                            <p>@order.CustomerName @if (!string.IsNullOrWhiteSpace(order.Phone)) { <span>· <a href="@("tel:" + Uri.EscapeDataString(order.Phone))">@order.Phone</a></span> }</p>
+                            @if (order.Receipt.Quote.Fulfillment == "delivery") { <p>@order.Address @order.Zip</p> }
+                            <ul>@foreach (var line in order.Receipt.Quote.Lines) { <li>@line.Quantity × @line.Name</li> }</ul>
+                            <p>Tip: @Money(order.Receipt.Quote.TipCents, order.Receipt.Quote.Currency)</p>
+                            @if (!string.IsNullOrWhiteSpace(order.Note)) { <p>Guest note: @order.Note</p> }
+                            <p class="ordering-note">Received @order.Receipt.CreatedAt</p>
+                        </article>
+                    }
+                </div>
+                <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/operations")">Manage orders and deliveries →</a></p>
+            </section>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private TideCasa.Contracts.RestaurantOrderingWorkspace? workspace;
+    private string? error;
+    private string CurrentPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/ordering";
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open this workspace."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.GetWorkspaceAsync(TenantId, token, HttpContext.RequestAborted);
+        if (result.Succeeded && result.Value is { CanManage: true } value) { workspace = value; return; }
+        HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403;
+        error = result.Uncertain ? "Your workspace could not be loaded. Please try again shortly."
+            : "This workspace is not available to this account, or restaurant ordering has not been enabled for it yet.";
+    }
+    private string QrPath(RestaurantTable table) => "/ordering/qr/" + Uri.EscapeDataString(workspace!.Slug) + "/" + Uri.EscapeDataString(table.Token);
+    private string OrderPath(RestaurantTable table) => "/order/" + Uri.EscapeDataString(workspace!.Slug) + "?table=" + Uri.EscapeDataString(table.Token);
+    private static string Money(int cents, string currency) => (cents / 100m).ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US")) + (currency.Equals("usd", StringComparison.OrdinalIgnoreCase) ? "" : " " + currency.ToUpperInvariant());
+    private static string Fulfillment(RestaurantQuote quote) => quote.Fulfillment switch { "dine-in" => "Dine in · " + quote.TableLabel, "delivery" => "Delivery", _ => "Pickup" };
+    private static string Payment(string method) => method == "staff" ? "Pay staff" : "Pay on phone";
+}

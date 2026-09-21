@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex, follow">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#063b3e">
+  <title>BarTide Demo Bar &amp; Kitchen | Menu</title>
+  <meta name="description" content="A fictional Gulf Coast bar and restaurant menu demonstrating BarTide.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="app-icons/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" href="styles.css">
+  <script src="data/menu.js" defer></script><script src="menu-model.js" defer></script><script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#menu">Skip to menu</a>
+  <header class="top"><a href="/" aria-label="BarTide home"><img src="assets/bartide-logo.png" alt="BarTide" width="138" height="46"></a><span>BarTide MENU APP DEMO</span></header>
+  <main>
+
+    <section class="hero" aria-labelledby="venue-name">
+      <div class="welcome"><p id="venue-area" class="eyebrow"></p><h1 id="venue-name">Your menu is loading.</h1><p id="venue-hours" class="venue-tagline"></p>
+      <p id="venue-tagline" class="tagline"></p><a id="current-website" href="#" target="_blank" rel="noopener noreferrer" hidden>Visit our website ↗</a><span class="welcome-line">Good bites. Great nights.</span></div>
+      <img class="hero-image" src="assets/coastal-dining.jpg" alt="Illustrative coastal patio with a citrus drink and tacos" width="1536" height="1024">
+    </section>
+    <div class="menu-wrap" id="menu">
+      <div class="menu-heading"><div><p class="eyebrow">FIND YOUR NEW FAVORITE</p><h2>On the menu.</h2></div><p id="result-count" role="status" aria-live="polite"></p></div>
+      <nav id="categories" class="categories" aria-label="Filter menu categories"></nav>
+      <p class="photo-hint">Tap a photo for a closer look and the full description.</p>
+      <div id="menu-sections"></div>
+      <p id="menu-error" class="error" role="alert" hidden>We couldn't load the menu. Please ask a staff member for a menu.</p>
+      <noscript><p class="error">Enable JavaScript to browse this demo menu.</p></noscript>
+    </div>
+    <aside id="install-menu" class="install-menu" aria-label="Save this menu">
+      <div><strong>Your menu. One tap away.</strong><p>Browse now, or add this app to your home screen.</p></div>
+      <button id="install-button" type="button" hidden>Add to home screen</button>
+      <details><summary>How to add it</summary><p><strong>iPhone or iPad:</strong> Open in Safari, tap Share, then Add to Home Screen. If shown, turn on Open as Web App, then tap Add.</p><p><strong>Android:</strong> Open in Chrome, tap its menu, then Add to home screen or Install app.</p><p><strong>Computer:</strong> Use your browser's install option if available. You can always bookmark this page.</p><p>Options vary by browser. A connection is needed for current menu updates. Adding it is optional.</p></details>
+    </aside>
+    <aside class="demo-note"><strong>Sample menu</strong><p id="service-note">Fictional demo venue and sample prices. Food photos are illustrative. Ordering is not enabled.</p></aside>
+  </main>
+  <dialog id="dish-dialog" class="dish-dialog" aria-labelledby="dish-title" aria-describedby="dish-description">
+    <button type="button" id="close-dish" class="close-dish" aria-label="Close dish details">×</button>
+    <img id="dish-large-photo" class="dish-large-photo" alt="" width="900" height="600">
+    <div class="dish-dialog-copy"><p class="eyebrow" id="dish-category"></p><h2 id="dish-title"></h2><p id="dish-price" class="dish-dialog-price"></p><p id="dish-description"></p><p class="dish-sample-note">Sample menu and illustrative photo. Ask the restaurant about ingredients, availability, and dietary needs.</p><a id="dish-full-photo" target="_blank" rel="noopener noreferrer">Open full-size photo ↗</a></div>
+  </dialog>
+  <footer><p>Good food. Good drinks. Good tides.</p><span>Menu experience by BarTide · $600 setup + $50/month maintenance</span><a href="/#pricing">Get your BarTide app ↗</a></footer>
+</body>
+</html>

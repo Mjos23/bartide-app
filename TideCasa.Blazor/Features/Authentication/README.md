@@ -1,0 +1,13 @@
+# Frontend authentication boundary
+
+Auth/account Razor pages use static SSR and ExcludeFromInteractiveRouting; cookie-changing actions use full same-origin HTTP POSTs plus antiforgery validation. Passwords, verification codes and email addresses stay in request bodies and are not echoed on errors or carried into redirect URLs. Only fixed notice names and a restricted local path are redirected.
+
+The standard encrypted HttpOnly authentication cookie contains a reference to an ITicketStore ticket. Tokens are stored in server-side authentication properties, not identity claims, HTML, component parameters or browser storage. The private memory cache is bounded to 1,024 tickets with absolute expiry no later than one hour or the API session lifetime, whichever is shorter. Sliding renewal is disabled. A frontend restart signs users out, and this store is not suitable for uncoordinated multiple Web replicas.
+
+Cookie authentication validates the API session on each fresh HTTP request. Account overview is static SSR and uses that freshly verified response. Future protected component actions must call the API each time; circuit claims are not an authorization source. Only the API decides tenant/owner access, using its configured owner identity; no email-based role grant exists here.
+
+Signout is the one narrow cookie-validation exception: it retains the locally authenticated ticket only long enough to validate the same-origin/antiforgery POST and request API revocation, then always clears local authentication. Provider failure yields a generic local-only signout notice. This allows logout during an API outage without treating the stale principal as permission to read account data.
+
+The named TideCasaAuthApi client sends no cookies, follows no redirects, and accepts only configured HTTPS, the internal http://api:8080 endpoint, or development loopback HTTP. Authentication form calls forward only the parsed connection IP from trusted proxy processing, using a request-local X-Forwarded-For header. API proxy trust must be configured for the Web address explicitly. No provider credentials belong in this frontend.
+
+References: [Microsoft cookie authentication](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/cookie?view=aspnetcore-10.0), [server-side ticket storage](https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.authentication.cookies.cookieauthenticationoptions.sessionstore?view=aspnetcore-10.0), [static SSR render-mode boundaries](https://learn.microsoft.com/en-us/aspnet/core/blazor/components/render-modes?view=aspnetcore-10.0).

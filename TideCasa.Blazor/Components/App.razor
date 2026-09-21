@@ -1,0 +1,43 @@
+@inject OrderingRequestContext OrderingContext
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="icon" href="/tide-casa/favicon.svg" />
+    <link rel="manifest" href="@(IsBarHost ? "/bartide.webmanifest" : "/tide-casa.webmanifest")" />
+    <link rel="apple-touch-icon" sizes="180x180" href="@(IsBarHost ? "/app-icons/icon-180.png" : "/tide-casa/app-icons/icon-180.png")" />
+    <meta name="theme-color" content="#123b48" />
+    <link rel="stylesheet" href="/brand.css" />
+    <link rel="stylesheet" href="/verticals.css" />
+    <link rel="stylesheet" href="/workspace.css" />
+    <link rel="stylesheet" href="/loyalty.css" />
+    <link rel="stylesheet" href="/bartide-one.css" />
+    <link rel="stylesheet" href="/tide-casa/homepage.css" />
+    <link rel="stylesheet" href="/bartide-night.css" />
+    <link rel="stylesheet" href="/install.css" />
+    <link rel="stylesheet" href="/app.css" />
+    <link rel="stylesheet" href="/restaurant-management.css" />
+    <link rel="stylesheet" href="/media.css" />
+    <link rel="stylesheet" href="/rewards.css" />
+    <link rel="stylesheet" href="/service-billing.css" />
+    <HeadOutlet @rendermode="PageRenderMode" />
+</head>
+<body>
+    <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="@IsBarHost" />
+    <Routes ProtectedOrderingContext="@protectedOrderingContext" @rendermode="PageRenderMode" />
+    <script src="/app.js"></script>
+    <script src="/merchant-payments.js"></script>
+    <script src="/business-posts.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private IComponentRenderMode? PageRenderMode => HttpContext.AcceptsInteractiveRouting() ? InteractiveServer : null;
+    private string? protectedOrderingContext;
+    private bool IsBarHost => HttpContext.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase);
+    protected override void OnInitialized() => protectedOrderingContext = OrderingContext.ProtectForCircuit();
+}

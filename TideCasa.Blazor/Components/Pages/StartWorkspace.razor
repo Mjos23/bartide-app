@@ -1,0 +1,43 @@
+@page "/start/{Plan}"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+<PageTitle>Your business | Tide Casa</PageTitle>
+<div class="bt-unified rewards-page"><header class="rewards-nav"><a href="/account">← Your account</a><span>Tide Casa · Get started</span></header><main class="rewards-main"><p class="bt-one-kicker">LET’S BUILD YOUR APP</p><h1>Your business.</h1>
+@if (Plan is not ("restaurant" or "business")) { <p>Choose a <a href="/purchase/restaurant">restaurant app</a> or <a href="/purchase/business">business app</a>.</p> }
+else if (existing is not null) { <section class="rewards-panel"><h2>@existing.Name</h2><p>Your workspace is already connected to this account. Continue there to review your package.</p><a class="bt-one-button" href="@($"/workspace/{Uri.EscapeDataString(existing.TenantId)}/billing?appStores={AppStores.ToString().ToLowerInvariant()}&referralCode={Uri.EscapeDataString(SafeReferral)}")">Continue to package review</a></section> }
+else
+{
+    @if (Notice is not null) { <p class="rewards-notice" role="alert">@(Notice == "review" ? "Your account needs a workspace review. Check your account before starting again." : "Your workspace was not confirmed. Check the details and try again.")</p> }
+    <p>Save your details for a private workspace. Review payment and monthly maintenance on the next page.</p>
+    <form class="rewards-panel" method="post" action="/account/workspace" data-enhance="false"><AntiforgeryToken />
+        <input type="hidden" name="requestId" value="@requestId" /><input type="hidden" name="plan" value="@Plan" /><input type="hidden" name="appStores" value="@AppStores.ToString().ToLowerInvariant()" />
+        <input type="hidden" name="referralCode" value="@SafeReferral" />
+        <label>Business name<input name="businessName" required maxlength="120" autocomplete="organization" /></label>
+        <label>Your name<input name="contactName" required maxlength="120" autocomplete="name" value="@account?.User.DisplayName" /></label>
+        <label>City and state<input name="area" required maxlength="120" autocomplete="address-level2" /></label>
+        <label>Phone (optional)<input name="phone" type="tel" maxlength="50" autocomplete="tel" /></label>
+        <label>Website (optional)<input name="website" type="url" maxlength="2048" placeholder="https://" /></label>
+        <label>What should we know? (optional)<textarea name="notes" maxlength="2000" rows="4"></textarea></label>
+        <label><input name="acknowledged" type="checkbox" value="true" required /> I’ve reviewed the $600 setup and $50/month maintenance. @(AppStores ? "The optional app-store service adds $300 once." : "") Creating this workspace does not charge me.</label>
+        <button type="submit">Save and review package</button>
+    </form>
+}
+</main></div>
+@code {
+    [Parameter] public string Plan { get; set; } = "restaurant";
+    [SupplyParameterFromQuery(Name="appStores")] public bool AppStores { get; set; }
+    [SupplyParameterFromQuery(Name="notice")] public string? Notice { get; set; }
+    [SupplyParameterFromQuery(Name="referralCode")] public string? ReferralCode { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private readonly string requestId = Guid.NewGuid().ToString("D");
+    private AccountOverview? account;
+    private WorkspaceAccess? existing;
+    private string SafeReferral => ReferralCode is { Length: <=32 } ? ReferralCode : "";
+    protected override void OnInitialized()
+    {
+        account = HttpContext.Items[AuthFlow.AccountItem] as AccountOverview;
+        existing = account?.User.IsPlatformOwner == false ? account.Workspaces.FirstOrDefault(w => w.IsOwner) : null;
+        if(account is null) HttpContext.Response.StatusCode=503;
+        if(Plan is not ("restaurant" or "business")) HttpContext.Response.StatusCode=404;
+    }
+}

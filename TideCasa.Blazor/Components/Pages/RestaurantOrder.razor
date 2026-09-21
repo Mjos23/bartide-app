@@ -1,0 +1,154 @@
+@page "/order/{Slug}"
+@page "/menu/{Slug}/order"
+@inject RestaurantOrderingClient Api
+<PageTitle>@(menu?.Name ?? "Your order") | BarTide</PageTitle>
+<div class="bt-unified restaurant-ordering">
+    <header class="ordering-nav"><a href="/" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="140" height="47" /></a><span>Good food. Your way.</span></header>
+    <main class="ordering-main">
+        @if (loading)
+        {
+            <h1>Your menu.</h1><p role="status">Loading the restaurant’s menu…</p>
+        }
+        else if (menu is null)
+        {
+            <h1>This menu is unavailable.</h1><p role="alert">@error</p>
+            <button class="bt-one-button" type="button" @onclick="LoadMenuAsync">Try again</button>
+            @if (!string.IsNullOrEmpty(TableToken)) { <p><a href="@($"/order/{Uri.EscapeDataString(Slug)}")">Open the menu without a table link</a></p> }
+        }
+        else if (receipt is not null)
+        {
+            <p class="bt-one-kicker">@menu.Name</p><h1>@(receipt.Status == "awaiting_payment" ? "Finish your payment." : "Your order.")</h1>
+            <section class="ordering-panel ordering-receipt" aria-labelledby="receipt-title">
+                <h2 id="receipt-title">Order @receipt.Number</h2>
+                <p role="status">@ReceiptStatus</p>
+                <p>Payment: <strong>@ReceiptPayment</strong>. @if (receipt.Quote.PaymentMethod == "staff") { <span>No payment has been collected through this page.</span> }</p>
+                @if (checkout is not null) { <p class="ordering-note">Sandbox payment: use Stripe test card details only. Real card payments are not enabled.</p> }
+                @if (checkout?.RefundedCents > 0) { <p>Refunded: @Money(checkout.RefundedCents)</p> }
+                @if (checkout?.PendingRefundCents > 0) { <p>Refund in progress: @Money(checkout.PendingRefundCents)</p> }
+                <p>@FulfillmentLabel(receipt.Quote.Fulfillment)@(!string.IsNullOrWhiteSpace(receipt.Quote.TableLabel) ? " · " + receipt.Quote.TableLabel : "") · @(receipt.Quote.PaymentMethod == "phone" ? "Pay on my phone" : "Pay staff")</p>
+                <ul class="ordering-summary-lines">@foreach (var line in receipt.Quote.Lines) { <li><span>@line.Quantity × @line.Name</span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
+                <dl class="ordering-totals">
+                    <div><dt>Food and drinks</dt><dd>@Money(receipt.Quote.SubtotalCents)</dd></div>
+                    <div><dt>Tax</dt><dd>@Money(receipt.Quote.TaxCents)</dd></div>
+                    @if (receipt.Quote.DeliveryFeeCents > 0) { <div><dt>Delivery</dt><dd>@Money(receipt.Quote.DeliveryFeeCents)</dd></div> }
+                    <div><dt>Tip</dt><dd>@Money(receipt.Quote.TipCents)</dd></div>
+                    <div class="ordering-total"><dt>Total to pay</dt><dd>@Money(receipt.Quote.TotalCents)</dd></div>
+                </dl>
+                <p>Save your order number and keep this page open to check its status.</p>
+                <button class="ordering-secondary" type="button" @onclick="RefreshReceiptAsync" disabled="@busy">@(busy ? "Checking…" : "Check order status")</button>
+                @if (checkout?.State == "open")
+                {
+                    @if (checkout.CheckoutUrl is not null) { <button class="bt-one-button" type="button" @onclick="ResumePayment" disabled="@busy">Continue to card payment</button> }
+                    <button class="ordering-secondary" type="button" @onclick="CancelPaymentAsync" disabled="@busy">Cancel unpaid checkout</button>
+                }
+                <button class="ordering-secondary" type="button" @onclick="StartAnotherOrderAsync" disabled="@(busy || checkout?.State is "reserved" or "creating" or "open" or "review")">Start another order</button>
+                @if (error is not null) { <p class="ordering-error" role="alert">@error</p> }
+            </section>
+        }
+        else
+        {
+            <p class="bt-one-kicker">ORDER FROM YOUR TABLE OR ON THE GO</p><h1>@menu.Name</h1>
+            <nav class="rm-workspace-nav" aria-label="Restaurant"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")">Customer rewards</a><a href="@($"/events/{Uri.EscapeDataString(Slug)}")">Events and RSVP</a><a href="@($"/updates/{Uri.EscapeDataString(Slug)}")">Latest updates · Phone alerts</a></nav>
+            @if (!connected) { <p class="ordering-note" role="status">Connecting to the restaurant…</p> }
+            @if (menu.Table is not null) { <p class="ordering-table-badge">You scanned @menu.Table.Label.</p> }
+            @if (!menu.Checkout.AcceptingOrders) { <p class="ordering-notice" role="status">The restaurant is not accepting new online orders right now. You can still browse the menu.</p> }
+            <div class="ordering-layout">
+                <section aria-label="Menu" class="ordering-menu">
+                    @foreach (var category in MenuGroups)
+                    {
+                        <section class="ordering-category" aria-labelledby="@("category-" + category.Key)">
+                            <h2 id="@("category-" + category.Key)">@CategoryName(category.Key)</h2>
+                            @foreach (var item in category)
+                            {
+                                <article class="ordering-menu-item">
+                                    <div>@if (item.PhotoId is not null) { <img class="ordering-item-photo" src="@($"/media/{Uri.EscapeDataString(item.PhotoId)}")" alt="@item.Name" loading="lazy" width="160" height="120" /> }<h3>@item.Name</h3><p>@item.Description</p><strong>@(item.PriceCents is { } price ? Money(price) : item.PriceLabel ?? "Ask staff")</strong>
+                                        @if (!item.Available) { <p class="ordering-note">Currently unavailable</p> }
+                                    </div>
+                                    @if (item.Available && item.PriceCents is >= 0)
+                                    {
+                                        <div class="ordering-quantity" aria-label="@($"Quantity of {item.Name}")">
+                                            <button type="button" class="ordering-secondary" aria-label="@($"Remove one {item.Name}")" disabled="@(Locked || Quantity(item.Id) == 0)" @onclick="() => ChangeQuantityAsync(item.Id, -1)">−</button>
+                                            <output aria-live="polite">@Quantity(item.Id)</output>
+                                            <button type="button" class="ordering-secondary" aria-label="@($"Add one {item.Name}")" disabled="@(Locked || Quantity(item.Id) >= 20 || cart.Values.Sum() >= 50 || (Quantity(item.Id) == 0 && cart.Count >= 20))" @onclick="() => ChangeQuantityAsync(item.Id, 1)">+</button>
+                                        </div>
+                                    }
+                                </article>
+                            }
+                        </section>
+                    }
+                    @if (menu.Items.Count == 0) { <p>No menu items are available right now.</p> }
+                </section>
+                <aside class="ordering-panel ordering-checkout" aria-labelledby="your-order-title">
+                    <h2 id="your-order-title">Your order</h2>
+                    <fieldset class="ordering-options" disabled="@Locked"><legend>How would you like your order?</legend>
+                        <label><input type="radio" name="fulfillment" value="dine-in" checked="@(fulfillment == "dine-in")" @onchange='() => SetFulfillmentAsync("dine-in")' disabled="@(!menu.Checkout.DineInEnabled || menu.Table is null)" /><span>Dine in @if (menu.Table is not null) { <small>@menu.Table.Label</small> }</span></label>
+                        <label><input type="radio" name="fulfillment" value="pickup" checked="@(fulfillment == "pickup")" @onchange='() => SetFulfillmentAsync("pickup")' disabled="@(!menu.Checkout.PickupEnabled)" /><span>Pickup</span></label>
+                        <label><input type="radio" name="fulfillment" value="delivery" checked="@(fulfillment == "delivery")" @onchange='() => SetFulfillmentAsync("delivery")' disabled="@(!menu.Checkout.DeliveryEnabled)" /><span>Delivery</span></label>
+                    </fieldset>
+                    @if (menu.Table is null) { <p class="ordering-note">For dine in, scan the QR code at your table.</p> }
+                    @if (fulfillment == "pickup" && !string.IsNullOrWhiteSpace(menu.Checkout.PickupInstructions)) { <p>@menu.Checkout.PickupInstructions</p> }
+                    @if (fulfillment == "delivery")
+                    {
+                        <label class="desk-field">Delivery ZIP code<input type="text" inputmode="numeric" autocomplete="postal-code" maxlength="5" value="@deliveryZip" @onchange="SetZipAsync" disabled="@Locked" /></label>
+                        <p class="ordering-note">Delivery minimum: @Money(menu.Checkout.DeliveryMinimumCents) before tax, delivery and tip. Delivery fee: @Money(menu.Checkout.DeliveryFeeCents).</p>
+                    }
+                    <fieldset class="ordering-options" disabled="@Locked"><legend>How would you like to pay?</legend>
+                        <label><input type="radio" name="payment" value="staff" checked="@(payment == "staff")" @onchange='() => SetPaymentAsync("staff")' disabled="@(!menu.Checkout.PayStaffEnabled)" /><span>Pay staff<small>Pay the restaurant directly.</small></span></label>
+                        <label><input type="radio" name="payment" value="phone" checked="@(payment == "phone")" @onchange='() => SetPaymentAsync("phone")' /><span>Pay on my phone<small>@(menu.Checkout.PhonePaymentAvailable ? "Secure card checkout · sandbox" : "Not available yet.")</small></span></label>
+                    </fieldset>
+                    @if (payment == "phone") { <p class="ordering-notice" role="status">@(menu.Checkout.PhonePaymentAvailable ? "You will continue to Stripe's sandbox to pay by card. Use test card details only; real payments are not enabled." : "Phone payments are being prepared. Choose Pay staff if available to send an unpaid order to the restaurant.")</p> }
+                    @if (!string.IsNullOrWhiteSpace(menu.Checkout.PaymentInstructions)) { <p class="ordering-note">@menu.Checkout.PaymentInstructions</p> }
+                    @if (menu.Checkout.TipsEnabled)
+                    {
+                        <fieldset class="ordering-options ordering-tips" disabled="@Locked"><legend>Add an optional tip</legend>
+                            @foreach (var choice in TipChoices)
+                            {
+                                <label><input type="radio" name="tip" value="@choice.Value" checked="@(tipChoice == choice.Value)" @onchange="() => SetTipAsync(choice.Value)" /><span>@choice.Label</span></label>
+                            }
+                        </fieldset>
+                        @if (tipChoice == "custom") { <label class="desk-field">Custom tip (USD)<input type="text" inputmode="decimal" value="@customTip" maxlength="8" placeholder="0.00" @onchange="SetCustomTipAsync" disabled="@Locked" /></label> }
+                        <p class="ordering-note">Tips are optional. Percentages apply to food and drinks before tax and delivery. Custom tips cannot exceed that subtotal or $500.</p>
+                    }
+                    @if (cart.Count == 0) { <p>Add something from the menu to get started.</p> }
+                    @if (quoting) { <p role="status">Checking availability and your total…</p> }
+                    @if (quote is not null)
+                    {
+                        <ul class="ordering-summary-lines">@foreach (var line in quote.Lines) { <li><span>@line.Quantity × @line.Name</span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
+                        <dl class="ordering-totals">
+                            <div><dt>Food and drinks</dt><dd>@Money(quote.SubtotalCents)</dd></div><div><dt>Tax</dt><dd>@Money(quote.TaxCents)</dd></div>
+                            @if (quote.DeliveryFeeCents > 0) { <div><dt>Delivery</dt><dd>@Money(quote.DeliveryFeeCents)</dd></div> }
+                            <div><dt>Tip</dt><dd>@Money(quote.TipCents)</dd></div><div class="ordering-total"><dt>Total to pay</dt><dd>@Money(quote.TotalCents)</dd></div>
+                        </dl>
+                        @if (!quote.CanSubmit && payment != "phone") { <p class="ordering-notice">The restaurant cannot accept this selection right now. Check its available ordering and payment options.</p> }
+                    }
+                    @if (error is not null) { <p class="ordering-error" role="alert">@error</p> }
+                    @if (cart.Count > 0 && quote is null && !quoting && !Locked) { <button class="ordering-secondary" type="button" @onclick="RefreshQuoteAsync">Check total again</button> }
+                    @if (uncertain)
+                    {
+                        <div class="ordering-notice"><h3>Let’s confirm your order.</h3><p>Keep this page open. Your choices are saved here. Retrying sends the same order request so it cannot create a duplicate.</p></div>
+                        <button class="bt-one-button" type="button" @onclick="SubmitAsync" disabled="@busy">@(busy ? "Confirming…" : "Retry this order")</button>
+                    }
+                    else
+                    {
+                        <form @onsubmit="ReviewAsync" @onsubmit:preventDefault="true">
+                            <fieldset class="ordering-fields" disabled="@(Locked || reviewing)">
+                                <label class="desk-field">Your name<input type="text" @bind="customerName" @bind:event="oninput" maxlength="80" autocomplete="name" required /></label>
+                                <label class="desk-field">Phone number@(fulfillment == "dine-in" ? " (optional)" : "")<input type="tel" @bind="phone" @bind:event="oninput" maxlength="30" autocomplete="tel" required="@(fulfillment != "dine-in")" /></label>
+                                @if (fulfillment == "delivery") { <label class="desk-field">Delivery address<input type="text" @bind="address" @bind:event="oninput" maxlength="250" autocomplete="street-address" required /></label> }
+                                <label class="desk-field">Order note (optional)<textarea @bind="note" @bind:event="oninput" rows="2" maxlength="500" placeholder="Anything your server should know? Allergies? Please also speak to staff." /></label>
+                                @if (!reviewing) { <button class="bt-one-button" type="submit" disabled="@(!CanReview)">Review order</button> }
+                            </fieldset>
+                        </form>
+                        @if (reviewing && quote is not null)
+                        {
+                            <div class="ordering-review" role="status"><h3>Ready to send?</h3><p>@FulfillmentLabel(quote.Fulfillment)@(!string.IsNullOrWhiteSpace(quote.TableLabel) ? " · " + quote.TableLabel : "") · @(payment == "phone" ? "Pay on my phone" : "Pay staff")</p><p>@customerName @if (!string.IsNullOrWhiteSpace(phone)) { <span>· @phone</span> }</p>@if (fulfillment == "delivery") { <p>@address @deliveryZip</p> }<p>Total to pay: <strong>@Money(quote.TotalCents)</strong>, including @Money(quote.TipCents) tip.</p><p>@(payment == "phone" ? "This reserves your order while you complete card payment. The restaurant can accept it after payment is confirmed." : "This sends an unpaid order request. The restaurant must accept it before preparing your order.")</p></div>
+                            <button class="ordering-secondary" type="button" disabled="@busy" @onclick="EditDetails">Edit details</button>
+                            <button class="bt-one-button" type="button" disabled="@(busy || !CanReview)" @onclick="SubmitAsync">@(busy ? "Confirming your order..." : payment == "phone" ? "Continue to card payment" : "Send order · Pay staff")</button>
+                        }
+                    }
+                </aside>
+            </div>
+        }
+    </main>
+    <footer class="ordering-footer">Powered by BarTide</footer>
+</div>

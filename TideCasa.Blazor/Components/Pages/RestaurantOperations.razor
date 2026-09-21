@@ -1,0 +1,120 @@
+@page "/workspace/{TenantId}/operations"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.Globalization
+@using TideCasa.Blazor.Features.RestaurantManagement
+@inject RestaurantManagementClient Api
+<PageTitle>Restaurant orders | Tide Casa</PageTitle>
+<div class="bt-unified restaurant-ordering restaurant-management">
+    <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Your order desk</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">KEEP EVERY ORDER MOVING</p><h1>@(workspace?.Name ?? "Restaurant orders")</h1>
+        <nav class="rm-workspace-nav" aria-label="Workspace"><a aria-current="page" href="@PagePath">Orders</a>@if (workspace?.Role == "owner") { <a href="@WorkspacePath("menu")">Menu and settings</a><a href="@WorkspacePath("ordering")">Table QR codes</a> }</nav>
+        @if (RestaurantManagementFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <div class="ordering-notice" role="alert"><p>@error</p><a href="@PagePath">Try loading again</a></div> }
+        @if (workspace is not null)
+        {
+            <div class="ordering-section-heading"><p>Review incoming orders, update their progress and record payments collected by your team.</p><a class="ordering-secondary" href="@PagePath">Refresh orders</a></div>
+            <p class="ordering-note">This page refreshes after each saved change. Use Refresh orders to check for new arrivals.</p>
+            @if (workspace.Orders.Count == 0)
+            {
+                <section class="ordering-panel"><h2>You’re all caught up.</h2><p>Orders visible to your role will appear here when guests send them.</p></section>
+            }
+            <div class="rm-operations-grid">
+                @foreach (var entry in workspace.Orders)
+                {
+                    var order = entry.Order;
+                    var quote = order.Receipt.Quote;
+                    var actions = entry.AllowedActions;
+                    <article class="ordering-panel rm-operation-order">
+                        <div class="ordering-section-heading"><h2>Order @order.Receipt.Number</h2><strong>@Money(quote.TotalCents)</strong></div>
+                        <p class="rm-order-badges"><span>@Status(order.Receipt.Status)</span><span>@PaymentStatus(order.Receipt.PaymentStatus)</span></p>
+                        <p><strong>@Fulfillment(quote.Fulfillment)</strong>@(!string.IsNullOrWhiteSpace(quote.TableLabel) ? " · " + quote.TableLabel : "") · @(quote.PaymentMethod == "staff" ? "Pay staff" : "Pay on phone")</p>
+                        <p>@order.CustomerName @if (!string.IsNullOrWhiteSpace(order.Phone)) { <span>· <a href="@("tel:" + Uri.EscapeDataString(order.Phone))">@order.Phone</a></span> }</p>
+                        @if (quote.Fulfillment == "delivery")
+                        {
+                            <p class="rm-delivery-address">@order.Address<br />@order.Zip</p>
+                            <p>Driver: <strong>@DriverName(entry.DriverId)</strong></p>
+                        }
+                        <ul class="ordering-summary-lines">@foreach (var line in quote.Lines) { <li><span>@line.Quantity × @line.Name</span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
+                        <dl class="ordering-totals">
+                            <div><dt>Food and drinks</dt><dd>@Money(quote.SubtotalCents)</dd></div><div><dt>Tax</dt><dd>@Money(quote.TaxCents)</dd></div>
+                            @if (quote.DeliveryFeeCents != 0) { <div><dt>Delivery</dt><dd>@Money(quote.DeliveryFeeCents)</dd></div> }
+                            <div><dt>Tip</dt><dd>@Money(quote.TipCents)</dd></div><div class="ordering-total"><dt>Order total</dt><dd>@Money(quote.TotalCents)</dd></div>
+                        </dl>
+                        @if (!string.IsNullOrWhiteSpace(order.Note)) { <div class="rm-guest-note"><strong>Guest note</strong><p>@order.Note</p></div> }
+                        <p class="ordering-note">Received @Received(order.Receipt.CreatedAt)</p>
+                        <div class="rm-order-actions">
+                            @foreach (var action in actions.Where(action => action is "accepted" or "preparing" or "ready" or "out_for_delivery" or "completed"))
+                            {
+                                <form method="post" action="@OrderPath(order.Receipt.OrderId)" data-enhance="false">
+                                    <AntiforgeryToken /><input type="hidden" name="version" value="@order.Version" /><input type="hidden" name="action" value="@action" />
+                                    <button class="bt-one-button" type="submit">@ActionLabel(action)</button>
+                                </form>
+                            }
+                        </div>
+                        @if (actions.Contains("assign-driver"))
+                        {
+                            @if (workspace.Drivers.Count > 0)
+                            {
+                                <form method="post" action="@OrderPath(order.Receipt.OrderId)" data-enhance="false" class="rm-assignment-form">
+                                    <AntiforgeryToken /><input type="hidden" name="version" value="@order.Version" /><input type="hidden" name="action" value="assign-driver" />
+                                    <label class="desk-field">Delivery driver<select name="driver_id" required><option value="">Choose a driver</option>@foreach (var driver in workspace.Drivers) { <option value="@driver.Id" selected="@(driver.Id == entry.DriverId)">@driver.Name</option> }</select></label>
+                                    <button class="ordering-secondary" type="submit">Assign driver</button>
+                                </form>
+                            }
+                            else { <p class="ordering-note">No delivery drivers are available to assign.</p> }
+                        }
+                        @if (actions.Contains("mark-paid") && quote.PaymentMethod == "staff")
+                        {
+                            <details class="rm-entry rm-payment-action"><summary>Record a payment collected by staff</summary>
+                                <form method="post" action="@OrderPath(order.Receipt.OrderId)" data-enhance="false">
+                                    <AntiforgeryToken /><input type="hidden" name="version" value="@order.Version" /><input type="hidden" name="action" value="mark-paid" />
+                                    <p class="ordering-note">This records a payment already received. It does not charge a card or collect money.</p>
+                                    <label class="rm-check"><input type="checkbox" name="payment_collected" value="true" required /><span>I collected the full @Money(quote.TotalCents), including the @Money(quote.TipCents) tip, directly from the customer.</span></label>
+                                    <button class="ordering-secondary" type="submit">Record payment received</button>
+                                </form>
+                            </details>
+                        }
+                        @if (actions.Contains("cancelled"))
+                        {
+                            <details class="rm-entry rm-cancel-action"><summary>Cancel this order</summary>
+                                <form method="post" action="@OrderPath(order.Receipt.OrderId)" data-enhance="false">
+                                    <AntiforgeryToken /><input type="hidden" name="version" value="@order.Version" /><input type="hidden" name="action" value="cancelled" />
+                                    <label class="rm-check"><input type="checkbox" name="confirm_cancel" value="true" required /><span>Cancel order @order.Receipt.Number. I have checked with the team and will inform the customer.</span></label>
+                                    <button class="ordering-secondary rm-danger" type="submit">Confirm cancellation</button>
+                                </form>
+                            </details>
+                        }
+                        @if (actions.Count == 0) { <p class="ordering-note">No further actions are available to your current role for this order.</p> }
+                    </article>
+                }
+            </div>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private RestaurantOperationsWorkspace? workspace;
+    private string? error;
+    private string PagePath => WorkspacePath("operations");
+    private string WorkspacePath(string page) => "/workspace/" + Uri.EscapeDataString(TenantId) + "/" + page;
+    private string OrderPath(string orderId) => "/restaurant-management/" + Uri.EscapeDataString(TenantId) + "/orders/" + Uri.EscapeDataString(orderId);
+    private string DriverName(string? id) => string.IsNullOrEmpty(id) ? "Not assigned" : workspace?.Drivers.FirstOrDefault(driver => driver.Id == id)?.Name ?? "Assigned driver";
+    private static string Money(int cents) => (cents / 100m).ToString("C2", CultureInfo.GetCultureInfo("en-US"));
+    private static string Received(string value) => DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var when) ? when.ToUniversalTime().ToString("MMM d, HH:mm 'UTC'", CultureInfo.InvariantCulture) : value;
+    private static string Fulfillment(string value) => value switch { "dine-in" => "Dine in", "delivery" => "Delivery", _ => "Pickup" };
+    private static string Status(string value) => value switch { "new" => "Awaiting acceptance", "accepted" => "Accepted", "preparing" => "Preparing", "ready" => "Ready", "out_for_delivery" => "Out for delivery", "completed" => "Completed", "cancelled" or "canceled" => "Cancelled", _ => value };
+    private static string PaymentStatus(string value) => value switch { "paid" => "Paid", "paid_in_person" => "Paid to staff", "unpaid" => "Unpaid", "refunded" => "Refunded", _ => value };
+    private static string ActionLabel(string value) => value switch { "accepted" => "Accept order", "preparing" => "Start preparing", "ready" => "Mark ready", "out_for_delivery" => "Out for delivery", "completed" => "Complete order", _ => "Update order" };
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open your order desk."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.GetOperationsAsync(TenantId, token, HttpContext.RequestAborted);
+        if (result.Succeeded && result.Value is { } value) { workspace = value; return; }
+        HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403;
+        error = result.Uncertain ? "Orders could not be loaded. Please try again shortly." : "The order desk is not available to your current account.";
+    }
+}

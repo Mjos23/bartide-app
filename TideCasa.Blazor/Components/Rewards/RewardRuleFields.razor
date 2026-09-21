@@ -1,0 +1,17 @@
+<input type="hidden" name="version" value="@(Rule?.Version ?? -1)" />
+<input type="hidden" name="rule_id" value="@Rule?.Id" />
+<label>Reward name<input name="title" value="@Rule?.Title" maxlength="100" required placeholder="Buy nine, get one free" /></label>
+<label>What the customer receives<textarea name="reward" maxlength="1000" rows="2" required>@Rule?.Reward</textarea></label>
+<div class="rewards-grid">
+    <label>How they earn it<select name="kind"><option value="punch-card" selected="@(Rule is null || Rule.Kind == "punch-card")">Paid item purchases</option><option value="monthly-visits" selected="@(Rule?.Kind == "monthly-visits")">Visits in one month</option><option value="points" selected="@(Rule?.Kind == "points")">Spend reward points</option></select></label>
+    <label>Purchases, visits or points required<input name="threshold" type="number" min="1" max="10000" value="@(Rule?.Threshold ?? 9)" required /></label>
+    <label>Qualifying item (purchase rewards only)<select name="item_id"><option value="">No item — visits or points</option>@foreach (var item in MenuItems) { <option value="@item.Id" selected="@(item.Id == Rule?.ItemId)">@item.Name</option> }</select></label>
+    <label>Business timezone<select name="timezone">@foreach (var zone in Zones) { <option value="@zone" selected="@(zone == (Rule?.TimeZoneId ?? "America/New_York"))">@zone.Replace('_', ' ')</option> }</select></label>
+</div>
+<label>Availability<select name="active"><option value="true" selected="@(Rule?.Active != false)">Active</option><option value="false" selected="@(Rule?.Active == false)">Paused</option></select></label>
+<p class="rewards-note">Visit rewards count one verified visit per day and award once per month. Updating a rule starts fresh progress; customers keep rewards they already earned.</p>
+@code {
+    [Parameter] public RewardRuleCard? Rule { get; set; }
+    [Parameter] public IReadOnlyList<RestaurantMenuItem> MenuItems { get; set; } = [];
+    private IEnumerable<string> Zones => new[] { Rule?.TimeZoneId ?? "America/New_York", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu", "UTC" }.Distinct();
+}

@@ -1,0 +1,33 @@
+@page "/owner/demo-requests"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@inject DemoInboxClient Api
+<PageTitle>Demo requests | Tide Casa</PageTitle>
+<div class="bt-unified rewards-page"><header class="rewards-nav"><a href="/account">← Your account</a><span>Tide Casa · Owner inbox</span></header><main class="rewards-main"><p class="bt-one-kicker">MEET YOUR NEXT CLIENT</p><h1>Demo requests</h1>
+@if (Notice is not null) { <p class="rewards-notice" role="status">@(Notice == "saved" ? "Your update is saved." : Notice == "changed" ? "This request changed. Review the latest details before saving." : "The change was not confirmed. Refresh this page before trying again.")</p> }
+@if (inbox is null) { <p role="alert">This inbox requires Tide Casa owner access. Sign in with the configured owner account and try again.</p> }
+else
+{
+    <p>Contact each person to agree on a time. A submitted request does not confirm an appointment.</p>
+    @if (!inbox.NotificationsEnabled) { <p class="rewards-notice">Email alerts are not connected in this environment. New requests still appear here.</p> }
+    @if (inbox.Inquiries.Count == 0) { <p>No demo requests yet.</p> }
+    @foreach (var inquiry in inbox.Inquiries)
+    {
+        <article class="rewards-panel"><h2>@inquiry.Request.Business</h2><p><strong>@inquiry.Request.Name</strong> · @inquiry.Request.Email</p>@if (inquiry.Request.Phone.Length > 0) { <p>@inquiry.Request.Phone</p> }<p><strong>Demo scheduling texts:</strong> @(inquiry.Request.CanText ? "Allowed for this request at " + inquiry.Request.Phone : "Not opted in for this request. Use email.")</p><p>@inquiry.Request.City · @(inquiry.Request.BusinessType == "bartide" ? "BarTide" : "Tide Casa")</p><h3>Preferred time</h3><p>@inquiry.Request.PreferredTimes · @inquiry.Request.TimeZone</p><h3>What they want to build</h3><p class="rewards-preserve">@inquiry.Request.Goals</p><p>Email alert: @Delivery(inquiry.NotificationState)</p>
+        <form method="post" action="@($"/owner/demo-requests/{inquiry.Request.Id}")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="version" value="@inquiry.Version" /><label>Status<select name="status">@foreach (var status in Statuses) { <option value="@status.Key" selected="@(inquiry.Status == status.Key)">@status.Value</option> }</select></label><label>Private follow-up notes<textarea name="note" maxlength="2000" rows="3">@inquiry.Note</textarea></label><p class="rewards-note">Choose “Time agreed” only after confirming with the customer. Saving does not send an email or calendar invitation.</p><button type="submit">Save follow-up</button></form></article>
+    }
+}
+</main></div>
+@code {
+    [SupplyParameterFromQuery(Name="notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private TideCasa.Contracts.DemoInbox? inbox;
+    private static readonly Dictionary<string,string> Statuses = new() { ["requested"]="New request", ["contacted"]="Contacted", ["scheduled"]="Time agreed", ["closed"]="Closed" };
+    private static string Delivery(string state) => state switch { "sent"=>"Accepted by email provider", "sending"=>"Sending", "pending"=>"Waiting to send", "review"=>"Needs review — check your email before retrying", _=>"Not queued" };
+    protected override async Task OnInitializedAsync()
+    {
+        if ((HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.User.IsPlatformOwner != true) { HttpContext.Response.StatusCode=403; return; }
+        if (HttpContext.Items[AuthFlow.TokenItem] is string token) inbox=await Api.ReadAsync(token,HttpContext.RequestAborted);
+        if(inbox is null) HttpContext.Response.StatusCode=503;
+    }
+}

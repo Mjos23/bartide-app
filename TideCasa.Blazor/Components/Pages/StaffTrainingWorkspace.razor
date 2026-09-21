@@ -1,0 +1,223 @@
+@page "/workspace/{TenantId}/team"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.StaffTraining
+@inject StaffTrainingClient Api
+<PageTitle>Team and training | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/staff-training.css" /></HeadContent>
+<div class="bt-unified team-workspace">
+    <header class="team-nav"><a href="/account">← Your account</a><span>BarTide · Team and training</span></header>
+    <main>
+        <p class="bt-one-kicker">YOUR PEOPLE, READY FOR SERVICE</p><h1>@(workspace?.Name ?? "Team and training")</h1>
+        @if (error is not null)
+        {
+            <p role="alert" class="team-notice">@error</p><a href="@CurrentPath">Try loading again</a>
+        }
+        else if (workspace is not null)
+        {
+            @if (StaffTrainingFlow.Notice(Notice) is { } notice) { <p class="team-notice" role="status">@notice</p> }
+            <p>Keep shifts, team conversations and onboarding lessons in one place.</p>
+            <nav class="team-links" aria-label="Team workspace sections"><a href="#team">Team</a><a href="#schedule">Schedule</a><a href="#messages">Messages</a><a href="#training">Training</a><a href="@CurrentPath">Refresh</a></nav>
+            <section id="team" class="team-panel">
+                <h2>Your team</h2>
+                @if (workspace.CanManage)
+                {
+                    <p>Use each employee's sign-in email. They can open this workspace after signing in and verifying that email. Share the workspace link with them; this form does not send an invitation email.</p>
+                    <p><a href="@CurrentPath">Team workspace link</a></p>
+                    <form method="post" action="@Action("member")" data-enhance="false" class="team-form team-grid">
+                        <AntiforgeryToken />
+                        <label>Name<input name="name" required maxlength="80" autocomplete="off" /></label>
+                        <label>Sign-in email<input type="email" name="email" required maxlength="254" autocomplete="off" /></label>
+                        <label>Role<select name="role"><option value="kitchen">Kitchen</option><option value="driver">Driver</option></select></label>
+                        <button type="submit" disabled="@(workspace.Members.Count >= 30)">Add employee</button>
+                    </form>
+                }
+                @if (workspace.Members.Count == 0) { <p>No employees have been added yet.</p> }
+                <div class="team-grid">
+                    @foreach (var member in workspace.Members)
+                    {
+                        <article class="team-card">
+                            <h3>@member.Name</h3><p>@Role(member.Role) · @(member.Active ? "Active" : "Access paused")</p>
+                            @if (workspace.CanManage)
+                            {
+                                <p>@member.Email</p><p class="team-note">@(member.AccountLinked ? "Sign-in account connected" : "Waiting for their first verified sign-in")</p>
+                                <form method="post" action="@Action("member-state")" data-enhance="false">
+                                    <AntiforgeryToken /><input type="hidden" name="id" value="@member.Id" /><input type="hidden" name="expected_active" value="@Flag(member.Active)" /><input type="hidden" name="active" value="@Flag(!member.Active)" />
+                                    <button type="submit" class="team-secondary">@(member.Active ? "Pause access" : "Restore access")</button>
+                                </form>
+                            }
+                        </article>
+                    }
+                </div>
+            </section>
+            <section id="schedule" class="team-panel">
+                <h2>Schedule</h2><p class="team-note">Saved shifts below are shown in Eastern time. Choose the correct time zone when adding a shift.</p>
+                @if (workspace.CanManage && ActiveMembers.Any())
+                {
+                    <form method="post" action="@Action("shift")" data-enhance="false" class="team-form team-grid">
+                        <AntiforgeryToken />
+                        <label>Employee<select name="member">@foreach (var member in ActiveMembers) { <option value="@member.Id">@member.Name</option> }</select></label>
+                        <label>Shift label<input name="label" required maxlength="80" placeholder="Lunch service" /></label>
+                        <label>Starts<input name="starts" type="datetime-local" required /></label>
+                        <label>Ends<input name="ends" type="datetime-local" required /></label>
+                        <label>Time zone<select name="timezone"><option value="America/New_York">Eastern</option><option value="America/Chicago">Central</option><option value="America/Denver">Mountain</option><option value="America/Los_Angeles">Pacific</option><option value="UTC">UTC</option></select></label>
+                        <button type="submit">Add shift</button>
+                    </form>
+                }
+                @if (workspace.Shifts.Count == 0) { <p>No current or upcoming shifts.</p> }
+                <ul class="team-list">
+                    @foreach (var shift in workspace.Shifts)
+                    {
+                        <li><div><strong>@MemberName(shift.MemberId) · @shift.Label</strong><p>@Time(shift.StartsAt) – @Time(shift.EndsAt)</p></div>
+                            @if (workspace.CanManage)
+                            {
+                                <form method="post" action="@Action("shift-delete")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="id" value="@shift.Id" /><button class="team-secondary" type="submit">Remove shift</button></form>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+            <section id="messages" class="team-panel">
+                <h2>Team messages</h2><p>Visible to the active team. Refresh to see new messages.</p>
+                @if (workspace.Messages.Count == 0) { <p>No messages yet.</p> }
+                <div class="team-messages">
+                    @foreach (var message in workspace.Messages)
+                    {
+                        <article class="team-message"><strong>@message.Author</strong><p class="team-preserve">@message.Text</p><small>@Time(message.CreatedAt)</small></article>
+                    }
+                </div>
+                <form method="post" action="@Action("message")" data-enhance="false" class="team-form">
+                    <AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid().ToString("D")" />
+                    <label>Message<textarea name="text" required maxlength="2000" rows="3" placeholder="Share an update with your team"></textarea></label><button type="submit">Post message</button>
+                </form>
+            </section>
+            <section id="training" class="team-panel">
+                <h2>@(workspace.CanManage ? "Employee onboarding courses" : "Your assigned training")</h2>
+                @if (workspace.CanManage)
+                {
+                    <p>Create a course, add your video lessons, assign employees and publish when it is ready.</p>
+                    <form method="post" action="@Action("course")" data-enhance="false" class="team-form">
+                        <AntiforgeryToken /><input type="hidden" name="published" value="false" />
+                        <label>New course title<input name="title" required maxlength="120" placeholder="Welcome to the team" /></label>
+                        <label>Description<textarea name="description" maxlength="2000" rows="2"></textarea></label>
+                        <button type="submit" disabled="@(workspace.Courses.Count >= 12)">Create draft course</button>
+                    </form>
+                }
+                @if (workspace.Courses.Count == 0) { <p>@(workspace.CanManage ? "No courses have been created yet." : "Your manager has not published any training assigned to you yet.")</p> }
+                @foreach (var course in workspace.Courses)
+                {
+                    var lessons = workspace.Lessons.Where(l => l.CourseId == course.Id).ToList();
+                    <article class="team-course">
+                        <h3>@course.Title</h3><p class="team-preserve">@course.Description</p>
+                        @if (workspace.CanManage)
+                        {
+                            <p><strong>@(course.Published ? "Published" : "Draft")</strong> · @lessons.Count lessons</p>
+                            <details><summary>Edit course and publishing</summary>
+                                <form method="post" action="@Action("course")" data-enhance="false" class="team-form">
+                                    <AntiforgeryToken /><input type="hidden" name="id" value="@course.Id" /><input type="hidden" name="version" value="@course.Version" />
+                                    <label>Title<input name="title" value="@course.Title" required maxlength="120" /></label>
+                                    <label>Description<textarea name="description" maxlength="2000" rows="2">@course.Description</textarea></label>
+                                    <label>Visibility<select name="published"><option value="false" selected="@(!course.Published)">Draft — visible to you</option><option value="true" selected="@course.Published">Published — visible to assigned employees</option></select></label>
+                                    <button type="submit">Save course</button>
+                                </form>
+                            </details>
+                            <details><summary>Assignments and progress</summary>
+                                @foreach (var member in workspace.Members)
+                                {
+                                    var assignment = workspace.Assignments.FirstOrDefault(a => a.CourseId == course.Id && a.MemberId == member.Id);
+                                    var assigned = assignment?.Active == true;
+                                    var completed = lessons.Count(l => workspace.Progress.Any(p => p.MemberId == member.Id && p.LessonId == l.Id && p.Completed));
+                                    <div class="team-assignment"><p><strong>@member.Name</strong> · @(assigned ? "Assigned" : "Not assigned") · @completed / @lessons.Count complete @(member.Active ? "" : "· access paused")</p>
+                                        @if (member.Active || assigned)
+                                        {
+                                            <form method="post" action="@Action("assignment")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="course" value="@course.Id" /><input type="hidden" name="member" value="@member.Id" /><input type="hidden" name="version" value="@(assignment?.Version ?? -1)" /><input type="hidden" name="active" value="@Flag(!assigned)" /><button type="submit" class="team-secondary">@(assigned ? "Revoke assignment" : "Assign course")</button></form>
+                                        }
+                                    </div>
+                                }
+                            </details>
+                            <details><summary>Add a video lesson</summary>
+                                <form method="post" action="@Action("lesson")" data-enhance="false" class="team-form">
+                                    <AntiforgeryToken /><input type="hidden" name="course" value="@course.Id" />
+                                    <label>Lesson title<input name="title" required maxlength="120" /></label>
+                                    <label>Lesson notes<textarea name="description" maxlength="4000" rows="2"></textarea></label>
+                                    <label>YouTube or Vimeo link<input type="url" name="video" maxlength="2000" placeholder="https://…" /></label>
+                                    <label>Or choose an uploaded video<select name="uploaded_video"><option value="">Use the video link above</option>@foreach (var video in workspace.UploadedVideos ?? []) { <option value="@video.Id">@video.Name</option> }</select></label>
+                                    <p class="team-note">Choose one video source. <a href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/media")">Upload a private video in Files</a>.</p>
+                                    <label>Position<input type="number" name="position" min="1" max="999" value="@(lessons.Count + 1)" required /></label>
+                                    <button type="submit" disabled="@(lessons.Count >= 40)">Add lesson</button>
+                                </form>
+                            </details>
+                        }
+                        else
+                        {
+                            var done = lessons.Count(l => workspace.Progress.Any(p => p.LessonId == l.Id && p.Completed));
+                            <p><strong>@done of @lessons.Count lessons complete</strong></p>
+                        }
+                        @foreach (var lesson in lessons)
+                        {
+                            var complete = workspace.Progress.Any(p => p.MemberId == workspace.MemberId && p.LessonId == lesson.Id && p.Completed);
+                            <section class="team-lesson"><h4>@lesson.Position. @lesson.Title</h4><p class="team-preserve">@lesson.Description</p>
+                                @if (!string.IsNullOrEmpty(lesson.VideoSource))
+                                {
+                                    @if (lesson.VideoKind == "upload")
+                                    { <video class="team-video" src="@lesson.VideoSource" controls preload="metadata" playsinline aria-label="@lesson.Title"></video> }
+                                    else
+                                    { <iframe class="team-video" src="@lesson.VideoSource" title="@lesson.Title" loading="lazy" allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe> }
+                                    <p><a href="@lesson.VideoSource" target="_blank" rel="noopener noreferrer">Open video in a separate tab</a></p>
+                                }
+                                else { <p class="team-note">This video is not available here yet. Ask your manager for the lesson material.</p> }
+                                @if (!workspace.CanManage)
+                                {
+                                    <p>@(complete ? "Completed" : "Ready when you are")</p>
+                                    <form method="post" action="@Action("progress")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="id" value="@lesson.Id" /><input type="hidden" name="completed" value="@Flag(!complete)" /><button type="submit">@(complete ? "Mark not complete" : "I completed this lesson")</button></form>
+                                }
+                                else
+                                {
+                                    <details><summary>Edit this lesson</summary>
+                                        <form method="post" action="@Action("lesson")" data-enhance="false" class="team-form"><AntiforgeryToken /><input type="hidden" name="id" value="@lesson.Id" /><input type="hidden" name="course" value="@course.Id" /><input type="hidden" name="version" value="@lesson.Version" />
+                                            <label>Title<input name="title" value="@lesson.Title" required maxlength="120" /></label><label>Notes<textarea name="description" maxlength="4000" rows="2">@lesson.Description</textarea></label>
+                                            <label>YouTube or Vimeo link<input type="url" name="video" value="@(lesson.VideoKind == "upload" ? "" : lesson.VideoSource)" maxlength="2000" /></label>
+                                            <label>Or choose an uploaded video<select name="uploaded_video"><option value="">Use the video link above</option>@foreach (var video in workspace.UploadedVideos ?? []) { <option value="@video.Id" selected="@(lesson.UploadedVideoId == video.Id)">@video.Name</option> }</select></label>
+                                            <p class="team-note">Choose one video source; clear the link when using an uploaded video.</p>
+                                            <label>Position<input name="position" type="number" value="@lesson.Position" required min="1" max="999" /></label><button type="submit">Save lesson</button>
+                                        </form>
+                                        @if (!course.Published)
+                                        {
+                                            <form method="post" action="@Action("lesson-delete")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="id" value="@lesson.Id" /><input type="hidden" name="version" value="@lesson.Version" /><p class="team-note">Removing a lesson also removes its completion history.</p><button class="team-secondary" type="submit">Remove lesson</button></form>
+                                        }
+                                    </details>
+                                }
+                            </section>
+                        }
+                    </article>
+                }
+            </section>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private TideCasa.Contracts.StaffTrainingWorkspace? workspace;
+    private string? error;
+    private string CurrentPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/team";
+    private string Action(string action) => "/team/manage/" + Uri.EscapeDataString(TenantId) + "/" + action;
+    private IEnumerable<TeamMember> ActiveMembers => workspace?.Members.Where(m => m.Active) ?? [];
+    private string MemberName(string id) => workspace?.Members.FirstOrDefault(m => m.Id == id)?.Name ?? "Former team member";
+    private static string Flag(bool flag) => flag ? "true" : "false";
+    private static string Role(string role) => role == "driver" ? "Driver" : "Kitchen";
+    private static string Time(string stamp)
+    {
+        if (!DateTimeOffset.TryParse(stamp, out var value)) return stamp;
+        return TimeZoneInfo.ConvertTime(value, TimeZoneInfo.FindSystemTimeZoneById("America/New_York")).ToString("MMM d, yyyy h:mm tt", System.Globalization.CultureInfo.GetCultureInfo("en-US")) + " Eastern";
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open your team."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.WorkspaceAsync(TenantId, token, HttpContext.RequestAborted);
+        if (result.Succeeded) { workspace = result.Value; return; }
+        HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403;
+        error = result.Uncertain ? "Your team could not be loaded. Please try again shortly." : "This account does not have active access to this restaurant team.";
+    }
+}

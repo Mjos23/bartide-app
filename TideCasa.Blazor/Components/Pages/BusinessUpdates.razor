@@ -1,0 +1,82 @@
+@page "/updates/{Slug}"
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.BusinessPosts
+@inject BusinessPostsClient Api
+<PageTitle>@(feed?.Name ?? "Your local spot") · Latest updates | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/business-posts.css" /></HeadContent>
+<div class="bt-unified restaurant-ordering business-posts">
+    <header class="ordering-nav"><a href="@($"/order/{Uri.EscapeDataString(Slug)}")">← Menu and ordering</a><a href="/account">Your account</a></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">GOOD NIGHTS START HERE</p><h1>@(feed?.Name ?? "Latest updates")</h1>
+        @if (BusinessPostsFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-error" role="alert">@error</p> }
+        @if (feed is not null)
+        {
+            <nav class="rm-workspace-nav" aria-label="Business"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")">Customer rewards</a><a href="@($"/events/{Uri.EscapeDataString(Slug)}")">Events and RSVP</a></nav>
+            <section class="ordering-panel posts-follow">
+                <h2>Get the next update on your phone.</h2><p>Music, specials and news from @feed.Name. Turn on alerts for this device, and choose to stop them whenever you like.</p>
+                @if (!feed.PushAvailable) { <p class="ordering-note">Phone notifications aren’t available for this app yet. You can read every published update below.</p> }
+                else if (!signedIn) { <a class="bt-one-button" href="@("/signin?return_to=" + Uri.EscapeDataString(BusinessPostsFlow.Public(Slug)))">Sign in to get updates</a> }
+                else if (subscriptions is not null)
+                {
+                    <div data-post-push data-vapid="@feed.VapidPublicKey" data-subscribe="@(BusinessPostsFlow.Subscriptions(Slug) + "/subscribe")">
+                        <form data-push-token><AntiforgeryToken /></form>
+                        <button type="button" class="bt-one-button" data-push-enable disabled>Notify me on this device</button>
+                        <p class="ordering-note" data-push-status role="status" aria-live="polite">Checking this browser…</p>
+                        <noscript><p>Turn on JavaScript to set up phone notifications. You can still read updates and stop existing alerts here.</p></noscript>
+                        @foreach (var item in subscriptions.Subscriptions) { <span hidden data-push-id="@item.Id" data-push-hash="@item.EndpointHash"></span> }
+                    </div>
+                }
+                <p class="ordering-note">On iPhone or iPad, first add this app to your Home Screen, open it there, then allow notifications. On other supported devices, allow them in your browser. Device settings can delay or silence alerts.</p>
+            </section>
+            <section aria-labelledby="updates-title"><h2 id="updates-title">Latest from @feed.Name</h2>
+                @if (feed.Posts.Count == 0) { <p>No updates yet. Check back for what’s next.</p> }
+                @foreach (var post in feed.Posts)
+                {
+                    <article class="ordering-panel" id="@("post-" + post.Id)"><p class="bt-one-kicker">@BusinessPostsFlow.When(post.PublishedAt)</p><h3>@post.Title</h3><p class="posts-body">@post.Body</p></article>
+                }
+            </section>
+        }
+        @if (subscriptions?.Subscriptions.Count > 0)
+        {
+            <section class="ordering-panel"><details class="posts-devices"><summary>Manage your alerts for this business</summary>
+                @foreach (var item in subscriptions.Subscriptions)
+                {
+                    <form method="post" action="@(BusinessPostsFlow.Subscriptions(Slug) + "/" + item.Id + "/remove")" data-enhance="false" data-device-form="@item.Id">
+                        <AntiforgeryToken /><span>Device enabled @BusinessPostsFlow.When(item.CreatedAt)<strong data-current-device hidden> · This device</strong></span>
+                        <button class="ordering-secondary" type="submit">Stop alerts for this device</button>
+                    </form>
+                }
+            </details></section>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private BusinessPostsFeed? feed;
+    private MyPushSubscriptions? subscriptions;
+    private bool signedIn;
+    private string? error;
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Api.SendAsync<BusinessPostsFeed>(BusinessPostsClient.PublicPath(Slug), HttpMethod.Get, null, null, HttpContext.RequestAborted);
+        if (!response.Succeeded || response.Value is null) { error = response.Uncertain ? "Updates could not be loaded. Please try again shortly." : "Updates are not available for this business."; HttpContext.Response.StatusCode = response.Uncertain ? 503 : 404; }
+        else feed = response.Value;
+        // Keep a customer's opt-out accessible even while the business's public app is paused.
+        signedIn = HttpContext.User.Identity?.IsAuthenticated == true;
+        if (signedIn && HttpContext.Items[AuthFlow.TokenItem] is string token)
+        {
+            var mine = await Api.SendAsync<MyPushSubscriptions>(BusinessPostsClient.PublicPath(Slug, "/subscriptions/mine"), HttpMethod.Get, null, token, HttpContext.RequestAborted);
+            if (mine.Succeeded && mine.Value is not null)
+            {
+                subscriptions = mine.Value;
+                // Razor's not-found response suppresses markup. A verified customer
+                // with saved alerts must still receive the private opt-out form.
+                if (feed is null && subscriptions.Subscriptions.Count > 0) HttpContext.Response.StatusCode = 200;
+            }
+            else error = "Your alert settings could not be loaded. Refresh this page before changing them.";
+        }
+    }
+}

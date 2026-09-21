@@ -1,0 +1,73 @@
+@page "/events/{Slug}"
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.Events
+@inject EventsClient Api
+<PageTitle>@(venue?.Name ?? "Live events") | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/events.css" /></HeadContent>
+<div class="bt-unified restaurant-ordering tide-events">
+    <header class="ordering-nav"><a href="@($"/order/{Uri.EscapeDataString(Slug)}")">← Menu and ordering</a><a href="/account">Your account</a></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">MAKE A NIGHT OF IT</p><h1>@(venue?.Name ?? "Live events")</h1><p class="events-intro">Good company. Something to look forward to. Save your place at an upcoming event.</p>
+        @if (EventsFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error</p> }
+        @if (venue is not null)
+        {
+            <p><a class="bt-one-link" href="@($"/updates/{Uri.EscapeDataString(Slug)}")">Latest updates and phone alerts →</a></p>
+            @if (venue.Events.Count == 0) { <section class="ordering-panel"><h2>More good times on the way</h2><p>There are no upcoming events listed right now. Check back soon.</p></section> }
+            <div class="events-public-grid">
+                @foreach (var item in venue.Events.OrderBy(x => x.StartsAt))
+                {
+                    var reservation = reservations?.Reservations.FirstOrDefault(x => x.Event.Id == item.Id)?.Rsvp;
+                    <article class="ordering-panel events-public-card">
+                        <p class="events-date">@EventsFlow.When(item)</p><h2>@item.Title</h2><p class="events-description">@item.Details</p><p><strong>Where</strong><br />@item.Location</p>
+                        <p>@(Math.Max(0, item.Capacity - item.Reserved)) places available</p>
+                        @if (reservation?.State == "checked_in") { <p class="ordering-notice">You’re checked in. Enjoy the event!</p> }
+                        else if (reservation?.State == "confirmed")
+                        {
+                            <p class="ordering-notice">You’re on the guest list · one place reserved.</p>
+                            <form method="post" action="@RsvpPath(item.Id)" data-enhance="false"><AntiforgeryToken /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" /><input name="version" type="hidden" value="@reservation.Version" /><input name="action" type="hidden" value="cancel" /><button class="ordering-secondary" type="submit">Cancel my RSVP</button></form>
+                        }
+                        else if (!EventsFlow.ReservationsOpen(item)) { <p>Reservations have closed.</p> }
+                        else if (item.Reserved >= item.Capacity) { <p class="ordering-notice">This event is full. Check back for a cancellation.</p> }
+                        else if (!signedIn) { <a class="bt-one-button" href="@SignInPath">Sign in to RSVP</a> }
+                        else if (reservations is not null)
+                        {
+                            <form method="post" action="@RsvpPath(item.Id)" data-enhance="false"><AntiforgeryToken /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" /><input name="version" type="hidden" value="@(reservation?.Version ?? -1)" /><input name="action" type="hidden" value="attend" /><button class="bt-one-button" type="submit">RSVP · Save my place</button></form>
+                            <p class="ordering-note">One place per account. Your name and email are shared privately with the business for its guest list.</p>
+                        }
+                    </article>
+                }
+            </div>
+            @if (reservations?.Reservations.Any(x => x.Event.State == "cancelled" && x.Rsvp.State != "cancelled") == true)
+            {
+                <section class="ordering-panel"><h2>Reservation updates</h2>
+                    @foreach (var item in reservations.Reservations.Where(x => x.Event.State == "cancelled" && x.Rsvp.State != "cancelled"))
+                    { <article class="events-guest"><div><h3>@item.Event.Title</h3><p>This event was cancelled by the business. Your reservation is no longer valid.</p></div></article> }
+                </section>
+            }
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private TideCasa.Contracts.RestaurantEvents? venue;
+    private MyEventReservations? reservations;
+    private string? error;
+    private bool signedIn;
+    private string SignInPath => "/signin?return_to=" + Uri.EscapeDataString(EventsFlow.Public(Slug));
+    private string RsvpPath(string id) => "/event-reservations/" + Uri.EscapeDataString(Slug) + "/" + Uri.EscapeDataString(id);
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.ListAsync(Slug, false, null, HttpContext.RequestAborted);
+        if (!result.Succeeded || result.Value is null) { error = result.Uncertain ? "Events could not be loaded. Please try again shortly." : "Events are not available for this business."; HttpContext.Response.StatusCode = result.Uncertain ? 503 : 404; return; }
+        venue = result.Value; signedIn = HttpContext.User.Identity?.IsAuthenticated == true;
+        if (signedIn && HttpContext.Items[AuthFlow.TokenItem] is string token)
+        {
+            var mine = await Api.MineAsync(Slug, token, HttpContext.RequestAborted);
+            if (mine.Succeeded) reservations = mine.Value;
+            else error = "Your reservations could not be loaded. Refresh this page before making a change.";
+        }
+    }
+}

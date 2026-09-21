@@ -1,0 +1,11 @@
+@page "/signout"
+@page "/auth/signout"
+@attribute [ExcludeFromInteractiveRouting]
+<PageTitle>Sign out | Tide Casa</PageTitle>
+<AuthFrame Title="Ready to sign out?" Description="End your session on this device.">
+    <form method="post" action="/auth/session/signout" data-enhance="false">
+        <AntiforgeryToken />
+        <button class="bt-one-button" type="submit">Sign out</button>
+    </form>
+    <p><a href="/account">Return to your account</a></p>
+</AuthFrame>

@@ -1,0 +1,295 @@
+# Preparation template, not a deployed app or a ready-to-submit account spec.
+# Replace source/secret placeholders only after inspecting the actual accounts.
+# Root must integrate and verify PostgreSQL, encrypted durable keys and DO ingress.
+# The release source must exclude/preserve unfinished demos and pipeline work.
+name: bartide-csharp
+# Candidate nearest the existing Supabase AWS us-west-2 project; verify availability.
+region: sfo
+disable_edge_cache: true
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
+# App Platform terminates public HTTPS. Do not copy the Droplet Caddy component.
+# No custom domains are attached here: the existing Worker routes remain intact.
+ingress:
+  rules:
+    - match:
+        path:
+          exact: /api/v1/webhooks/stripe/service
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        path:
+          exact: /api/stripe/connect/webhook
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        path:
+          exact: /api/stripe/accounts/webhook
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        path:
+          prefix: /
+      component:
+        name: web
+        preserve_path_prefix: true
+
+services:
+  - name: api
+    github:
+      repo: Mjos23/bartide-app
+      branch: main
+      deploy_on_push: false
+    source_dir: /
+    dockerfile_path: deploy/app-platform/Dockerfile.api
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    instance_count: 1
+    http_port: 8080
+    internal_ports:
+      - 8080
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 30
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 6
+    alerts:
+      - rule: MEM_UTILIZATION
+        operator: GREATER_THAN
+        value: 80
+        window: FIVE_MINUTES
+    envs:
+      - key: RELEASE_SOURCE_REVIEWED
+        scope: BUILD_TIME
+        value: "false"
+      - key: ASPNETCORE_ENVIRONMENT
+        scope: RUN_TIME
+        value: Production
+      - key: DOTNET_ENVIRONMENT
+        scope: RUN_TIME
+        value: Production
+      - key: ASPNETCORE_URLS
+        scope: RUN_TIME
+        value: http://+:8080
+      - key: AllowedHosts
+        scope: RUN_TIME
+        value: api;localhost;127.0.0.1;${APP_DOMAIN}
+      - key: ReverseProxy__Provider
+        scope: RUN_TIME
+        value: DigitalOceanAppPlatform
+      - key: ReverseProxy__InternalToken
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_SHARED_RANDOM_INTERNAL_PROXY_TOKEN
+      - key: Storage__Provider
+        scope: RUN_TIME
+        value: PostgreSql
+      - key: Storage__PostgresSchema
+        scope: RUN_TIME
+        value: tide_casa
+      # Proposed initial API pool maximum: 5, minimum: 0, pending account budget.
+      - key: ConnectionStrings__Application
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_API_SESSION_POOLER_CONNECTION_STRING
+      - key: Auth__Enabled
+        scope: RUN_TIME
+        value: "false"
+      - key: Auth__SupabaseUrl
+        scope: RUN_TIME
+        value: https://eerdotgmssernhnhggqw.supabase.co
+      - key: Auth__PublishableKey
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_EXISTING_PROJECT_PUBLISHABLE_KEY
+      - key: Auth__PlatformOwnerUserId
+        scope: RUN_TIME
+        value: REPLACE_WITH_VERIFIED_APPLICATION_OWNER_USER_ID
+      - key: Auth__AllowLocalTestProvider
+        scope: RUN_TIME
+        value: "false"
+      - key: Ordering__PublicBaseUrl
+        scope: RUN_TIME
+        value: ${APP_URL}
+      - key: Media__Provider
+        scope: RUN_TIME
+        value: disabled
+      - key: Media__AllowLocalStore
+        scope: RUN_TIME
+        value: "false"
+      - key: Media__MaxApplicationBytes
+        scope: RUN_TIME
+        value: "4294967296"
+      - key: Media__R2__AccountId
+        scope: RUN_TIME
+        value: 51e1ec9e2e9afa464c3e7175662f18e3
+      - key: Media__R2__Bucket
+        scope: RUN_TIME
+        value: bartide-production-private
+      - key: Media__R2__AccessKeyId
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_SCOPED_R2_ACCESS_KEY_ID
+      - key: Media__R2__SecretAccessKey
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_SCOPED_R2_SECRET_ACCESS_KEY
+      - key: Notifications__Mode
+        scope: RUN_TIME
+        value: disabled
+      - key: Notifications__AllowLocalProvider
+        scope: RUN_TIME
+        value: "false"
+      - key: Notifications__PublicBaseUrl
+        scope: RUN_TIME
+        value: ${APP_URL}
+      - key: WebPush__Enabled
+        scope: RUN_TIME
+        value: "false"
+      - key: WebPush__AllowDevelopmentLoopback
+        scope: RUN_TIME
+        value: "false"
+      - key: Stripe__Mode
+        scope: RUN_TIME
+        value: sandbox
+      - key: Stripe__CheckoutEnabled
+        scope: RUN_TIME
+        value: "false"
+      - key: Stripe__InvoicesEnabled
+        scope: RUN_TIME
+        value: "false"
+      - key: ServiceBilling__Environment
+        scope: RUN_TIME
+        value: sandbox
+      - key: ServiceBilling__LiveEnabled
+        scope: RUN_TIME
+        value: "false"
+      - key: ServiceBilling__CheckoutEnabled
+        scope: RUN_TIME
+        value: "false"
+      - key: ServiceBilling__CardsOnlyVerified
+        scope: RUN_TIME
+        value: "false"
+      - key: ServiceBilling__AllowLocalTestProvider
+        scope: RUN_TIME
+        value: "false"
+      - key: ServiceBilling__RestrictedKey
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_VERIFIED_RESTRICTED_SANDBOX_KEY
+      - key: ServiceBilling__WebhookSecret
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_SERVICE_WEBHOOK_SIGNING_SECRET
+      - key: ServiceBilling__AccountId
+        scope: RUN_TIME
+        value: REPLACE_WITH_VERIFIED_STRIPE_SANDBOX_ACCOUNT_ID
+      - key: ServiceBilling__PaymentMethodConfigurationId
+        scope: RUN_TIME
+        value: REPLACE_WITH_VERIFIED_CARDS_ONLY_CONFIGURATION_ID
+      - key: ServiceBilling__PublicOrigin
+        scope: RUN_TIME
+        value: ${APP_URL}
+      # Current merchant implementation is test-only; these stay off.
+      - key: MerchantPayments__OnboardingEnabled
+        scope: RUN_TIME
+        value: "false"
+      - key: MerchantPayments__CheckoutEnabled
+        scope: RUN_TIME
+        value: "false"
+      - key: MerchantPayments__CardsOnlyVerified
+        scope: RUN_TIME
+        value: "false"
+      - key: MerchantPayments__AllowLocalTestProvider
+        scope: RUN_TIME
+        value: "false"
+      - key: MerchantPayments__RestrictedKey
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_VERIFIED_RESTRICTED_SANDBOX_KEY
+      - key: MerchantPayments__PlatformAccountId
+        scope: RUN_TIME
+        value: REPLACE_WITH_VERIFIED_STRIPE_SANDBOX_ACCOUNT_ID
+      - key: MerchantPayments__ConnectWebhookSecret
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_CONNECT_WEBHOOK_SIGNING_SECRET
+      - key: MerchantPayments__AccountWebhookSecret
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_ACCOUNT_WEBHOOK_SIGNING_SECRET
+      - key: MerchantPayments__PublicBaseUrl
+        scope: RUN_TIME
+        value: ${APP_URL}
+
+  - name: web
+    github:
+      repo: Mjos23/bartide-app
+      branch: main
+      deploy_on_push: false
+    source_dir: /
+    dockerfile_path: deploy/app-platform/Dockerfile.web
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    instance_count: 1
+    http_port: 8080
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 30
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 6
+    alerts:
+      - rule: MEM_UTILIZATION
+        operator: GREATER_THAN
+        value: 80
+        window: FIVE_MINUTES
+    envs:
+      - key: RELEASE_SOURCE_REVIEWED
+        scope: BUILD_TIME
+        value: "false"
+      - key: ASPNETCORE_ENVIRONMENT
+        scope: RUN_TIME
+        value: Production
+      - key: DOTNET_ENVIRONMENT
+        scope: RUN_TIME
+        value: Production
+      - key: ASPNETCORE_URLS
+        scope: RUN_TIME
+        value: http://+:8080
+      - key: AllowedHosts
+        scope: RUN_TIME
+        value: web;localhost;127.0.0.1;${APP_DOMAIN}
+      - key: Api__BaseUrl
+        scope: RUN_TIME
+        value: http://api:8080/
+      - key: ReverseProxy__Provider
+        scope: RUN_TIME
+        value: DigitalOceanAppPlatform
+      - key: ReverseProxy__InternalToken
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_SHARED_RANDOM_INTERNAL_PROXY_TOKEN
+      - key: Storage__Provider
+        scope: RUN_TIME
+        value: PostgreSql
+      - key: Storage__PostgresSchema
+        scope: RUN_TIME
+        value: tide_casa
+      - key: DataProtection__Provider
+        scope: RUN_TIME
+        value: PostgreSql
+      # Proposed initial Web pool maximum: 2, minimum: 0, pending account budget.
+      - key: ConnectionStrings__Application
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_WEB_SESSION_POOLER_CONNECTION_STRING
+      # Stable base64 encoding of 32 random bytes. Never generate during startup.
+      - key: DataProtection__EncryptionKey
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_PROTECTED_STABLE_BASE64_32_BYTE_KEY

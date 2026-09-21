@@ -1,0 +1,60 @@
+@page "/purchase/{Plan}"
+@inject TideCasaApiClient Api
+<PageTitle>Review your package | Tide Casa</PageTitle>
+<div class="bt-unified bt-purchase-process">
+    <SiteHeader IsBarTide="@(Plan == "restaurant")" />
+    <main class="purchase-main">
+        <p class="bt-one-kicker">BUILD. LAUNCH. KEEP GROWING.</p><h1>Let’s build your app.</h1>
+        <p class="bt-purchase-intro">One setup payment. Clear monthly care. Your choices, together.</p>
+        <div class="purchase-grid">
+            <section class="purchase-package">
+                <h2>From your idea to launch.</h2>
+                <ol class="bt-purchase-timeline">
+                    <li><h3>Agree on your app.</h3><p>Review the features that fit your business and prepare your content.</p></li>
+                    <li><h3>Choose your package.</h3><p>Review the setup cost and monthly maintenance. App-store preparation is optional.</p></li>
+                    <li><h3>Build and review together.</h3><p>Confirmed initial payment starts seven calendar days of private building and review. A person approves your app with you before launch.</p></li>
+                </ol>
+                <div class="tide-maintenance-detail"><h3>What the $50/month covers</h3><p>Hosting, basic upkeep and your content editor. Major new features, outside services and store-account fees are separate.</p><p>Maintenance begins with your first payment and renews each month. Cancel before your next renewal; service continues through the paid period.</p></div>
+                <p>Your customers pay your business through your own connected Stripe account. This package is your agreement with Tide Casa.</p>
+            </section>
+            <aside class="purchase-summary" aria-label="Payment details">
+                <p class="bt-one-kicker">YOUR BUSINESS APP</p><h2>$600<span>one-time setup</span></h2>
+                <p class="tide-monthly-line"><strong>+ $50 / month</strong><br />Hosting and maintenance</p>
+                <label class="tide-store-option"><input type="checkbox" @bind="appStores" @bind:after="RefreshQuoteAsync" disabled="@loading" /><span><strong>Add app-store integration · $300 once</strong><small>Packaging and submission support for eligible stores, including Apple and Google. Store approval is separate; developer-account fees are paid by you.</small></span></label>
+                @if (quote is not null)
+                {
+                    <dl class="tide-price-breakdown">
+                        <div><dt>App setup</dt><dd>@Usd(quote.SetupCents)</dd></div>
+                        @if (quote.AppStoresCents > 0) { <div><dt>App-store package</dt><dd>@Usd(quote.AppStoresCents)</dd></div> }
+                        <div><dt>First maintenance month</dt><dd>@Usd(quote.FirstMonthCents)</dd></div>
+                        <div class="tide-first-total"><dt>First payment</dt><dd>@Usd(quote.FirstPaymentCents)</dd></div>
+                        <div><dt>Then each month</dt><dd>@Usd(quote.MonthlyCents)</dd></div>
+                    </dl>
+                }
+                @if (loading) { <p role="status">Updating your total…</p> }
+                @if (error is not null) { <p role="alert">@error</p> }
+                <p class="purchase-tax-note">USD. The app-store service is charged once. Monthly maintenance stays $50.</p>
+                @if (!string.IsNullOrEmpty(ReferralCode)) { <p>Your referral code will be checked when you review your signed-in checkout total.</p> }
+                <a class="bt-one-button" href="@($"/start/{(Plan == "restaurant" ? "restaurant" : "business")}?appStores={appStores.ToString().ToLowerInvariant()}&referralCode={Uri.EscapeDataString(ReferralCode is { Length: <=32 } ? ReferralCode : "")}")">Continue with your business</a>
+                <p><a class="bt-one-link" href="/book-a-demo">Book a demo first</a></p>
+            </aside>
+        </div>
+    </main><SiteFooter IsBarTide="@(Plan == "restaurant")" />
+</div>
+@code {
+    [Parameter] public string Plan { get; set; } = "business";
+    [SupplyParameterFromQuery(Name="ref")] public string? ReferralCode { get; set; }
+    private bool appStores, loading;
+    private PackageQuote? quote;
+    private string? error;
+    protected override Task OnInitializedAsync() => RefreshQuoteAsync();
+    private async Task RefreshQuoteAsync()
+    {
+        loading = true; error = null; quote = null;
+        try { quote = await Api.GetQuoteAsync(appStores); }
+        catch (ApiRequestException ex) { error = ex.Message; }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { error = "Your total could not be confirmed. Please try again shortly."; }
+        finally { loading = false; }
+    }
+    private static string Usd(int cents) => (cents / 100m).ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+}

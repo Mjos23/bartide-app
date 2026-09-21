@@ -1,0 +1,17 @@
+@page "/signin"
+@page "/auth/signin"
+@attribute [ExcludeFromInteractiveRouting]
+@inherits AuthPageBase
+
+<PageTitle>Welcome back. | Tide Casa</PageTitle>
+<AuthFrame Title="Welcome back." Description="Sign in to your business workspace.">
+    @if (NoticeText is not null) { <p role="status">@NoticeText</p> }
+    <form method="post" action="/auth/session/signin" data-enhance="false">
+        <AntiforgeryToken />
+        <input type="hidden" name="return_to" value="@ReturnPath" />
+        <label class="desk-field" for="email">Email address<input id="email" name="email" type="email" autocomplete="username" maxlength="254" required /></label>
+<label class="desk-field" for="password">Password<input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" required /></label>
+        <button class="bt-one-button" type="submit">Sign in</button>
+    </form>
+    <p><a href="@AuthLink("/forgot-password")">Forgot your password?</a></p><p>New here? <a href="@AuthLink("/signup")">Create an account</a>.</p><p><a href="@AuthLink("/verify-email")">Verify your email</a></p>
+</AuthFrame>

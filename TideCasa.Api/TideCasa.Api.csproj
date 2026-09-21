@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>TideCasa-Api-Development</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\SharedHosting\AppPlatformIngress.cs" Link="Hosting\AppPlatformIngress.cs" />
+    <EmbeddedResource Include="Migrations\*.sql;Migrations\manifest.json" LogicalName="TideCasa.Api.Migrations.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="FeatureMigrations\*.sql" LogicalName="TideCasa.Api.FeatureMigrations.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="PostgresMigrations\*.sql;PostgresMigrations\*.json" LogicalName="TideCasa.Api.PostgresMigrations.%(Filename)%(Extension)" />
+    <ProjectReference Include="..\TideCasa.Contracts\TideCasa.Contracts.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+    <PackageReference Include="Lib.Net.Http.WebPush" Version="3.3.1" />
+    <PackageReference Include="Stripe.net" Version="52.4.2" />
+    <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
+    <PackageReference Include="SkiaSharp" Version="4.152.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.1" />
+  </ItemGroup>
+</Project>
