@@ -51,7 +51,7 @@ internal static class AppPlatformIngressChecks
         static bool Arrived(DefaultHttpContext context) => context.Items.ContainsKey("arrived");
         var web = Pipeline(false);
         var api = Pipeline(true);
-        foreach (var peer in new[] { "127.0.0.1", "::1", "10.1.2.3", "172.16.0.2", "172.31.255.254", "192.168.1.2", "fd00::2", "::ffff:10.1.2.3" })
+        foreach (var peer in new[] { "127.0.0.1", "::1", "10.1.2.3", "172.16.0.2", "172.31.255.254", "192.168.1.2", "fd00::2", "::ffff:10.1.2.3", "100.64.0.0", "100.127.255.255", "::ffff:100.127.9.223" })
         {
             var request = Request(peer); Edge(request);
             request.Request.Headers["X-Forwarded-For"] = "198.51.100.99";
@@ -67,7 +67,7 @@ internal static class AppPlatformIngressChecks
                 && !request.Request.Headers.ContainsKey(AppPlatformIngress.TokenHeader)
                 && !request.Request.Headers.ContainsKey(AppPlatformIngress.ClientHeader));
         }
-        foreach (var peer in new string?[] { null, "198.51.100.2", "172.15.0.2", "172.32.0.2", "192.169.0.2", "2001:db8::2" })
+        foreach (var peer in new string?[] { null, "198.51.100.2", "172.15.0.2", "172.32.0.2", "192.169.0.2", "2001:db8::2", "100.63.255.255", "100.128.0.0", "::ffff:100.128.0.0" })
         {
             var request = Request(peer); Edge(request);
             request.Request.Headers[AppPlatformIngress.TokenHeader] = Token;

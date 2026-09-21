@@ -20,9 +20,9 @@
     "gitBlobSha": "326ea9ee65d785ef13f842d2f166c2494b20706a"
   },
   "deploy/app-platform/README.md": {
-    "bytes": 22032,
-    "sha256": "047a13ebc4145a5ead3e017f9a76070cccdc1527662c031176791a7c23a61a5e",
-    "gitBlobSha": "1e62ef5b86724ef622f93a9df0ea3036f094629f"
+    "bytes": 22398,
+    "sha256": "9cf180837986eadf622e00f90814375b72639732f0f333de5b8edbfe33fe8530",
+    "gitBlobSha": "73d86ab73258921a4166b0dae626b3dc411c0085"
   },
   "deploy/app-platform/supabase-prod-ca-2021.crt": {
     "bytes": 1367,
@@ -205,9 +205,9 @@
     "gitBlobSha": "6a50267fa67e9ef8570b87c33f82efe5d7b5f8d2"
   },
   "SharedHosting/AppPlatformIngress.cs": {
-    "bytes": 4396,
-    "sha256": "d11f511451f5912fe1db9c9412f25fb7e112f8dc6390fa7c969795a40539c385",
-    "gitBlobSha": "f5651bcdbe2ee7535da9d20597ac13549d9533b3"
+    "bytes": 5121,
+    "sha256": "944b657616817a53fd224fafdb9eac72b47f07fedc0dee66b8774ada5f2b220d",
+    "gitBlobSha": "18d6ca9cb1ca3732688c859b7732a616b7905182"
   },
   "TideCasa.Api/appsettings.json": {
     "bytes": 558,
@@ -1760,9 +1760,9 @@
     "gitBlobSha": "6b63358daeb1c66205e2d886d5e561478d547c75"
   },
   "TideCasa.Persistence.Checks/AppPlatformIngressChecks.cs": {
-    "bytes": 10742,
-    "sha256": "9d9564af4cd963476a720854dfef69e25cdad6e4aaee1d20d7b9b49303ceebe3",
-    "gitBlobSha": "274c6f8e03d9eee1ca2482bed48594ab14aebd2f"
+    "bytes": 10854,
+    "sha256": "b55c3302909a36e2698a84086abe1b4c03b103b59d8f7dab63a0a6e4ae1be71a",
+    "gitBlobSha": "755728905db7f52c094395788f3f846a37bab5d2"
   },
   "TideCasa.Persistence.Checks/Program.cs": {
     "bytes": 5557,

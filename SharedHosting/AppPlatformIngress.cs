@@ -31,8 +31,9 @@ public static class AppPlatformIngress
             }
             if (context.Request.Path == "/health") { await next(); return; }
             var peer = context.Connection.RemoteIpAddress;
-            if (peer is null || !PrivatePeer(peer)) { Reject("transport_peer"); return; }
+            if (peer is null || !PlatformPeer(peer)) { Reject("transport_peer"); return; }
             IPAddress? client;
+            var internalHop = false;
             if (api && context.Request.Headers.TryGetValue(TokenHeader, out var supplied) && supplied.Count == 1
                 && supplied[0] is { Length: <= 200 } presented
                 && CryptographicOperations.FixedTimeEquals(expected, SHA256.HashData(Encoding.UTF8.GetBytes(presented))))
@@ -41,6 +42,7 @@ public static class AppPlatformIngress
                 // headers are never enough to impersonate the internal forwarding hop.
                 client = ReadAddress(context.Request.Headers[ClientHeader]);
                 if (client is null) { Reject("internal_client"); return; }
+                internalHop = true;
             }
             else
             {
@@ -58,6 +60,12 @@ public static class AppPlatformIngress
             context.Request.Headers.Remove("X-Forwarded-Host");
             context.Connection.RemoteIpAddress = client;
             context.Request.Scheme = "https";
+            if (diagnostics is not null)
+            {
+                var normalized = client.IsIPv4MappedToIPv6 ? client.MapToIPv4() : client;
+                diagnostics.LogInformation("Ingress accepted; transport peer {Peer}; client fingerprint {ClientFingerprint}; internal hop {InternalHop}",
+                    peer, Convert.ToHexString(SHA256.HashData(normalized.GetAddressBytes()))[..16], internalHop);
+            }
             await next();
         });
     }
@@ -65,12 +73,15 @@ public static class AppPlatformIngress
     private static IPAddress? ReadAddress(Microsoft.Extensions.Primitives.StringValues values) =>
         values.Count == 1 && IPAddress.TryParse(values[0], out var address) ? address : null;
 
-    private static bool PrivatePeer(IPAddress address)
+    private static bool PlatformPeer(IPAddress address)
     {
         if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
         if (IPAddress.IsLoopback(address)) return true;
         var bytes = address.GetAddressBytes();
+        // App Platform ingress was observed on RFC 6598 shared address space.
+        // This allowance applies only in the provider-specific deployment mode.
         return bytes.Length == 4 ? bytes[0] == 10 || bytes[0] == 172 && bytes[1] is >= 16 and <= 31 || bytes[0] == 192 && bytes[1] == 168
+            || bytes[0] == 100 && bytes[1] is >= 64 and <= 127
             : (bytes[0] & 0xfe) == 0xfc;
     }
 }
