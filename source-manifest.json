@@ -5,9 +5,9 @@
     "gitBlobSha": "20d9762dd021a33c0577b1f552a856434b7b5d28"
   },
   "deploy/app-platform/app.template.yaml": {
-    "bytes": 9370,
-    "sha256": "d796d986bdb6487704e9b2af960d69c04254cc66bcd512323b20a6fd4b645c86",
-    "gitBlobSha": "e66198484448d853237d4acc0615229d20652d28"
+    "bytes": 9501,
+    "sha256": "78cf7e7d4892865437c818b4e6a44f7ee3e84705b7b78f53426dfa86fd7994c4",
+    "gitBlobSha": "d6685378c4ff4c4121a5179b88dba9cc92c0a812"
   },
   "deploy/app-platform/Dockerfile.api": {
     "bytes": 1210,
@@ -20,9 +20,9 @@
     "gitBlobSha": "326ea9ee65d785ef13f842d2f166c2494b20706a"
   },
   "deploy/app-platform/README.md": {
-    "bytes": 20197,
-    "sha256": "65097730a17e748d2e872ecefa5e8767cde49a6a4b019a36ed0279ef09d96ba5",
-    "gitBlobSha": "a43ed5b55a6ab44865e6f89dc779a47c61eed288"
+    "bytes": 21556,
+    "sha256": "f73dcc9d51df316bc4325d138db60c3b58ef63da4e2b815c26297eb892967980",
+    "gitBlobSha": "4d327b920db9024f279c5069d60181aca2bb7a8e"
   },
   "deploy/app-platform/supabase-prod-ca-2021.crt": {
     "bytes": 1367,

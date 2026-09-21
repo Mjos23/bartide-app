@@ -2,12 +2,16 @@
 
 This folder contains a two-service template for the PostgreSQL-backed application. The local migration, encrypted key storage, restricted database roles and internal forwarding have been exercised successfully. Account setup, Linux builds and hosted verification remain required. The template itself does not deploy anything.
 
-- [app.template.yaml](app.template.yaml): API and Web, one fixed 512 MiB container each, exact public webhook routes, runtime-secret placeholders and inactive external features.
+- [app.template.yaml](app.template.yaml): API and Web, one fixed 512 MiB container each, narrow public webhook route prefixes, runtime-secret placeholders and inactive external features.
 - [Dockerfile.api](Dockerfile.api) and [Dockerfile.web](Dockerfile.web): separate .NET 10 multi-stage images using the existing SDK version, port 8080 and the non-root runtime user.
 
 The $5 containers give a **$10/month compute baseline**. Each includes 50 GiB outbound allowance; excess transfer is $0.02/GiB and allowances pool at team level. Tax, existing Supabase/R2 usage, registry charges and any added resources are separate. No managed database, worker, dedicated IP, Caddy container or additional replica is selected. The $20 ceiling is not an automatic provider billing stop. [DigitalOcean pricing](https://docs.digitalocean.com/products/app-platform/details/pricing/).
 
 ## Current facts and remaining account checks
+
+September 21 update: the actual DigitalOcean proposal validated the two-service configuration at $10/month, and app `bb80369f-0289-44b6-9f25-d84386e9babc` was created in the verified default project. Initial Linux builds are in progress. The provider requires prefix route matching, rejects `internal_ports` duplicating `http_port`, and allows `disable_edge_cache: true` only after a custom domain is added. This template reflects those observed constraints. Application authorization, webhook signatures and no-store responses remain in place; real edge path normalization and cache behavior require hosted checks. [Platform limits](https://docs.digitalocean.com/products/app-platform/details/limits/).
+
+Supabase remote rehearsal, independent native backup restoration, restricted runtime roles, Production API startup and encrypted Web key recovery have passed. The `tide_casa` baseline is provisioned, while its 76 application tables remain empty pending final source refresh and migration. Protected evidence and credentials remain outside the source archive. The following preparation notes describe the original account inspection; use the launch checkpoint for current state.
 
 Authenticated inspection confirmed Supabase project `eerdotgmssernhnhggqw` (BarTide), Free plan, AWS `us-west-2`, approximately 26 MB of 500 MB database space. The session pooler is `aws-0-us-west-2.pooler.supabase.com:5432`; observed backend connection use was 7/60. The database password, remote restricted runtime roles, remote schema provisioning and off-host recovery remain pending. Do not deploy the administrator account as a runtime role. The template proposes `sfo` to be geographically near the existing database, subject to actual App Platform availability and measured latency.
 
@@ -62,7 +66,7 @@ All credentials are `type: SECRET`, `scope: RUN_TIME` placeholders. Add real val
 
 ## Public ingress and private API
 
-The API remains reachable by Web at `http://api:8080/`. Its component declares internal port 8080 and public ingress maps only these exact paths, preserving the original path:
+The API is configured for Web at `http://api:8080/`. Its HTTP port also serves internal traffic; it must not be duplicated in `internal_ports`. Public ingress matches the following narrow prefixes and preserves the full path. Application endpoint routing and signature validation determine which webhook requests are accepted:
 
 | Public path | Source endpoint | Purpose |
 | --- | --- | --- |
@@ -70,7 +74,7 @@ The API remains reachable by Web at `http://api:8080/`. Its component declares i
 | `/api/stripe/connect/webhook` | API MerchantPaymentsEndpoints | Connected-account snapshot notifications |
 | `/api/stripe/accounts/webhook` | API MerchantPaymentsEndpoints | Account thin notifications |
 
-The Web service receives `/` and every other path. There is no catch-all `/api` route. Public `/api/v1/auth`, owner/API data paths and API health must therefore not reach the API component. This does not remove authorization or Stripe signature checks. A wrong-method webhook request may receive 405; an invalid signed POST must fail without recording a successful event. No cross-origin browser API access is assumed. Verify edge normalization, exact-path behavior, trailing slashes and encoded paths on the real platform. The component health check probes `/health` directly; its success alone does not prove database readiness.
+The Web service receives `/` and paths outside those prefixes. There is no catch-all `/api` route. Public `/api/v1/auth`, owner/API data paths and API health must therefore not reach the API component. This does not remove authorization or Stripe signature checks. A wrong-method webhook request may receive 405; an invalid signed POST must fail without recording a successful event. No cross-origin browser API access is assumed. Verify edge normalization, unmatched webhook suffixes, trailing slashes and encoded paths on the real platform. The component health check probes `/health` directly; its success alone does not prove database readiness.
 
 When adding custom domains later, update `AllowedHosts` on both components to enumerate the generated hostname and verified custom hostnames. Retain `api` internally. Current source includes `api.tide.casa` in its defaults, but this plan does not create or expose that separate host. Public webhook URLs may use the chosen verified primary Web domain. [App spec ingress and ports](https://docs.digitalocean.com/products/app-platform/reference/app-spec/), [internal routing](https://docs.digitalocean.com/products/app-platform/how-to/manage-internal-routing/).
 

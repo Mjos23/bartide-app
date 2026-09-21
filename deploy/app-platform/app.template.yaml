@@ -5,7 +5,9 @@
 name: bartide-csharp
 # Candidate nearest the existing Supabase AWS us-west-2 project; verify availability.
 region: sfo
-disable_edge_cache: true
+# The starter hostname requires CDN caching enabled. Disable it when adding the
+# verified custom domain; sensitive application responses already use no-store.
+disable_edge_cache: false
 alerts:
   - rule: DEPLOYMENT_FAILED
   - rule: DOMAIN_FAILED
@@ -16,19 +18,19 @@ ingress:
   rules:
     - match:
         path:
-          exact: /api/v1/webhooks/stripe/service
+          prefix: /api/v1/webhooks/stripe/service
       component:
         name: api
         preserve_path_prefix: true
     - match:
         path:
-          exact: /api/stripe/connect/webhook
+          prefix: /api/stripe/connect/webhook
       component:
         name: api
         preserve_path_prefix: true
     - match:
         path:
-          exact: /api/stripe/accounts/webhook
+          prefix: /api/stripe/accounts/webhook
       component:
         name: api
         preserve_path_prefix: true
@@ -50,8 +52,6 @@ services:
     instance_size_slug: apps-s-1vcpu-0.5gb
     instance_count: 1
     http_port: 8080
-    internal_ports:
-      - 8080
     health_check:
       http_path: /health
       initial_delay_seconds: 30
