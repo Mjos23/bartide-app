@@ -1,8 +1,10 @@
-"""Run unchanged feature assertions against isolated real PostgreSQL schemas.
+"""Run original feature workflows against isolated real PostgreSQL schemas.
 
 Build API/Web first. This runner never builds, calls real providers, or touches
 normal preview databases. The AST insertion installs test boundary adapters only;
-it does not change any assertion, workflow, seed value, or production source.
+it does not change workflows, seed values, or production source. The one literal
+SQLite-ledger assertion is explicitly replaced by a real PostgreSQL-ledger check
+and recorded in evidence. Focused media startup checks are separately labelled.
 """
 import argparse
 import ast
@@ -41,6 +43,18 @@ def child(suite, destination):
         path = ROOT / 'scripts' / ('verify-' + source_suite + '.py')
         source = path.read_text(encoding='utf-8-sig')
         tree = ast.parse(source, filename=str(path))
+        if source_suite == 'business-posts':
+            expected = "check('Eighth additive migration has recorded source checksum', history[-1][0] == 8 and history[-1][2] == hashlib.sha256((s.ROOT/'TideCasa.Api/FeatureMigrations/0008_business_posts.sql').read_bytes()).hexdigest())"
+            target = ast.dump(ast.parse(expected).body[0], include_attributes=False)
+            run_function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'run')
+            matches = [i for i, node in enumerate(run_function.body) if ast.dump(node, include_attributes=False) == target]
+            if len(matches) != 1:
+                raise RuntimeError('The SQLite-specific business-post ledger assertion changed; review its explicit provider equivalent')
+            replacement = ast.parse('_postgres_fixture.check_postgres_baseline_history(check, history)').body[0]
+            run_function.body[matches[0]] = ast.copy_location(replacement, run_function.body[matches[0]])
+            adapter.provider_assertion_adaptations.append({'original': 'Eighth additive migration has recorded source checksum',
+                'replacement': 'PostgreSQL baseline has recorded source and manifest checksums',
+                'reason': 'PostgreSQL uses one hashed version-1 baseline; it does not fabricate the SQLite migration ledger'})
         position = next(i for i, node in enumerate(tree.body) if isinstance(node, ast.Try) or
                         isinstance(node, ast.If) and isinstance(node.test, ast.Compare) and
                         isinstance(node.test.left, ast.Name) and node.test.left.id == '__name__')
@@ -78,11 +92,12 @@ def child(suite, destination):
                         'failedChecks': [row['check'] for row in records if not row['passed']],
                         'assertions': records, 'postgresVersion': adapter.server_version,
                         'assertionSourceSha256': hashlib.sha256((ROOT / 'scripts' / ('verify-' + source_suite + '.py')).read_bytes()).hexdigest(),
-                        'scope': 'Two unchanged media startup assertions only' if suite == 'media-guards' else 'Complete unchanged suite',
+                        'scope': 'Two unchanged media startup assertions only' if suite == 'media-guards' else 'Complete original workflow suite; provider metadata adaptations are listed separately',
                         'binarySha256': adapter.binaries, 'expectedBinarySha256': adapter.expected_hashes,
                         'evidenceDirectories': adapter.evidence_directories(), 'schema': adapter.schema,
                         'storageBoundaryExceptions': adapter.storage_boundary_exceptions,
-                        'startupAllowances': adapter.startup_allowances}
+                        'startupAllowances': adapter.startup_allowances,
+                        'providerAssertionAdaptations': adapter.provider_assertion_adaptations}
             try:
                 adapter.cleanup()
                 evidence['schemaRemoved'] = True

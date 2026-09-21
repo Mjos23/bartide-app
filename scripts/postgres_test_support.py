@@ -237,6 +237,7 @@ class PostgresFixture:
         self.suite = suite
         self.storage_boundary_exceptions = []
         self.startup_allowances = []
+        self.provider_assertion_adaptations = []
         self.schema = 'tide_test_' + re.sub('[^a-z0-9]', '', suite)[:20] + '_' + uuid.uuid4().hex[:16]
         self.owned = False
         self.processes, self.namespaces, self.binaries, self.copies = [], [], {}, []
@@ -345,8 +346,8 @@ class PostgresFixture:
                 raise RuntimeError('A fixture provider URL must use loopback')
         if is_api and not env.get('Auth__SupabaseUrl') and env.get('Auth__Enabled') != 'false':
             raise RuntimeError('Synthetic identity-provider configuration is required')
-        # Keep the suite's explicit loopback mail fake for notification tests.
-        # All money, object-storage and push capabilities stay disabled.
+        # Keep explicit loopback mail fakes. Other provider families default off;
+        # only the current suite's validated fake/local configuration is restored.
         env.update({'ASPNETCORE_ENVIRONMENT': environment, 'DOTNET_ENVIRONMENT': environment,
                     'DOTNET_PROCESSOR_COUNT': '1',
                     'Storage__Provider': 'PostgreSql', 'Storage__PostgresSchema': self.schema,
@@ -430,6 +431,18 @@ class PostgresFixture:
             if process.poll() is None:
                 process.terminate()
                 process.wait(timeout=15)
+
+    def check_postgres_baseline_history(self, check, history):
+        baseline = ROOT / 'TideCasa.Api/PostgresMigrations/0001_baseline.sql'
+        manifest = ROOT / 'TideCasa.Api/PostgresMigrations/manifest.json'
+        valid = len(history) == 1 and len(history[0]) == 6
+        if valid:
+            row = history[0]
+            valid = (row[0] == 1 and row[1] == 'TideCasa.Api.PostgresMigrations.0001_baseline.sql'
+                     and row[2] == hashlib.sha256(baseline.read_bytes()).hexdigest()
+                     and row[3] == hashlib.sha256(manifest.read_bytes()).hexdigest()
+                     and re.fullmatch('[a-f0-9]{64}', row[4]) is not None and bool(row[5]))
+        check('PostgreSQL baseline has recorded source and manifest checksums', valid)
 
     def results(self):
         seen, records = set(), []
