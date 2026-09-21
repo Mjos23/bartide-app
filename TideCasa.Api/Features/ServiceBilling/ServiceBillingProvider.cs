@@ -25,6 +25,7 @@ public sealed class ServiceBillingProvider : IDisposable
     public string WebhookSecret { get; } = "";
     public bool Ready => stripe is not null;
     public bool CheckoutReady { get; }
+    public bool GuestCheckoutReady { get; }
 
     public ServiceBillingProvider(IConfiguration configuration, IHostEnvironment host)
     {
@@ -56,6 +57,7 @@ public sealed class ServiceBillingProvider : IDisposable
         stripe = new StripeClient(key, httpClient: new SystemNetHttpClient(http, maxNetworkRetries: 1, enableTelemetry: false), apiBase: apiBase);
         CheckoutReady = configuration["ServiceBilling:CheckoutEnabled"] == "true" && configuration["ServiceBilling:CardsOnlyVerified"] == "true"
             && Regex.IsMatch(MethodConfiguration, "^pmc_[A-Za-z0-9]+$");
+        GuestCheckoutReady = CheckoutReady && configuration["ServiceBilling:GuestCheckoutEnabled"] == "true";
     }
 
     public async Task CheckAccountAsync(CancellationToken ct)

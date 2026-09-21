@@ -22,3 +22,8 @@
 
 .tide-casa dialog{margin:auto;overscroll-behavior:contain}
 .tide-casa .purchase-steps{display:block;list-style:decimal}.tide-casa .purchase-steps li{display:list-item;color:var(--ink);font-size:1rem}
+
+/* Keep the demo and purchase choices together on both homepages. */
+.tide-casa .home-cta-pair{display:inline-flex;align-items:center;gap:10px;max-width:100%}.tide-casa .home-cta-pair .button{white-space:nowrap}.tide-casa .button.outline{background:transparent;color:var(--ink);border-color:currentColor}.tide-casa .button.outline:hover{background:#e5f0ea}
+@media(max-width:390px){.tide-casa .actions .home-cta-pair .button{padding-inline:17px;font-size:.9375rem}}
+.purchase-preview-note{padding:14px 18px;border:1px solid #c9dedd;border-radius:14px;background:#edf6f3;color:#25464b;font-size:.95rem}.purchase-payment-form{display:grid;gap:18px}.purchase-consent{display:flex;align-items:flex-start;gap:10px;font-size:.88rem;line-height:1.55}.purchase-consent input{flex:0 0 auto;width:18px;height:18px;margin-top:4px;accent-color:#123b48}.purchase-payment-form button{width:100%}.purchase-payment-form button:disabled{opacity:.65;cursor:not-allowed}

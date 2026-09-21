@@ -17,6 +17,12 @@ public static class ServiceBillingEndpoints
     }
     public static void MapTideCasaServiceBilling(this WebApplication app)
     {
+        var purchases = app.MapGroup("/api/v1/service-purchases").RequireRateLimiting("public-form").AddEndpointFilter<ServiceBillingFilter>();
+        purchases.MapGet("/options", (ServiceBillingProvider provider) => Results.Ok(new GuestPurchaseOptions(provider.GuestCheckoutReady, ServiceBillingProvider.TermsVersion)));
+        purchases.MapPost("/checkout", async (GuestCheckoutRequest request, ServiceBillingStore store, CancellationToken ct) => Results.Ok(await store.GuestCheckoutAsync(request, ct)));
+        purchases.MapPost("/discard", async (GuestPurchaseReset request, ServiceBillingStore store, CancellationToken ct) => Results.Ok(await store.DiscardGuestAsync(request, ct)));
+        purchases.MapGet("/{orderId}/{sessionId}", async (string orderId, string sessionId, ServiceBillingStore store, CancellationToken ct) => Results.Ok(await store.GuestStatusAsync(orderId, sessionId, ct)));
+        purchases.MapPost("/{orderId}/{sessionId}/claim", async (string orderId, string sessionId, GuestPurchaseClaim request, HttpContext context, ServiceBillingStore store, CancellationToken ct) => Results.Ok(await store.ClaimGuestAsync(orderId, sessionId, request, User(context), ct))).RequireAuthorization();
         var group = app.MapGroup("/api/v1/tenants/{tenant}/billing").RequireAuthorization().WithTags("Service billing").AddEndpointFilter<ServiceBillingFilter>();
         group.MapGet("", async (string tenant, HttpContext context, ServiceBillingStore store, CancellationToken ct) => Results.Ok(await store.WorkspaceAsync(tenant, User(context), ct)));
         group.MapPost("/quote", async (string tenant, ServiceQuoteRequest request, HttpContext context, ServiceBillingStore store, CancellationToken ct) => Results.Ok(await store.QuoteAsync(tenant, User(context), request, ct)));

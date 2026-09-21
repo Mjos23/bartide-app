@@ -267,7 +267,7 @@ def run():
         'ServiceBilling__Environment': 'sandbox', 'ServiceBilling__RestrictedKey': 'rk_test_tide_local_fixture',
         'ServiceBilling__WebhookSecret': SECRET, 'ServiceBilling__AccountId': 'acct_fixture', 'ServiceBilling__PublicOrigin': 'https://tide.example.invalid',
         'ServiceBilling__PaymentMethodConfigurationId': 'pmc_fixture', 'ServiceBilling__CheckoutEnabled': 'true', 'ServiceBilling__CardsOnlyVerified': 'true',
-        'ServiceBilling__AllowLocalTestProvider': 'true', 'ServiceBilling__DevelopmentApiBase': f'http://127.0.0.1:{STRIPE.server_port}'}
+        'ServiceBilling__AllowLocalTestProvider': 'true', 'ServiceBilling__DevelopmentApiBase': f'http://127.0.0.1:{STRIPE.server_port}', 'ServiceBilling__GuestCheckoutEnabled': 'true'}
     process = launch('TideCasa.Api', s.API, settings)
     for tenant in ['basic', 'stores', 'referral', 'dbfail', 'recover', 'concurrent', 'legacy', 'review', 'wrong', 'web']:
         s.seed(tenant, status='draft')
@@ -424,12 +424,14 @@ def run():
     foreign_browser = w.login('bob')
     s.check('Foreign signed-in user cannot render owner billing', w.web('/workspace/web/billing', client=foreign_browser)[0] == 403)
     s.check('Returned checkout shows pending refresh without marking paid', 'http-equiv="refresh"' in w.web('/workspace/web/billing?checkout=returned', client=owner_browser)[1] and s.sql('SELECT status FROM tide_service_orders WHERE id=?', (web_id,))[0][0] == 'pending')
+    guest_purchase_checks(tokens)
     process.terminate(); process.wait(timeout=10)
     settings['ServiceBilling__CheckoutEnabled'] = 'false'
     process = launch('TideCasa.Api', s.API, settings, '-checkout-off')
     # Fresh sessions are registered in durable SQLite and survive this API restart.
     s.check('Disabling checkout preserves authenticated billing history', not api('basic')[1]['checkoutAvailable'])
     s.check('Flag-off rejects new checkout', checkout('wrong')[0][0] == 503)
+    s.check('Disabling checkout also disables public guest creation', not s.call('/api/v1/service-purchases/options')[1]['checkoutAvailable'] and s.call('/api/v1/service-purchases/checkout', {'checkoutKey': 'd'*64, 'plan': 'business', 'appStores': False, 'acceptedTerms': True, 'termsVersion': '2026-09-maintenance-v1'})[0] == 503)
     s.check('Flag-off still verifies signed notifications', event(rec_invoice)[0] == 200)
     s.check('Flag-off still permits known subscription cancellation', action('recover', rec_id, 'cancel-renewal')[0] == 200)
     s.check('All provider writes remain only checkout, expiry and period-end subscription update', all(r['method'] == 'GET' or r['path'] == '/v1/checkout/sessions' or r['path'].endswith('/expire') or r['path'].startswith('/v1/subscriptions/') for r in REQUESTS))
@@ -440,6 +442,70 @@ def run():
     s.check('No configured credentials defaults checkout off', not api('basic')[1]['checkoutAvailable'] and checkout('wrong')[0][0] == 503 and len(REQUESTS) == request_count)
     s.check('Default-off history remains available', api('referral')[0] == 200 and len(api('referral')[1]['orders'][0]['invoices']) == 2)
     rejects_production_fixture()
+
+
+def guest_purchase_checks(tokens):
+    root = '/api/v1/service-purchases'
+    s.check('Guest payment options require no account', s.call(root + '/options')[1]['checkoutAvailable'])
+    guest = w.browser()
+    forms, page = w.forms_for(guest, '/purchase/restaurant?appStores=true')
+    form = w.find_form(forms, '/guest-checkout')
+    s.check('Anonymous purchase shows total, add-on and payment before account', page[0] == 200 and '$950' in page[1] and 'Create your account' in page[1] and form['fields']['appStores'] == 'true' and '/start/restaurant' not in page[1])
+    s.check('Purchase page cannot be cached or leak return reference externally', 'no-store' in page[2].get('Cache-Control', '') and page[2].get('Referrer-Policy') == 'same-origin')
+    s.check('Guest payment consent is required and initially unchecked', all('checked' not in c and 'required' in c for c in form['controls'] if c.get('name') == 'acceptedTerms'))
+    before = len([r for r in REQUESTS if r['path'] == '/v1/checkout/sessions' and r['method'] == 'POST'])
+    s.check('Guest payment rejects missing CSRF', w.post(guest, form, {'acceptedTerms': 'true'}, remove=['__RequestVerificationToken'])[0] == 400)
+    s.check('Guest payment rejects cross-origin requests', w.post(guest, form, {'acceptedTerms': 'true'}, headers={'Origin': 'https://wrong.invalid'})[0] == 400)
+    s.check('Guest payment rejects absent renewal consent', 'notice=confirmation' in w.post(guest, form)[2].get('Location', ''))
+    s.check('Rejected forms made no provider writes', len([r for r in REQUESTS if r['path'] == '/v1/checkout/sessions' and r['method'] == 'POST']) == before)
+    posted = w.post(guest, form, {'acceptedTerms': 'true'})
+    s.check('Guest checkout opens hosted payment without signing in', posted[0] == 302 and posted[2].get('Location', '').startswith('https://checkout.stripe.com/'), posted)
+    session = posted[2]['Location'].rsplit('/', 1)[1]
+    order, tenant = s.sql('SELECT id,tenant_id FROM tide_service_orders WHERE session_id=?', (session,))[0]
+    checkout_request = [r for r in REQUESTS if r['path'] == '/v1/checkout/sessions' and r['method'] == 'POST'][-1]['body']
+    s.check('Checkout expiry leaves margin below Stripe maximum for clock skew', all(1800 < int(r['body']['expires_at']) - time.time() < 23.5 * 3600 for r in REQUESTS if r['path'] == '/v1/checkout/sessions' and r['method'] == 'POST'))
+    s.check('Stripe collects billing email and returns to post-payment account step', 'customer_email' not in checkout_request and checkout_request['success_url'].endswith('/purchase/complete/' + order + '/{CHECKOUT_SESSION_ID}') and '/signin' not in checkout_request['success_url'])
+    s.check('Guest package has no owner or business details before payment', s.sql('SELECT user_id,status FROM bartide_customers WHERE id=?', (tenant,))[0] == (None, 'draft') and OBJECTS[session]['amount_total'] == 95000)
+    repeated = w.post(guest, form, {'acceptedTerms': 'true'})
+    s.check('Repeated guest click resumes same provider session', repeated[2].get('Location') == posted[2].get('Location') and len(s.sql('SELECT id FROM tide_service_orders WHERE tenant_id=?', (tenant,))) == 1)
+    s.check('Changing an open checkout cannot create a second charge', 'notice=guest_options_saved' in w.post(guest, form, {'acceptedTerms': 'true', 'appStores': 'false'})[2].get('Location', '') and len(s.sql('SELECT id FROM tide_service_orders WHERE tenant_id=?', (tenant,))) == 1)
+    returned = '/purchase/complete/' + order + '/' + session
+    status_path = root + '/' + order + '/' + session
+    details = {'businessName': 'Synthetic Guest Bar', 'contactName': 'Guest Buyer', 'area': 'Test City'}
+    s.check('Browser return does not mark a payment paid', 'Confirming your payment' in w.web(returned, client=guest)[1] and s.call(status_path)[1]['status'] == 'pending')
+    s.check('Unpaid purchase cannot be claimed even by verified account', s.call(status_path + '/claim', details, tokens['staff'])[0] == 409)
+    s.check('Different session reference cannot read or claim purchase', s.call(root + '/' + order + '/cs_test_wrong')[0] == 404)
+    invoice, sub, charge, _ = settle(session)
+    OBJECTS[session]['customer_details'] = {'email': 'staff@example.invalid'}
+    s.check('Settlement alone still waits for verified webhook evidence', s.call(status_path)[1]['status'] == 'pending')
+    s.check('Guest invoice verifies through existing signed billing pipeline', event(invoice)[0] == 200 and s.call(status_path)[1]['status'] == 'paid')
+    public = s.call(status_path)[1]
+    s.check('Anonymous purchase status exposes no buyer email or identity', 'staff@example.invalid' not in json.dumps(public) and 'tenantId' not in public)
+    s.check('Paid purchase cannot be claimed anonymously', s.call(status_path + '/claim', details)[0] == 401)
+    s.check('Foreign verified email cannot steal paid purchase', s.call(status_path + '/claim', details, tokens['alice'])[0] == 403 and s.sql('SELECT user_id FROM bartide_customers WHERE id=?', (tenant,))[0][0] is None)
+    forms, paid_page = w.forms_for(guest, returned)
+    s.check('Only verified payment reveals account creation next step', 'Test payment confirmed.' in paid_page[1] and '/signup?return_to=' in paid_page[1])
+    buyer = w.login('staff')
+    forms, buyer_page = w.forms_for(buyer, returned)
+    claim = w.find_form(forms, '/claim')
+    s.check('Business details are collected after payment and account verification', 'Tell us about your business.' in buyer_page[1] and claim['fields']['orderId'] == order)
+    s.check('Account connection rejects missing CSRF', w.post(buyer, claim, details, remove=['__RequestVerificationToken'])[0] == 400)
+    connected = w.post(buyer, claim, details)
+    s.check('Verified checkout email connects paid purchase without another payment', connected[0] == 302 and connected[2].get('Location') == '/workspace/' + tenant + '/billing' and s.sql('SELECT user_id,name FROM bartide_customers WHERE id=?', (tenant,))[0] == ('supabase:' + s.STAFF, 'Synthetic Guest Bar'), connected)
+    s.check('Repeated account connection is idempotent', s.call(status_path + '/claim', details, tokens['staff'])[0] == 200)
+    s.check('Buyer can open invoices and renewal management after connection', w.web('/workspace/' + tenant + '/billing', client=buyer)[0] == 200 and api(tenant, token=tokens['staff'])[1]['orders'][0]['status'] == 'paid')
+    resumed = w.post(guest, form, {'acceptedTerms': 'true'})
+    s.check('Returning buyer cannot accidentally pay the same purchase again', resumed[2].get('Location') == returned)
+    reset_key = 'c' * 64
+    req = {'checkoutKey': reset_key, 'plan': 'business', 'appStores': False, 'acceptedTerms': True, 'termsVersion': '2026-09-maintenance-v1'}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        attempts = list(pool.map(lambda _: s.call(root + '/checkout', req), range(2)))
+    s.check('Concurrent anonymous checkout is idempotent', all(x[0] == 200 for x in attempts) and len({x[1]['orderId'] for x in attempts}) == 1, attempts)
+    reset_order = attempts[0][1]['orderId']; reset_session = session_for(reset_order)
+    s.check('Base guest price remains 650 dollars', OBJECTS[reset_session]['amount_total'] == 65000)
+    s.check('Closing unpaid checkout verifies provider expiry', s.call(root + '/discard', {'checkoutKey': reset_key})[0] == 200 and OBJECTS[reset_session]['status'] == 'expired' and s.sql('SELECT status FROM tide_service_orders WHERE id=?', (reset_order,))[0][0] == 'expired')
+    s.check('No email or account data accepted as a purchase credential', s.call(root + '/checkout', {**req, 'checkoutKey': 'staff@example.invalid'})[0] == 404)
+    s.check('BarTide payment pages consolidate to the return domain', w.web('/purchase/restaurant?appStores=true', headers={'Host': 'bar.tide.casa'})[2].get('Location') == 'https://tide.casa/purchase/restaurant?appStores=true')
 
 
 try:

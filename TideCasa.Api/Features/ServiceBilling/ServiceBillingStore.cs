@@ -74,7 +74,7 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
             {
                 var now = Now(); var ident = Guid.NewGuid().ToString("D");
                 var quote = quoted.Quote;
-                var saved = JsonSerializer.Serialize(new { email = owner.Email, name = owner.Name, origin = provider.Origin, expires = DateTimeOffset.UtcNow.AddHours(24).ToUnixTimeSeconds(),
+                var saved = JsonSerializer.Serialize(new { email = owner.Email, name = owner.Name, origin = provider.Origin, expires = DateTimeOffset.UtcNow.AddHours(23).ToUnixTimeSeconds(),
                     termsVersion = TermsVersion, consentedAt = now, appStores = request.AppStores, requestId = request.RequestId, fingerprint = quote.Fingerprint,
                     methodConfigurationId = provider.MethodConfiguration,
                     referral = quoted.Referral is { } referral ? new { profileId = referral.ProfileId, code = referral.Code, discountPercent = referral.DiscountPercent } : null,
@@ -181,13 +181,20 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
     {
         using var document = JsonDocument.Parse(order.RequestJson); var snapshot = document.RootElement; var quote = P(snapshot, "quote");
         if (S(snapshot, "methodConfigurationId") != provider.MethodConfiguration || S(snapshot, "origin") != provider.Origin) throw new BillingException("Checkout configuration changed. This saved request needs review.", 409, "checkout_review");
-        var values = new Dictionary<string, string> { ["mode"] = "subscription", ["customer_email"] = S(snapshot, "email") ?? throw Review(), ["client_reference_id"] = order.Id,
+        var guest = B(snapshot, "guest");
+        var values = new Dictionary<string, string> { ["mode"] = "subscription", ["client_reference_id"] = order.Id,
             ["payment_method_configuration"] = provider.MethodConfiguration, ["wallet_options[link][display]"] = "never", ["adaptive_pricing[enabled]"] = "false",
             ["managed_payments[enabled]"] = "false",
             ["expires_at"] = N(snapshot, "expires").ToString(CultureInfo.InvariantCulture),
             ["success_url"] = provider.Origin + "/workspace/" + Uri.EscapeDataString(order.TenantId) + "/billing?checkout=returned",
             ["cancel_url"] = provider.Origin + "/workspace/" + Uri.EscapeDataString(order.TenantId) + "/billing?checkout=cancelled",
             ["custom_text[submit][message]"] = "Includes the first $50 maintenance month. Renews at $50/month until canceled. Terms: " + provider.Origin + "/service-terms" };
+        if (guest)
+        {
+            values["success_url"] = provider.Origin + "/purchase/complete/" + order.Id + "/{CHECKOUT_SESSION_ID}";
+            values["cancel_url"] = provider.Origin + "/purchase/" + (S(snapshot, "plan") == "restaurant" ? "restaurant" : "business") + "?appStores=" + (order.AppStores ? "true" : "false") + "&notice=cancelled";
+        }
+        else values["customer_email"] = S(snapshot, "email") ?? throw Review();
         foreach (var prefix in new[] { "metadata", "subscription_data[metadata]" })
         { values[prefix + "[tide_purpose]"] = Purpose; values[prefix + "[tide_order_id]"] = order.Id; values[prefix + "[tide_tenant_id]"] = order.TenantId; }
         var index = 0;

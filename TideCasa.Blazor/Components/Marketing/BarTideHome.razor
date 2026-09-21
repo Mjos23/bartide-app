@@ -2,17 +2,17 @@
 @inject NavigationManager Navigation
 
 <div class="tide-casa bartide-night">
-    <a class="skip" href="/restaurant#main">Skip to content</a>
+    <a class="skip" href="#main">Skip to content</a>
     <header class="nav wrap">
         <div class="night-brands">
-            <a class="brand night-brand" href="/restaurant" aria-label="BarTide home"><img src="/assets/bartide-logo.png" width="170" height="57" alt="BarTide" /></a>
+            <a class="brand night-brand" href="@PublicSeo.Link(Navigation.Uri, "/restaurant")" aria-label="BarTide home"><img src="/assets/bartide-logo.png" width="170" height="57" alt="BarTide" /></a>
             <a class="night-byline" href="@TideCasaHomeHref">by <span>Tide Casa</span></a>
         </div>
         <nav aria-label="Main navigation">
-            <a class="nav-detail" href="/restaurant#included">What’s included</a>
+            <a class="nav-detail" href="#included">What’s included</a>
             <a class="nav-detail" href="/account">Log in</a>
             <a class="nav-careers" href="/careers">Careers</a>
-            <a class="button small" href="/book-a-demo">Book a demo <span aria-hidden="true">↗</span></a>
+            <span class="home-cta-pair"><a class="button small outline" href="/book-a-demo">Book a demo</a><a class="button small" href="/purchase/restaurant">Buy now</a></span>
         </nav>
     </header>
     <main id="main">
@@ -20,26 +20,26 @@
             <div class="hero-copy">
                 <p class="eyebrow">FOR YOUR LATE-NIGHT CROWD</p>
                 <h1 id="hero-title">Your bar.<br /><em>Their kind of night.</em></h1>
-                <p class="lead">Keep regulars coming back.<br />Keep the night moving.</p>
-                <p class="intro">Rewards worth returning for. A menu in their pocket. Guests can scan, order and pay right at the table—and get your latest updates directly on their phone when they opt in.</p>
-                <div class="actions"><a class="button" href="/book-a-demo">Let’s talk about your bar <span aria-hidden="true">↗</span></a><a class="text-link" href="/enhanced-demo">Try the sample app</a></div>
+                <p class="lead">Apps for bars and restaurants.<br />Built and hosted by Tide Casa.</p>
+                <p class="intro">Bring your menu, customer rewards, team tools and events into one app. Keep regulars connected and everyday updates in your hands.</p>
+                <div class="actions"><span class="home-cta-pair"><a class="button outline" href="/book-a-demo">Book a demo</a><a class="button" href="/purchase/restaurant">Buy now</a></span><a class="text-link" href="@PublicSeo.Link(Navigation.Uri, "/enhanced-demo")">Try the sample app</a></div>
                 <p class="keep-site"><span class="check" aria-hidden="true">✓</span> Keep your website. We build and host your app.</p>
             </div>
             <figure class="night-figure">
-                <div class="night-scene" role="img" aria-label="Illustrative BarTide app showing a late-night event, nine visits toward a reward, and pay at the table. An example phone notification announces live music.">
+                <div class="night-scene" role="img" aria-label="Illustrative BarTide app showing an event, customer rewards and a menu. Restaurant payment checkout and phone notification sending are currently disabled.">
                     <div class="night-scene-caption"><span class="night-star" aria-hidden="true">✦</span><span>A GOOD NIGHT.<br /><strong>A REASON TO COME BACK.</strong></span></div>
                     <div class="night-phone" aria-hidden="true">
                         <div class="night-phone-top"><span>9:41</span><span>● ● ●</span></div>
                         <div class="night-phone-title"><span>YOUR NEIGHBORHOOD BAR</span><strong>Stay a little longer.</strong></div>
                         <div class="night-gig"><span>TONIGHT · 9 PM</span><strong>Live music.<br />Good company.</strong><span class="night-gig-link">See what’s on ↗</span></div>
                         <div class="night-phone-reward"><span>YOUR NEXT LITTLE THANK-YOU</span><div><strong>9<span>/10</span></strong><span>visits toward<br />your next reward</span></div><div class="night-punches">● ● ● ● ● ● ● ● ● ○</div></div>
-                        <div class="night-table-pay"><span>TABLE 08</span><strong>Order. Tip. Pay here.</strong><span>Right from your phone ↗</span></div>
+                        <div class="night-table-pay"><span>TABLE 08</span><strong>Browse. Choose. Enjoy.</strong><span>Right from your phone ↗</span></div>
                         <div class="night-phone-handle"></div>
                     </div>
                     <div class="night-alert" aria-hidden="true"><span class="night-alert-icon">B</span><div><span>YOUR BAR <span>now</span></span><strong>The band starts at 9.</strong><p>Make tonight a good one. See what’s on.</p></div></div>
                 </div>
                 <figcaption><span class="caption-line" aria-hidden="true"></span><span>Your place. Your people.<br /><strong>A little more connected.</strong></span></figcaption>
-                <p class="night-illustration-note">Illustrative app and opt-in notification shown.</p>
+                <p class="night-illustration-note">Illustrative app and notification shown. Restaurant payment checkout and phone notification sending are currently disabled.</p>
             </figure>
         </section>
 
@@ -56,8 +56,8 @@
                     <div class="mini-ui" role="img" aria-label="Illustrative menu with signature drinks and late-night food"><span class="ui-label">A LITTLE SOMETHING FOR TONIGHT</span><strong>Signature drinks.<br />Late-night favorites.</strong><span>Your photos. Your descriptions.<br />Your latest specials.</span><div class="ui-divider"></div><span class="ui-footer">Easy to browse <span>Easy to update</span></span></div>
                 </article>
                 <article class="feature-row night-table-feature" id="pay-at-table">
-                    <div class="feature-copy"><p class="feature-label">03 · ORDERING, DELIVERY &amp; PAYMENTS</p><h3>Pay at the table.<br />Stay in the moment.</h3><p>Guests scan the table’s QR code, browse your menu, order, add an optional tip and pay by card on their phone. The table is already selected. Prefer to pay your team? They can choose that too. Pickup and delivery are there when you offer them.</p></div>
-                    <div class="mini-ui night-checkout" role="img" aria-label="Illustrative dine-in order for table eight, with optional tip and choices to pay on a phone or pay staff"><span class="ui-label">YOU’RE AT TABLE 08</span><strong>Your order. Your way.</strong><div class="night-choice"><span>Dine in</span><span>Pickup</span><span>Delivery</span></div><div class="ui-divider"></div><span class="ui-footer">Add a tip <span>Always optional</span></span><span class="night-pay-button">Pay on my phone ↗</span><span class="night-pay-staff">or choose Pay staff</span></div>
+                    <div class="feature-copy"><p class="feature-label">03 · ORDERING, DELIVERY &amp; PAYMENTS</p><h3>Orders in one place.<br />Your team in control.</h3><p>Guests can browse your menu and your team can manage orders. Explore table, pickup and delivery workflows in the sample. Restaurant card checkout and payment-account onboarding are currently disabled.</p></div>
+                    <div class="mini-ui night-checkout" role="img" aria-label="Illustrative dine-in order for table eight; restaurant card checkout is currently disabled"><span class="ui-label">YOU’RE AT TABLE 08</span><strong>Your order. Your way.</strong><div class="night-choice"><span>Dine in</span><span>Pickup</span><span>Delivery</span></div><div class="ui-divider"></div><span class="ui-footer">Add a tip <span>Always optional</span></span><span class="night-pay-button">Card checkout not enabled</span><span class="night-pay-staff">or choose Pay staff</span></div>
                 </article>
                 <article class="feature-row">
                     <div class="feature-copy"><p class="feature-label">04 · EMPLOYEE SCHEDULES, MESSAGES &amp; REWARDS</p><h3>A busy bar. A connected team.</h3><p>Keep shifts, private team messages and employee rewards together. Share the plan before doors open, and recognize the people who make a great night happen.</p></div>
@@ -72,12 +72,12 @@
                     <div class="mini-ui" role="img" aria-label="Illustrative Friday live music event with RSVP and guest list"><span class="ui-label">SAVE YOUR FRIDAY</span><strong>Live music.<br />Your favorite people.</strong><div class="share-options"><span>Event details</span><span>RSVP</span><span>Guest list</span></div></div>
                 </article>
             </div>
-            <p class="features-note">Illustrative tools shown. Your guests pay your bar through its own connected Stripe account.<br />Your customer payments are separate from BarTide setup and monthly maintenance.</p>
+            <p class="features-note">Illustrative tools shown. Restaurant customer-payment checkout and phone notification sending are currently disabled.<br />Tide Casa app setup and monthly maintenance billing are available separately.</p>
         </section>
 
         <section class="night-updates wrap" id="phone-updates" aria-labelledby="updates-title">
-            <div><p class="eyebrow">YOUR NEWS. ON THEIR PHONE.</p><h2 id="updates-title">Post it once.<br /><em>Bring your people closer.</em></h2><p>Tonight’s lineup. A new menu favorite. A reason to stop by. Publish an update in your app and customers who opt in can get a notification directly on their phone.</p><p class="night-updates-note">Phone notifications use permission-based web push on supported devices. On iPhone, customers add your app to their home screen first. They choose whether to turn notifications on, and can turn them off at any time.</p><a class="text-link" href="/book-a-demo">See it in a personal walkthrough <span aria-hidden="true">↗</span></a></div>
-            <ol class="night-update-steps"><li><span>01</span><div><h3>They find your app.</h3><p>A tap from your site or a scan at the table.</p></div></li><li><span>02</span><div><h3>They choose to stay in the loop.</h3><p>Save the app and allow notifications on a supported device.</p></div></li><li><span>03</span><div><h3>You give them a reason to return.</h3><p>Your published update opens in your app when they tap the notification.</p></div></li></ol>
+            <div><p class="eyebrow">YOUR NEWS. ON THEIR PHONE.</p><h2 id="updates-title">Post it once.<br /><em>Bring your people closer.</em></h2><p>Tonight’s lineup. A new menu favorite. A reason to stop by. Publish an update for customers to read in your app. Phone notification sending is currently disabled.</p><p class="night-updates-note">The illustrated notification flow is a preview. It requires separate activation and customer permission before any notifications can be sent.</p><a class="text-link" href="/book-a-demo">See it in a personal walkthrough <span aria-hidden="true">↗</span></a></div>
+            <ol class="night-update-steps"><li><span>01</span><div><h3>They find your app.</h3><p>A tap from your site or a scan at the table.</p></div></li><li><span>02</span><div><h3>They choose to stay in the loop.</h3><p>Save the app and return to read your updates.</p></div></li><li><span>03</span><div><h3>You give them a reason to return.</h3><p>Your published updates give customers a reason to open your app again.</p></div></li></ol>
         </section>
 
         <section class="human wrap" id="process" aria-labelledby="human-title">
@@ -86,21 +86,21 @@
         </section>
 
         <section class="offer wrap" id="pricing" aria-labelledby="price-title">
-            <div class="offer-copy"><p class="eyebrow">YOUR BAR. YOUR APP. ONGOING CARE.</p><h2 id="price-title"><span class="amount">$600</span><span class="term">Setup + $50/month maintenance.</span></h2><p class="included-line">Built for your bar. Hosted and cared for every month.</p><div class="offer-includes"><span>Your six core tools</span><span>Your own editing access</span><span>App posts &amp; opt-in notifications</span><span>A link &amp; QR to share</span></div><p class="offer-note">$650 to start: your setup and first month. Then $50/month, automatically renewed until canceled.</p><a class="button light" href="/purchase/restaurant">Build my BarTide app <span aria-hidden="true">↗</span></a><p class="fine"><a href="/service-terms#maintenance">Maintenance &amp; cancellation details</a>. Review your package and recurring charges before paying. New features and any outside service costs are agreed separately.</p></div>
-            <aside class="demo"><a class="qr-link" href="/enhanced-demo" aria-label="Open the BarTide sample app"><img src="/assets/BarTide-Full-App-QR.svg" width="288" height="288" alt="Scan to open the BarTide sample app" loading="lazy" /></a><h3>See it on your phone.</h3><p>A little look at the tools<br />that bring it all together.</p><a class="text-link" href="/enhanced-demo">Try the sample app <span aria-hidden="true">↗</span></a></aside>
+            <div class="offer-copy"><p class="eyebrow">YOUR BAR. YOUR APP. ONGOING CARE.</p><h2 id="price-title"><span class="amount">$600</span><span class="term">Setup + $50/month maintenance.</span></h2><p class="included-line">Built for your bar. Hosted and cared for every month.</p><div class="offer-includes"><span>Your six core tools</span><span>Your own editing access</span><span>App posts &amp; updates</span><span>A link &amp; QR to share</span></div><p class="offer-note">$650 to start: your setup and first month. Then $50/month, automatically renewed until canceled.</p><a class="button light" href="/purchase/restaurant">Build my BarTide app <span aria-hidden="true">↗</span></a><p class="fine"><a href="/service-terms#maintenance">Maintenance &amp; cancellation details</a>. Review your package and recurring charges before paying. New features and any outside service costs are agreed separately.</p></div>
+            <aside class="demo"><a class="qr-link" href="@PublicSeo.Link(Navigation.Uri, "/enhanced-demo")" aria-label="Open the BarTide sample app"><img src="/assets/BarTide-Full-App-QR.svg" width="288" height="288" alt="Scan to open the BarTide sample app" loading="lazy" /></a><h3>See it on your phone.</h3><p>A little look at the tools<br />that bring it all together.</p><a class="text-link" href="@PublicSeo.Link(Navigation.Uri, "/enhanced-demo")">Try the sample app <span aria-hidden="true">↗</span></a></aside>
         </section>
 
         <section class="night-faq wrap" aria-labelledby="faq-title">
             <div><p class="eyebrow">A FEW GOOD QUESTIONS</p><h2 id="faq-title">Easy to start.<br /><em>Easy to make yours.</em></h2></div>
             <div class="night-faq-list">
                 <details><summary>Can I keep my current website?</summary><p>Yes. Link your BarTide app from your website and social profiles. Guests can scan a QR code to open it on their phone, too.</p></details>
-                <details><summary>How does pay at the table work?</summary><p>You create a QR code for each table. Guests scan it to open your menu with their table selected. They place an order and choose to pay on their phone, with an optional tip, or pay your staff. Card payments go through your bar’s own connected Stripe account.</p></details>
-                <details><summary>Will every customer get my notifications?</summary><p>Only customers who choose to allow notifications on a supported device can receive them. On iPhone, they need iOS 16.4 or later and must add the app to their home screen first. Device settings, connectivity and browser support can affect delivery. These are app notifications, not text messages.</p></details>
+                <details><summary>Is restaurant payment checkout available?</summary><p>Restaurant customer-payment checkout is currently disabled. The sample lets you explore a simulated table order without taking payment. Tide Casa app setup and maintenance billing are separate and available.</p></details>
+                <details><summary>Are phone notifications available?</summary><p>Phone notification sending is currently disabled. You can publish updates for customers to read in your app. The notification illustration shows a flow that needs separate activation and customer permission.</p></details>
                 <details><summary>What does the $50 monthly plan cover?</summary><p>Hosting, routine app upkeep and support for your agreed app. Use your own login for everyday content updates. Cancel before your next renewal; your plan continues through the paid period. New features and outside services are agreed separately.</p></details>
             </div>
         </section>
     </main>
-    <footer><div class="footer-inner wrap"><a class="brand footer-brand night-brand" href="/restaurant" aria-label="BarTide home"><img src="/assets/bartide-logo.png" width="170" height="57" alt="BarTide" loading="lazy" /></a><p class="footer-message">For your place.<br />For your late-night people.</p><nav aria-label="Footer"><a href="/book-a-demo">Book a demo</a><a href="/careers">Careers · Sales engineers</a><a href="/service-terms">Service &amp; billing details</a><a href="/account">Your workspace</a><a href="@TideCasaHomeHref">Meet Tide Casa</a></nav><div class="footer-bottom"><p>Gulf Coast roots. Made for bars and restaurants across Florida.</p><span class="domain-label">bar.tide.casa</span></div></div></footer>
+    <footer><div class="footer-inner wrap"><a class="brand footer-brand night-brand" href="@PublicSeo.Link(Navigation.Uri, "/restaurant")" aria-label="BarTide home"><img src="/assets/bartide-logo.png" width="170" height="57" alt="BarTide" loading="lazy" /></a><p class="footer-message">For your place.<br />For your late-night people.</p><nav aria-label="Footer"><a href="/book-a-demo">Book a demo</a><a href="/careers">Careers · Sales engineers</a><a href="/service-terms">Service &amp; billing details</a><a href="/account">Your workspace</a><a href="@TideCasaHomeHref">Meet Tide Casa</a></nav><div class="footer-bottom"><p>Gulf Coast roots. Made for bars and restaurants across Florida.</p><span class="domain-label">bar.tide.casa</span></div></div></footer>
 </div>
 
 @code {

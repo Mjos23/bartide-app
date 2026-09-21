@@ -16,3 +16,10 @@ public sealed record HistoricalBillingOrder(string Id, string Environment, strin
     long RefundedCents, long RefundPendingCents, string? PaidAt, string? Url);
 public sealed record ServiceBillingWorkspace(string TenantId, string Name, string Environment, bool CheckoutAvailable, bool CanPurchase,
     string AvailabilityMessage, IReadOnlyList<ServiceBillingOrder> Orders, IReadOnlyList<HistoricalBillingOrder> HistoricalOrders);
+
+public sealed record GuestPurchaseOptions(bool CheckoutAvailable, string TermsVersion);
+public sealed record GuestCheckoutRequest(string CheckoutKey, string Plan, bool AppStores, bool AcceptedTerms, string TermsVersion);
+public sealed record GuestCheckoutLink(string OrderId, string Url, string Environment, bool Completed = false);
+public sealed record GuestPurchaseStatus(string Status, string Plan, bool AppStores, long FirstPaymentCents, string Environment);
+public sealed record GuestPurchaseClaim(string BusinessName, string ContactName, string Area);
+public sealed record GuestPurchaseReset(string CheckoutKey);

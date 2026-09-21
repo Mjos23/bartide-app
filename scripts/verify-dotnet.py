@@ -135,7 +135,7 @@ try:
         status, html, _ = call(WEB, path)
         check('Booking form renders at ' + path, status == 200 and 'Request my demo' in html and 'When works for you?' in html)
     status, html, _ = call(WEB, '/purchase/restaurant')
-    check('Checkout renders API total and optional stores with next step', status == 200 and '$650' in html and '$300 once' in html and '/start/restaurant?appStores=false' in html and 'Continue with your business' in html)
+    check('Checkout renders API total and optional stores before account setup', status == 200 and '$650' in html and '$300 once' in html and '/service-billing/purchase/guest-checkout' in html and 'Pay $650 securely' in html and '/start/restaurant?appStores=false' not in html)
     for asset in ['/brand.css', '/tide-casa/homepage.css', '/tide-casa/assets/tide-casa-logo.png', '/assets/coastal-dining.jpg', '/app.js', '/_framework/blazor.web.js']:
         check('Public asset ' + asset, call(WEB, asset)[0] == 200)
     # Restart only our child API process to prove persistence beyond process memory.

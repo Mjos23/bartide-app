@@ -12,6 +12,9 @@ public static partial class ServiceBillingFlow
     public static IEndpointRouteBuilder MapServiceBillingForms(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/service-billing/{tenant}/checkout", CheckoutAsync).RequireAuthorization();
+        endpoints.MapPost("/service-billing/purchase/guest-checkout", GuestCheckoutAsync);
+        endpoints.MapPost("/service-billing/purchase/restart", RestartGuestAsync);
+        endpoints.MapPost("/service-billing/purchase/claim", ClaimGuestAsync).RequireAuthorization();
         endpoints.MapPost("/service-billing/{tenant}/orders/{orderId}/{action}", ActionAsync).RequireAuthorization();
         return endpoints;
     }

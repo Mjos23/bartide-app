@@ -147,7 +147,9 @@ builder.Services.AddHttpClient<SalesPipelineClient>(client =>
 var app = builder.Build();
 app.UseAppPlatformIngress(builder.Configuration, api: false);
 app.UseForwardedHeaders();
+app.UseGuestPurchaseCookie();
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
+app.UsePublicSeo();
 app.UseStaticFiles();
 app.Use(async (context, next) =>
 {
@@ -198,6 +200,7 @@ app.MapBusinessPostForms();
 app.MapSalesPipelineForms();
 app.MapGet("/start", (HttpContext context) => Results.LocalRedirect("/start/" + (context.Request.Query["business"] == "general" ? "business" : "restaurant")
     + "?referralCode=" + Uri.EscapeDataString(context.Request.Query["ref"].ToString()[..Math.Min(context.Request.Query["ref"].ToString().Length, 32)])));
+app.MapPublicSeo();
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "tide-casa-web" }));
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.Run();

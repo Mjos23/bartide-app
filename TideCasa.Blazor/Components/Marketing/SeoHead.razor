@@ -1,0 +1,27 @@
+@namespace TideCasa.Blazor.Components.Marketing
+@inject NavigationManager Navigation
+
+@if (Page is { } metadata)
+{
+    <PageTitle>@metadata.Title</PageTitle>
+    <HeadContent>
+        <meta name="description" content="@metadata.Description" />
+        <link rel="canonical" href="@metadata.Canonical" />
+        @if (Stylesheet is not null)
+        {
+            <link rel="stylesheet" href="@Stylesheet" />
+        }
+    </HeadContent>
+}
+
+@code {
+    [Parameter] public string? Stylesheet { get; set; }
+    private PublicPageSeo? Page
+    {
+        get
+        {
+            var uri = new Uri(Navigation.Uri);
+            return PublicSeo.Get(uri.Host, uri.AbsolutePath);
+        }
+    }
+}

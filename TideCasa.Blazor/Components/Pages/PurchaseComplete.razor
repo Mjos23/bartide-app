@@ -1,0 +1,67 @@
+@page "/purchase/complete/{OrderId}/{SessionId}"
+@attribute [ExcludeFromInteractiveRouting]
+@inject ServiceBillingClient Billing
+<PageTitle>Finish your app setup | Tide Casa</PageTitle>
+@if (purchase?.Status is "pending" or "processing" && Poll is >= 0 and < 10)
+{
+    <HeadContent><meta http-equiv="refresh" content="@($"8;url={CurrentPath}?poll={Poll + 1}")" /></HeadContent>
+}
+<div class="bt-unified rewards-page">
+    <SiteHeader IsBarTide="@(purchase?.Plan == "restaurant")" />
+    <main class="rewards-main">
+        <p class="bt-one-kicker">YOUR APP · NEXT STEPS</p>
+        @if (purchase is null)
+        {
+            <h1>Check your purchase.</h1><p role="alert">We couldn’t load this purchase. Use the link returned by checkout, or contact <a href="mailto:hello@tide.casa">hello@tide.casa</a>. Please don’t pay again to recover an existing purchase.</p>
+        }
+        else if (purchase.Status != "paid")
+        {
+            <h1>@(purchase.Status == "expired" ? "Checkout expired." : "Confirming your payment.")</h1>
+            <p>Your account and business details come next, after payment confirmation. This page checks for confirmation for a short time.</p>
+            <a class="bt-one-button" href="@CurrentPath">Refresh payment status</a><p>Need help? <a href="mailto:hello@tide.casa">hello@tide.casa</a></p>
+        }
+        else
+        {
+            <h1>@(purchase.Environment == "sandbox" ? "Test payment confirmed." : "Payment confirmed.")</h1>
+            <p>Your @(purchase.Plan == "restaurant" ? "BarTide" : "Tide Casa") purchase is saved. Now let’s connect your account and business.</p>
+            @if (Notice is not null) { <p class="rewards-notice" role="alert">@NoticeText</p> }
+            @if (account is null)
+            {
+                <section class="rewards-panel"><h2>Create your account.</h2><p>Use the same email you entered at checkout. We’ll verify it before connecting your purchase.</p>
+                    <a class="bt-one-button" href="@("/signup?return_to=" + Uri.EscapeDataString(CurrentPath))">Create account</a>
+                    <p>Already have an account? <a href="@("/signin?return_to=" + Uri.EscapeDataString(CurrentPath))">Sign in</a></p>
+                </section>
+            }
+            else
+            {
+                <form class="rewards-panel" method="post" action="/service-billing/purchase/claim" data-enhance="false">
+                    <AntiforgeryToken /><input type="hidden" name="orderId" value="@OrderId" /><input type="hidden" name="sessionId" value="@SessionId" />
+                    <h2>Tell us about your business.</h2><p>Signed in as @account.User.Email. This must match your checkout email.</p>
+                    <label>Business name<input name="businessName" required maxlength="120" autocomplete="organization" /></label>
+                    <label>Your name<input name="contactName" required maxlength="120" autocomplete="name" value="@account.User.DisplayName" /></label>
+                    <label>City and state<input name="area" required maxlength="120" autocomplete="address-level2" /></label>
+                    <button type="submit">Save details and open my account</button><p>Your purchase is already paid. Saving these details does not charge you again.</p>
+                </form>
+                <p><a href="@("/signin?return_to=" + Uri.EscapeDataString(CurrentPath))">Use a different account</a></p>
+            }
+        }
+    </main><SiteFooter IsBarTide="@(purchase?.Plan == "restaurant")" />
+</div>
+@code {
+    [Parameter] public string OrderId { get; set; } = "";
+    [Parameter] public string SessionId { get; set; } = "";
+    [SupplyParameterFromQuery(Name="notice")] public string? Notice { get; set; }
+    [SupplyParameterFromQuery(Name="poll")] public int Poll { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private GuestPurchaseStatus? purchase;
+    private AccountOverview? account;
+    private string CurrentPath => "/purchase/complete/" + Uri.EscapeDataString(OrderId) + "/" + Uri.EscapeDataString(SessionId);
+    private string NoticeText => Notice switch { "buyer_email_required" => "Use the verified account email that you entered at checkout. Your purchase has not been connected to this account.", "existing_workspace" => "Your purchase is saved. Contact hello@tide.casa to connect it to your existing workspace.", "payment_pending" => "Payment confirmation is still pending. Please refresh shortly.", _ => "Your details could not be saved. Check the fields and try again; there is no need to pay again." };
+    protected override async Task OnInitializedAsync()
+    {
+        account = HttpContext.Items[AuthFlow.AccountItem] as AccountOverview;
+        var result = await Billing.GuestStatusAsync(OrderId, SessionId, HttpContext.RequestAborted);
+        purchase = result.Value;
+        if (purchase is null) HttpContext.Response.StatusCode = result.Uncertain ? 503 : 404;
+    }
+}

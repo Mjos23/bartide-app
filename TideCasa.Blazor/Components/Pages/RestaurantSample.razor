@@ -1,8 +1,8 @@
 @page "/enhanced-demo"
-<PageTitle>Explore the restaurant app | BarTide</PageTitle>
+<SeoHead />
 <div class="bt-unified rewards-page"><SiteHeader /><main class="rewards-main">
     <p class="bt-one-kicker">A LITTLE LOOK INSIDE</p><h1>Coastal Kitchen.</h1>
-    <p>Explore an illustrative restaurant. Names, prices, shifts and events are examples. Your selections stay in this visit; nothing is charged, sent to a restaurant or dispatched.</p>
+    <p>Explore an illustrative restaurant. Names, prices, shifts and events are examples. Your selections stay in this visit; nothing is charged, sent to a restaurant or dispatched. Restaurant payment checkout and phone notification sending are not currently enabled.</p>
     <p class="rewards-note">Tap a feature to try it, or <a href="/enhanced-demo#feature-flow">read through all six below</a>.</p>
     <nav class="sample-tabs" id="sample-features" aria-label="Restaurant features">@foreach (var item in Tabs) { <button type="button" class="@(tab == item.Key ? "selected" : "")" aria-pressed="@(tab == item.Key)" @onclick="() => tab = item.Key">@item.Value</button> }</nav>
     @if (tab == "rewards")
@@ -32,7 +32,7 @@
             <button @onclick="() => orderShown = true">Preview order confirmation</button>
             @if (orderShown) { <p role="status">Your example order is received. In your restaurant app, the kitchen tracks progress and customers see their order status. No payment or real order was created here.</p> }
         }
-        <p class="rewards-note">A table QR code identifies the table automatically. Restaurant payments go to the business’s own connected Stripe account.</p></section>
+        <p class="rewards-note">A table QR code identifies the table automatically. Restaurant payment checkout is currently disabled; this sample does not collect payments.</p></section>
     }
     else if (tab == "team")
     {
@@ -65,8 +65,8 @@
             </div></li>
             <li><span class="sample-flow-number" aria-hidden="true">03</span><div>
                 <h3>Ordering, delivery &amp; payments</h3>
-                <p>Guests scan a table QR code, order, add an optional tip and pay on their phone—or choose to pay your staff. Offer pickup and delivery when they suit your business.</p>
-                <p class="sample-flow-detail">The table is selected automatically. Card payments go to your own connected Stripe account.</p>
+                <p>Explore an example table QR, order, optional tip and payment choice. These sample steps are simulated; restaurant payment checkout is currently disabled.</p>
+                <p class="sample-flow-detail">The example table is selected automatically. No payment is taken or sent to a business.</p>
             </div></li>
             <li><span class="sample-flow-number" aria-hidden="true">04</span><div>
                 <h3>Employee schedules, messages &amp; rewards</h3>
@@ -81,7 +81,7 @@
             <li><span class="sample-flow-number" aria-hidden="true">06</span><div>
                 <h3>Live events &amp; RSVP</h3>
                 <p>Give people their next night out to look forward to. Share live music, trivia and special events, accept RSVPs and keep a private guest list for your team.</p>
-                <p class="sample-flow-detail">Keep the conversation going: publish app updates that customers who opt in can receive as phone notifications on supported devices.</p>
+                <p class="sample-flow-detail">Businesses can publish app updates. Phone notification sending is currently disabled.</p>
             </div></li>
         </ol>
     </section>

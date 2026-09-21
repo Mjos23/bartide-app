@@ -1,4 +1,5 @@
 @namespace TideCasa.Blazor.Components.Marketing
+@inject NavigationManager Navigation
 
 <footer class="bt-one-footer">
     <div>
@@ -6,9 +7,9 @@
         <p>@(IsBarTide ? "Made for restaurants. Built with people." : "A home for your business. Built with people.")</p>
     </div>
     <nav aria-label="Footer">
-        <a href="/book-a-demo">Book a demo</a>
-        <a href="/careers">Careers</a>
-        <a href="/service-terms">Service &amp; billing details</a>
+        <a href="@PublicSeo.Link(Navigation.Uri, "/book-a-demo")">Book a demo</a>
+        <a href="@PublicSeo.Link(Navigation.Uri, "/careers")">Careers</a>
+        <a href="@PublicSeo.Link(Navigation.Uri, "/service-terms")">Service &amp; billing details</a>
         @if (IsBarTide)
         {
             <a href="/flyers/BarTide-Flyer-Sequence.pdf">Download the flyer</a>
