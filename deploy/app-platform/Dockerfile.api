@@ -13,6 +13,7 @@ RUN dotnet publish TideCasa.Api/TideCasa.Api.csproj -c Release -o /out --no-rest
 FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_RUNTIME_VERSION}-noble AS runtime
 WORKDIR /app
 COPY --from=build /out/ ./
+COPY deploy/app-platform/supabase-prod-ca-2021.crt /app/certs/supabase-prod-ca-2021.crt
 # This directory is disposable scratch space, never a durable database location.
 RUN mkdir -p /tmp/bartide && chown "$APP_UID:$APP_UID" /tmp/bartide && chmod 0700 /tmp/bartide
 ENV ASPNETCORE_URLS=http://+:8080 \

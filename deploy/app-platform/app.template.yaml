@@ -93,6 +93,7 @@ services:
         scope: RUN_TIME
         value: tide_casa
       # Proposed initial API pool maximum: 5, minimum: 0, pending account budget.
+      # Include SSL Mode=VerifyFull;Root Certificate=/app/certs/supabase-prod-ca-2021.crt.
       - key: ConnectionStrings__Application
         scope: RUN_TIME
         type: SECRET

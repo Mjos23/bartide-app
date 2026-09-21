@@ -15,7 +15,8 @@ FOLDERS = (
 EXCLUDED_DIRS = {'bin', 'obj', 'app_data', '.git', '.tools', 'secrets', 'usersecrets', 'properties', 'simulation', '__pycache__'}
 EXCLUDED_NAMES = {'restaurantshowcase.razor', 'restaurantshowcasegallery.razor', 'restaurant-showcase.css'}
 ALLOWED_SUFFIXES = {'.cs', '.csproj', '.razor', '.css', '.js', '.json', '.sql', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.ico', '.woff', '.woff2', '.ttf', '.webmanifest', '.pdf', '.html', '.mp4', '.md', '.py', '.yaml'}
-TEXT_SUFFIXES = {'.cs', '.csproj', '.razor', '.css', '.js', '.json', '.sql', '.svg', '.webmanifest', '.html', '.md', '.py', '.yaml', '.slnx'}
+TEXT_SUFFIXES = {'.cs', '.csproj', '.razor', '.css', '.js', '.json', '.sql', '.svg', '.webmanifest', '.html', '.md', '.py', '.yaml', '.slnx', '.crt'}
+PUBLIC_CERTIFICATES = {'deploy/app-platform/supabase-prod-ca-2021.crt': '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7'}
 SECRET = re.compile(rb'(?:[sr]k_(?:live|test)_[A-Za-z0-9]{16,}|AKIA[A-Z0-9]{16}|-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----)')
 
 def selected(path):
@@ -27,7 +28,7 @@ def selected(path):
         return False
     if path.is_symlink():
         raise RuntimeError('Source candidate contains a symlink: ' + relative.as_posix())
-    if path.suffix.lower() not in ALLOWED_SUFFIXES and not path.name.startswith('Dockerfile.'):
+    if path.suffix.lower() not in ALLOWED_SUFFIXES and not path.name.startswith('Dockerfile.') and relative.as_posix() not in PUBLIC_CERTIFICATES:
         raise RuntimeError('Unreviewed source type: ' + relative.as_posix())
     return True
 
@@ -42,6 +43,8 @@ def main():
     for path in sorted(set(inputs)):
         relative = path.relative_to(ROOT).as_posix()
         data = path.read_bytes()
+        if relative in PUBLIC_CERTIFICATES:
+            assert hashlib.sha256(data).hexdigest() == PUBLIC_CERTIFICATES[relative], 'Public CA certificate changed; review its provider provenance'
         if path.suffix in TEXT_SUFFIXES or path.name.startswith('Dockerfile.'):
             if SECRET.search(data):
                 raise RuntimeError('Possible credential in source candidate: ' + relative)
