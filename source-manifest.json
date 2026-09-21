@@ -190,9 +190,9 @@
     "gitBlobSha": "5739cf7e0ba83eebd04524422e7ebbd0c1decacf"
   },
   "scripts/verify-service-billing.py": {
-    "bytes": 37212,
-    "sha256": "a022281c7048d99066a570cee0256552c979045f1ab9857f5575e6b52d664684",
-    "gitBlobSha": "d07b9b78991cb44d7daf43494e112cb6c267780e"
+    "bytes": 37538,
+    "sha256": "4a57a9bc6a3a06d9cc1d3c54bb450450731773047246a7500121bf1515daad5c",
+    "gitBlobSha": "c52161b2d0f0cdad39b98cfc5084aba530bef065"
   },
   "scripts/verify-staff-training.py": {
     "bytes": 34304,
@@ -500,9 +500,9 @@
     "gitBlobSha": "e3b389513bf8542bc7c4489fce6adaad2a611eaa"
   },
   "TideCasa.Api/Features/ServiceBilling/ServiceBillingStore.cs": {
-    "bytes": 25578,
-    "sha256": "b3b3e23b889e1ff38e62abd76ad5334accd612fa735835f0b7fd5db4af99311b",
-    "gitBlobSha": "a4a0ffb8dd95fd41aba99beb547406f3cb781de3"
+    "bytes": 25631,
+    "sha256": "5fc24f119f49d4b45e58c53062834f7d3e053ab607070dd174c7d0b1b40476fe",
+    "gitBlobSha": "154c35db85e95a74d1a43f492fad7455520c0657"
   },
   "TideCasa.Api/Features/StaffTraining/StaffTrainingEndpoints.cs": {
     "bytes": 4869,

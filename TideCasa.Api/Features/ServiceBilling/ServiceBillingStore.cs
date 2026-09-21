@@ -183,6 +183,7 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
         if (S(snapshot, "methodConfigurationId") != provider.MethodConfiguration || S(snapshot, "origin") != provider.Origin) throw new BillingException("Checkout configuration changed. This saved request needs review.", 409, "checkout_review");
         var values = new Dictionary<string, string> { ["mode"] = "subscription", ["customer_email"] = S(snapshot, "email") ?? throw Review(), ["client_reference_id"] = order.Id,
             ["payment_method_configuration"] = provider.MethodConfiguration, ["wallet_options[link][display]"] = "never", ["adaptive_pricing[enabled]"] = "false",
+            ["managed_payments[enabled]"] = "false",
             ["expires_at"] = N(snapshot, "expires").ToString(CultureInfo.InvariantCulture),
             ["success_url"] = provider.Origin + "/workspace/" + Uri.EscapeDataString(order.TenantId) + "/billing?checkout=returned",
             ["cancel_url"] = provider.Origin + "/workspace/" + Uri.EscapeDataString(order.TenantId) + "/billing?checkout=cancelled",

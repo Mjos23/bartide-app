@@ -86,6 +86,9 @@ class StripeFixture(BaseHTTPRequestHandler):
                         return self.respond(409, {'error': {'message': 'Changed idempotency parameters', 'type': 'idempotency_error'}})
                     return self.respond(200, OBJECTS[old['id']])
                 if path == '/v1/checkout/sessions':
+                    # Reproduce the live account's Managed Payments default.
+                    if body.get('managed_payments[enabled]') != 'false':
+                        return self.respond(400, {'error': {'message': 'payment_method_configuration conflicts with default Managed Payments', 'type': 'invalid_request_error'}})
                     ident = 'cs_test_' + uuid.uuid4().hex
                     total = sum(int(value) for key, value in body.items() if key.endswith('[unit_amount]'))
                     item = {'id': ident, 'object': 'checkout.session', 'livemode': False, 'metadata': {
