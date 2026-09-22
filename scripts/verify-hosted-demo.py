@@ -7,10 +7,22 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 import http.cookiejar
 import json
+import re
 from pathlib import Path
 import urllib.error, urllib.parse, urllib.request
 
 ROOT=Path(__file__).resolve().parents[1]
+def page_has_email(raw,email):
+    if email.encode() in raw: return True
+    # The App Platform edge protects rendered email addresses. Check the exact
+    # decoded identity, as its browser script does, rather than a display name.
+    for value in re.findall(rb'data-cfemail="([0-9a-fA-F]+)"',raw):
+        try:
+            encoded=bytes.fromhex(value.decode())
+            if encoded and bytes(byte ^ encoded[0] for byte in encoded[1:]).decode()==email: return True
+        except (ValueError,UnicodeDecodeError): pass
+    return False
+
 class Forms(HTMLParser):
     def __init__(self): super().__init__(); self.forms=[]; self.current=None
     def handle_starttag(self,tag,attrs):
@@ -35,7 +47,8 @@ def main():
         req=urllib.request.Request(base+path,data=None if body is None else urllib.parse.urlencode(body).encode(),headers=head)
         try:r=opener.open(req,timeout=45)
         except urllib.error.HTTPError as e:r=e
-        with r:return r.status,r.read(),r.geturl(),dict(r.headers)
+        # Preserve HTTPMessage's case-insensitive lookup through the public proxy.
+        with r:return r.status,r.read(),r.geturl(),r.headers
     run=ROOT/'.tools/hosted-demo-verification'/datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S');run.mkdir(parents=True)
     try:
         status,raw,url,head=request('/')
@@ -58,7 +71,7 @@ def main():
                 print(json.dumps({'person':person['key'],'status':status,'landingPath':urllib.parse.urlparse(url).path}),flush=True)
             check(person['key']+' signs into its actual app view',status==200 and (url.endswith('/rewards/gulf-lantern') if person['role']=='customer' else url.endswith('/account')) and b'Gulf Lantern' in raw)
             status,raw,_,_=request('/account')
-            check(person['key']+' account identity matches',status==200 and person['email'].encode() in raw and b'Platform owner' not in raw)
+            check(person['key']+' account identity matches',status==200 and page_has_email(raw,person['email']) and b'Platform owner' not in raw)
         status,raw,_,_=request('/sample-bar');forms=Forms();forms.feed(raw.decode()); form=next(f for f in forms.forms if 'person_key' in f['fields'])
         fields={**form['fields']};fields.pop('__RequestVerificationToken',None)
         check('Role switch rejects missing antiforgery token',request(form['action'],fields)[0]==400)

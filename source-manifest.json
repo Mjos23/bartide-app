@@ -125,9 +125,9 @@
     "gitBlobSha": "2b4e190750bdfa9ecead6de47ed4b87bd5ca6795"
   },
   "scripts/verify-hosted-demo.py": {
-    "bytes": 5376,
-    "sha256": "6fbeedf1e52b38b3c9fc7126574bf985c9141af91d1eceba29576294bc801a55",
-    "gitBlobSha": "48c43b670b183dc9baaf2b45ccdcaa3fbc6fbac2"
+    "bytes": 6006,
+    "sha256": "0b9fa26a49bfc1cee8f966bceb9bc39df79b10962b6d1ff363ed4cf9186bbd03",
+    "gitBlobSha": "070e393203637df89bf0a36a9e67bca73a3d141c"
   },
   "scripts/verify-hosting.py": {
     "bytes": 4952,
