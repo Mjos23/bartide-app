@@ -865,9 +865,9 @@
     "gitBlobSha": "5e96651ecd266b788421043def2882edf804a6b8"
   },
   "TideCasa.Blazor/Components/App.razor": {
-    "bytes": 3363,
-    "sha256": "dc927324d54f0aab1bad3b0840a3af576dd9b2efcfb585b75e6563d86d6456cc",
-    "gitBlobSha": "b9bb350383c724a8c2544fb64af59e7dc3fd1c41"
+    "bytes": 3402,
+    "sha256": "4fffa80865e8fa162244d0b0b92b7f0bba1d7c54b3952c5232e2dc6c591af4d7",
+    "gitBlobSha": "4ba915c2a97eb470d38272dbdebfe00f7a2c1e48"
   },
   "TideCasa.Blazor/Components/Marketing/BarTideHome.razor": {
     "bytes": 16193,
