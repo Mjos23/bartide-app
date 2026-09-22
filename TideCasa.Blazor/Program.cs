@@ -152,6 +152,22 @@ app.UsePublicDemoWeb();
 app.UseGuestPurchaseCookie();
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
 app.UsePublicSeo();
+// This learning studio serves only curated lessons. Draft code stays in the browser.
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/engineering"))
+    {
+        if (!PublicDemoWeb.Enabled(builder.Configuration) && !app.Environment.IsDevelopment())
+        { context.Response.StatusCode = 404; return; }
+        context.Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        context.Response.Headers.CacheControl = "no-cache";
+        if (context.Request.Path == "/engineering" || context.Request.Path == "/engineering/")
+            context.Request.Path = "/engineering/index.html";
+    }
+    await next();
+});
 app.UseStaticFiles();
 app.Use(async (context, next) =>
 {

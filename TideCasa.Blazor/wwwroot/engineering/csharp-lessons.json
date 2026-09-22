@@ -1,0 +1,114 @@
+{
+  "lessons": [
+    {
+      "id": "money",
+      "title": "Add an order in cents",
+      "minutes": 15,
+      "goal": "Calculate a fictional lunch total without losing cents.",
+      "explanation": "An int stores whole cents. decimal handles the fractional tax calculation; rounding converts it back to cents. The m suffix makes a decimal literal. checked makes an arithmetic overflow fail visibly. The sample uses a fictional 7.5% tax and a stated rounding rule, not tax advice or a complete checkout implementation.",
+      "steps": [
+        "Read the Check calls before reading Quote. Predict the total on paper.",
+        "Trace 1,299 cents times 2, then round the sample tax once and add the 400-cent tip.",
+        "Download the C# project and run dotnet run locally. Match the output below.",
+        "Change AwayFromZero to ToEven. Run again and use the failing half-cent check to find the difference.",
+        "Restore the rounding rule, rerun, and record why the boundary case matters."
+      ],
+      "notebook": "Prediction: 1299 × 2 = ____ cents.\nTax: 2598 × 750 / 10000 = ____ cents before rounding.\nTotal including 400-cent tip: ____ cents.\nBug observed:\nFix and evidence:",
+      "source": "using System;\n\n// Fictional Lantern Cafe: two lunches, a sample tax, and a tip.\nvar quote = Quote(1299, 2, 750, 400);\nCheck(quote.Subtotal == 2598, \"Two lunches cost 2598 cents.\");\nCheck(quote.Tax == 195, \"The sample tax rounds to 195 cents.\");\nCheck(quote.Total == 3193, \"Total includes subtotal, tax, and tip.\");\nCheck(Quote(10, 1, 500, 0).Tax == 1, \"Half a cent rounds away from zero.\");\nCheck(Quote(100, 1, 0, 0).Total == 100, \"Zero tax and tip add nothing.\");\n\nConsole.WriteLine($\"Subtotal: {quote.Subtotal} cents\");\nConsole.WriteLine($\"Tax: {quote.Tax} cents; tip: 400 cents\");\nConsole.WriteLine($\"Total: {quote.Total} cents\");\nConsole.WriteLine(\"PASS: money\");\n\nstatic (int Subtotal, int Tax, int Total) Quote(\n    int unitCents, int quantity, int taxBasisPoints, int tipCents)\n{\n    if (unitCents < 0 || quantity is < 1 or > 20 ||\n        taxBasisPoints is < 0 or > 2500 || tipCents < 0)\n        throw new ArgumentOutOfRangeException(\"Use valid sample inputs.\");\n    int subtotal = checked(unitCents * quantity);\n    int tax = checked((int)decimal.Round(\n        subtotal * (decimal)taxBasisPoints / 10000m,\n        0, MidpointRounding.AwayFromZero));\n    int total = checked(subtotal + tax + tipCents);\n    return (subtotal, tax, total);\n}\n\nstatic void Check(bool condition, string message)\n{\n    if (!condition) throw new Exception(\"FAIL: \" + message);\n}\n",
+      "expected": "Subtotal: 2598 cents\nTax: 195 cents; tip: 400 cents\nTotal: 3193 cents\nPASS: money",
+      "challenge": "Add a check that Quote(200, 3, 0, 50).Total is 650. Then add a delivery-fee parameter and a separate check for its effect. State whether your fictional tax includes that fee.",
+      "sourcePaths": [
+        "TideCasa.Contracts/RestaurantOrdering.cs",
+        "TideCasa.Api/Features/RestaurantOrdering/RestaurantOrderingStore.cs"
+      ]
+    },
+    {
+      "id": "validation",
+      "title": "Stop an invalid order early",
+      "minutes": 15,
+      "goal": "Turn simple input rules into understandable validation messages.",
+      "explanation": "A method accepts inputs and returns a list of problems. string? means the name may be null. Trimming removes surrounding spaces before checking the sample name. The quantity rule includes both endpoints: 1 and 20. These are exercise rules, not all of the application’s validation rules.",
+      "steps": [
+        "Write down which cases should pass: quantity 0, 1, 20, and 21.",
+        "Read Validate and connect each if statement to its message.",
+        "Run the downloaded C# project locally and confirm all boundary checks pass.",
+        "Change quantity < 1 to quantity < 0. Rerun and read the zero-quantity failure.",
+        "Restore the rule and add your own check before extending validation."
+      ],
+      "notebook": "Rule in plain English:\nAccepted boundary values:\nRejected boundary values:\nWhat happened with a blank name?\nBug, fix, and passing evidence:",
+      "source": "using System;\nusing System.Collections.Generic;\n\n// Fictional Harbor Kitchen pickup request; no order is saved.\nCheck(Validate(\"Avery\", 1).Count == 0, \"Quantity 1 is allowed.\");\nCheck(Validate(\"Avery\", 20).Count == 0, \"Quantity 20 is allowed.\");\nCheck(Validate(\"Avery\", 0).Contains(\"Choose 1 to 20 items.\"), \"Zero is rejected.\");\nCheck(Validate(\"Avery\", 21).Contains(\"Choose 1 to 20 items.\"), \"21 is rejected.\");\nCheck(Validate(null, 1).Count == 1, \"A missing name is rejected.\");\nCheck(Validate(\"   \", 1).Count == 1, \"A blank name is rejected.\");\nCheck(Validate(new string('x', 41), 1).Count == 1, \"A long name is rejected.\");\nCheck(Validate(\" Avery \", 2).Count == 0, \"Surrounding spaces are accepted.\");\nvar problems = Validate(\"\", 0);\nCheck(problems.Count == 2, \"Report both independent problems.\");\nforeach (string problem in problems) Console.WriteLine(problem);\nConsole.WriteLine(\"PASS: validation\");\n\nstatic List<string> Validate(string? name, int quantity)\n{\n    var problems = new List<string>();\n    string cleanedName = (name ?? \"\").Trim();\n    if (cleanedName.Length is < 1 or > 40)\n        problems.Add(\"Enter a name from 1 to 40 characters.\");\n    if (quantity < 1 || quantity > 20)\n        problems.Add(\"Choose 1 to 20 items.\");\n    return problems;\n}\n\nstatic void Check(bool condition, string message)\n{\n    if (!condition) throw new Exception(\"FAIL: \" + message);\n}\n",
+      "expected": "Enter a name from 1 to 40 characters.\nChoose 1 to 20 items.\nPASS: validation",
+      "challenge": "Add a check for exactly 40 name characters. Then reject control characters such as a newline with a new message and a matching check.",
+      "sourcePaths": [
+        "TideCasa.Api/Features/RestaurantOrdering/RestaurantOrderingStore.cs",
+        "TideCasa.Blazor/Features/Ordering/RestaurantOrderingFlow.cs"
+      ]
+    },
+    {
+      "id": "records",
+      "title": "Change a copy, keep the original",
+      "minutes": 15,
+      "goal": "Use a C# record to describe a menu item and make a changed copy.",
+      "explanation": "A record groups named values and compares those values for equality. A with expression creates a copy with selected properties changed. The source record remains unchanged. This lesson uses only strings, integers, and booleans; with copies are shallow, so records containing mutable collections need more care.",
+      "steps": [
+        "Identify each value in the MenuItem record at the bottom of the file.",
+        "Predict which values change in weekend and which stay the same.",
+        "Run locally and confirm the original menu item still costs 900 cents.",
+        "Change the weekend price to 900. Rerun and use the price check to locate the bug.",
+        "Restore the price, then create a separate unavailable copy."
+      ],
+      "notebook": "Original values:\nCopied values:\nWhy are sameValues and original equal?\nWhat does with leave unchanged?\nBug and evidence:",
+      "source": "using System;\n\n// Fictional Cove Diner menu snapshots, held only in memory.\nvar original = new MenuItem(\"soup\", \"Garden soup\", 900, true);\nvar weekend = original with { PriceCents = 950 };\nvar soldOut = weekend with { Available = false };\nvar sameValues = new MenuItem(\"soup\", \"Garden soup\", 900, true);\n\nCheck(original.PriceCents == 900, \"The original price stays unchanged.\");\nCheck(weekend.PriceCents == 950, \"The copied price is 950 cents.\");\nCheck(weekend.Id == original.Id, \"The item identity stays the same.\");\nCheck(weekend.Name == original.Name, \"The name is copied.\");\nCheck(original == sameValues, \"Records compare their values.\");\nCheck(original != weekend, \"A changed price makes unequal values.\");\nCheck(!ReferenceEquals(original, weekend), \"with creates a different object.\");\nCheck(!soldOut.Available && weekend.Available, \"Only the sold-out copy changes.\");\nCheck(soldOut.PriceCents == 950, \"A later copy keeps the changed price.\");\n\nConsole.WriteLine($\"Original: {original.Name}, {original.PriceCents} cents\");\nConsole.WriteLine($\"Weekend: {weekend.Name}, {weekend.PriceCents} cents\");\nConsole.WriteLine($\"Sold-out copy available: {soldOut.Available}\");\nConsole.WriteLine(\"PASS: records\");\n\nstatic void Check(bool condition, string message)\n{\n    if (!condition) throw new Exception(\"FAIL: \" + message);\n}\n\nsealed record MenuItem(string Id, string Name, int PriceCents, bool Available);\n",
+      "expected": "Original: Garden soup, 900 cents\nWeekend: Garden soup, 950 cents\nSold-out copy available: False\nPASS: records",
+      "challenge": "Make a renamed copy and verify that its name changes while the original name and price stay unchanged. Explain why a copied menu item would still need validation before saving.",
+      "sourcePaths": [
+        "TideCasa.Contracts/RestaurantOrdering.cs",
+        "TideCasa.Domain/CustomerRewards/RewardRule.cs"
+      ]
+    },
+    {
+      "id": "tenants",
+      "title": "Keep each restaurant’s orders separate",
+      "minutes": 20,
+      "goal": "Look up an order using both a restaurant identifier and an order identifier.",
+      "explanation": "A tenant is one restaurant or business in a shared application. An order number alone may appear in several restaurants. The lookup must match both values. This is a data-filtering exercise, not authentication or authorization: real server code must first establish which tenant the signed-in person may access.",
+      "steps": [
+        "Notice that both fictional restaurants have an order named order-1.",
+        "Trace the two comparisons in FindOrder and predict each result.",
+        "Run locally. Confirm that an unknown restaurant receives no order.",
+        "Remove o.TenantId == tenantId && from the lookup. Run again to see the isolation check fail.",
+        "Restore the tenant comparison and write why a browser-supplied tenant alone is insufficient."
+      ],
+      "notebook": "Tenant means:\nWhy can order-1 exist twice?\nWhat must the lookup match?\nWhat would a real server need to authorize first?\nBug and evidence:",
+      "source": "using System;\nusing System.Collections.Generic;\nusing System.Linq;\n\n// Fictional data only. The caller here is not authenticated.\nvar orders = new List<Order>\n{\n    new(\"lantern-cafe\", \"order-1\", 1200),\n    new(\"harbor-kitchen\", \"order-1\", 900)\n};\n\nvar lantern = FindOrder(orders, \"lantern-cafe\", \"order-1\");\nvar harbor = FindOrder(orders, \"harbor-kitchen\", \"order-1\");\nCheck(lantern?.TotalCents == 1200, \"Lantern receives its own order.\");\nCheck(harbor?.TotalCents == 900, \"Harbor receives its own order.\");\nCheck(FindOrder(orders, \"unknown-cafe\", \"order-1\") is null,\n    \"An unknown tenant receives no order.\");\nCheck(FindOrder(orders, \"lantern-cafe\", \"missing\") is null,\n    \"A missing order receives no result.\");\nCheck(FindOrder(orders, \"\", \"order-1\") is null,\n    \"A missing tenant cannot broaden the lookup.\");\n\nConsole.WriteLine($\"Lantern order: {lantern!.TotalCents} cents\");\nConsole.WriteLine($\"Harbor order: {harbor!.TotalCents} cents\");\nConsole.WriteLine(\"PASS: tenants\");\n\nstatic Order? FindOrder(IEnumerable<Order> orders, string tenantId, string orderId)\n{\n    if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(orderId))\n        return null;\n    return orders.FirstOrDefault(o => o.TenantId == tenantId && o.Id == orderId);\n}\n\nstatic void Check(bool condition, string message)\n{\n    if (!condition) throw new Exception(\"FAIL: \" + message);\n}\n\nsealed record Order(string TenantId, string Id, int TotalCents);\n",
+      "expected": "Lantern order: 1200 cents\nHarbor order: 900 cents\nPASS: tenants",
+      "challenge": "Add a third restaurant with order-1 and a different total. Write a check proving its result is separate, and another proving a missing order is not replaced by a different restaurant’s order.",
+      "sourcePaths": [
+        "TideCasa.Api/Infrastructure/TenantStaffAccess.cs",
+        "TideCasa.Api/Features/RestaurantOrdering/RestaurantOrderingStore.cs"
+      ]
+    },
+    {
+      "id": "retries",
+      "title": "Retry without a second order",
+      "minutes": 25,
+      "goal": "Reuse a receipt for an identical repeated request and reject conflicting reuse.",
+      "explanation": "A request key names one attempt to create an order. Repeating the same tenant, key, and payload returns the original receipt. Reusing that key with changed details fails. The in-memory dictionary demonstrates the idea only: production needs durable storage, transactions, uniqueness constraints, concurrency handling, and review before retrying side effects.",
+      "steps": [
+        "Find the dictionary key: it combines Tenant and Key.",
+        "Predict how many stored orders remain after an identical retry.",
+        "Run locally and confirm the retry returns the same receipt and a conflict adds nothing.",
+        "Change request with { Quantity = 2 } to request. Run again; the conflict check should fail because you no longer submitted changed details.",
+        "Restore the changed payload. Explain why a new request key would create a new order."
+      ],
+      "notebook": "What identifies one attempted order?\nWhat is returned after an identical retry?\nWhat happens when its payload changes?\nWhy is an in-memory dictionary insufficient in production?\nBug and evidence:",
+      "source": "using System;\nusing System.Collections.Generic;\n\n// Fictional orders only. This single-process ledger is not durable.\nvar ledger = new Dictionary<(string Tenant, string Key), (Request Body, Receipt Result)>();\nvar request = new Request(\"soup\", 1);\nvar first = Submit(\"lantern-cafe\", \"attempt-1\", request);\nvar retry = Submit(\"lantern-cafe\", \"attempt-1\", request);\nCheck(first == retry, \"An identical retry returns the original receipt.\");\nCheck(ledger.Count == 1, \"An identical retry does not create a second order.\");\n\nbool conflict = false;\ntry { Submit(\"lantern-cafe\", \"attempt-1\", request with { Quantity = 2 }); }\ncatch (InvalidOperationException) { conflict = true; }\nCheck(conflict, \"Changed details with the same key must be rejected.\");\nCheck(ledger.Count == 1, \"A rejected request creates no order.\");\nCheck(Submit(\"lantern-cafe\", \"attempt-1\", request) == first,\n    \"A conflict cannot overwrite the original receipt.\");\n\nvar other = Submit(\"harbor-kitchen\", \"attempt-1\", request);\nCheck(other != first, \"Another tenant has a separate request key.\");\nCheck(ledger.Count == 2, \"Exactly two fictional orders exist.\");\nConsole.WriteLine($\"First receipt: {first.OrderId}\");\nConsole.WriteLine($\"Retry receipt: {retry.OrderId}\");\nConsole.WriteLine($\"Stored orders: {ledger.Count}\");\nConsole.WriteLine(\"PASS: retries\");\n\nReceipt Submit(string tenant, string key, Request body)\n{\n    if (string.IsNullOrWhiteSpace(tenant) || string.IsNullOrWhiteSpace(key) ||\n        string.IsNullOrWhiteSpace(body.ItemId) || body.Quantity is < 1 or > 20)\n        throw new ArgumentException(\"Use valid fictional order inputs.\");\n    if (ledger.TryGetValue((tenant, key), out var existing))\n    {\n        if (existing.Body != body)\n            throw new InvalidOperationException(\"Request key has different details.\");\n        return existing.Result;\n    }\n    var receipt = new Receipt($\"order-{ledger.Count + 1}\", tenant, body.Quantity);\n    ledger.Add((tenant, key), (body, receipt));\n    return receipt;\n}\n\nstatic void Check(bool condition, string message)\n{\n    if (!condition) throw new Exception(\"FAIL: \" + message);\n}\n\nsealed record Request(string ItemId, int Quantity);\nsealed record Receipt(string OrderId, string TenantId, int Quantity);\n",
+      "expected": "First receipt: order-1\nRetry receipt: order-1\nStored orders: 2\nPASS: retries",
+      "challenge": "Submit the same item with attempt-2 for Lantern Cafe. Add checks that a new receipt is created and there are now three orders. Then explain why changing the key is not a safe response to every uncertain result.",
+      "sourcePaths": [
+        "TideCasa.Contracts/RestaurantOrdering.cs",
+        "TideCasa.Api/Features/RestaurantOrdering/RestaurantOrderingStore.cs"
+      ]
+    }
+  ]
+}

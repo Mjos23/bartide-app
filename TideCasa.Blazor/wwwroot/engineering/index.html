@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+  <title>Engineering Studio · Tide Casa</title>
+  <link rel="stylesheet" href="/engineering/studio.css?v=1">
+  <script src="/engineering/studio.js?v=1" defer></script>
+</head>
+<body>
+  <a class="skip" href="#workspace">Skip to workspace</a>
+  <header class="topbar"><a class="brand" href="/engineering/"><span class="brand-icon">tc</span><span>TIDE CASA <small>ENGINEERING STUDIO</small></span></a><span class="demo-badge">PRACTICE EDITION</span><a class="bar-link" href="/sample-bar">Explore the sample bar ↗</a></header>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-intro"><p class="eyebrow">FROM FIRST CLICK TO FIRST BUILD</p><h1>Build your<br>understanding.</h1><p>One small change.<br>One visible result.</p></div>
+      <div class="progress-label"><span>Your learning path</span><strong id="progress-text">0 / 9</strong></div><progress id="progress" value="0" max="9" aria-label="Learning path progress"></progress>
+      <nav id="lessons" aria-label="Learning slices"><p>Loading your lessons…</p></nav>
+      <div class="sidebar-footer"><button id="map-open" class="quiet">◎ How the real app fits together</button><button id="release-open" class="quiet">↗ Prepare an engineering handoff</button><p>Private to this browser. No account needed. Export a backup before changing devices.</p></div>
+    </aside>
+    <main id="workspace">
+      <section class="welcome"><div><p class="eyebrow">YOUR FIRST APP STARTS HERE</p><h2>A place to try, break, and learn.</h2><p>Build a tiny beach-bar ordering app. See what each line changes, then connect it to the C# behind Tide Casa.</p></div><div class="welcome-mark" aria-hidden="true">{ <span>build</span> }</div></section>
+      <section class="workspace-toolbar" aria-label="Project actions"><label>Project name<input id="project-name" maxlength="60" value="My first beach bar"></label><div class="backup-actions"><span id="save-state" role="status">Opening workspace…</span><button id="export">Export backup</button><button id="import-open">Import backup</button><input type="file" id="import" accept=".json,application/json" hidden></div></section>
+      <div id="notice" class="notice" role="status" hidden></div>
+      <section class="lesson-card" aria-labelledby="lesson-title"><div><p id="lesson-kicker" class="eyebrow"></p><h2 id="lesson-title">Getting your workspace ready</h2><p id="lesson-goal"></p></div><button class="primary" id="complete">Mark slice complete</button><p id="lesson-explanation" class="lesson-explanation"></p><ol id="lesson-steps"></ol><details><summary>Write this in your notebook</summary><p id="notebook"></p><p id="source-paths" class="source-paths"></p></details></section>
+      <section class="workbench" aria-label="Code and preview">
+        <div class="editor-pane"><div class="pane-heading"><span>01 / EDIT</span><button id="reset-open" class="small">Restore starter</button></div><div class="file-tabs" role="tablist" aria-label="Project files"></div><label id="editor-label" for="code">index.html</label><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-describedby="editor-help"></textarea><p id="editor-help">Edit a line, then run the preview. Tab moves to the next control; use spaces to indent.</p><div class="editor-actions"><button id="run" class="primary">▶ Run preview</button><button id="download">Download project ZIP</button></div></div>
+        <div class="preview-pane"><div class="pane-heading"><span id="preview-label">02 / SEE IT WORK</span><div id="view-controls"><button id="view-phone" class="small" aria-pressed="false">Phone</button><button id="view-wide" class="small" aria-pressed="true">Wide</button></div></div><div class="preview-stage" id="preview-stage"><iframe id="preview" title="Your practice app preview" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe></div><div id="csharp-guide" hidden><span class="language-pill">C# · .NET 10</span><h3>Real C#. Run on your computer.</h3><p>Edit Program.cs here, then download the project ZIP. Extract it, open that folder in a terminal, and run:</p><pre>dotnet run</pre><p>Requires the .NET 10 SDK. The studio does not compile C# in your browser or send your code to a server.</p><h4>Starter’s expected output</h4><pre id="expected"></pre><h4>Make it yours</h4><p id="challenge"></p><p class="subtle">A completion checkmark is your learning record, not evidence that edited C# passed. Use the output from your local run.</p><button id="record-run">Record my local result</button></div></div>
+      </section>
+      <section class="bottom-grid"><div class="console-card"><div class="pane-heading"><span>03 / CHECK & DEBUG</span><button id="check" class="small">Run behavior checks</button></div><div id="console" role="log" aria-live="polite"><p>Run a preview to see output here.</p></div><button id="bug-open" class="quiet">Try the cart debugging challenge →</button><p class="subtle">Checks exercise this practice app. They do not test the live restaurant or certify a release.</p></div><div class="notes-card"><label for="notes">04 / YOUR BUILD NOTES</label><p>What changed? What did you expect? What actually happened?</p><textarea id="notes" maxlength="8000" placeholder="I changed…&#10;I expected…&#10;I observed…&#10;My next question is…"></textarea></div></section>
+      <footer class="workspace-footer"><p>A learning workbench, connected to your domain. Browser previews use fictional data. Nothing here publishes changes to customer apps.</p><button id="next">Next slice →</button></footer>
+    </main>
+  </div>
+  <dialog id="modal"><form method="dialog"><button class="dialog-close" aria-label="Close dialog">×</button></form><div id="modal-content"></div></dialog>
+  <noscript>This programming workspace needs JavaScript. The sample bar remains available at /sample-bar.</noscript>
+</body>
+</html>
