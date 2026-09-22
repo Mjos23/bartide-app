@@ -59,9 +59,10 @@ public static class AuthFlow
         return endpoints;
     }
 
-    private static async Task<IResult> HandleAsync(string action, HttpContext context, IAntiforgery antiforgery, AccountApiClient api)
+    private static async Task<IResult> HandleAsync(string action, HttpContext context, IAntiforgery antiforgery, AccountApiClient api, IConfiguration configuration)
     {
-        if (action is not ("signin" or "signup" or "verify" or "resend" or "forgot" or "reset" or "signout")) return Results.NotFound();
+        var demo = PublicDemoWeb.Enabled(configuration);
+        if (demo ? action is not ("demo-switch" or "signout") : action is not ("signin" or "signup" or "verify" or "resend" or "forgot" or "reset" or "signout")) return Results.NotFound();
         if (context.Items.ContainsKey(UnavailableItem) && action != "signout") return ServiceUnavailable();
         if (!IsSameOrigin(context.Request) || !context.Request.HasFormContentType) return Failure(StatusCodes.Status400BadRequest, "Please open the form on this site and try again.");
         var bodyFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
@@ -77,6 +78,7 @@ public static class AuthFlow
         { return Failure(400, "The form has expired. Reload the page and try again."); }
 
         var returnTo = SafeReturnPath(form["return_to"].ToString());
+        if (demo && returnTo is not ("/account" or "/rewards/gulf-lantern")) returnTo = "/account";
         if (action == "signout")
         {
             var auth = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -87,7 +89,7 @@ public static class AuthFlow
                 if (!string.IsNullOrEmpty(token)) confirmed = (await api.SignOutAsync(token, context.RequestAborted)).Succeeded;
             }
             finally { await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); }
-            return Results.LocalRedirect("/signin?notice=" + (confirmed ? "signed-out" : "local-signout"));
+            return Results.LocalRedirect(demo ? "/sample-bar" : "/signin?notice=" + (confirmed ? "signed-out" : "local-signout"));
         }
 
         var email = form["email"].ToString().Trim();
@@ -99,6 +101,7 @@ public static class AuthFlow
             return Redirect("/reset-password", "password-mismatch", returnTo);
         object request = action switch
         {
+            "demo-switch" => new { personKey = form["person_key"].ToString() },
             "signin" => new SignInRequest(email, password),
             "signup" => new SignUpRequest(email, password),
             "verify" => new VerifyEmailRequest(email, code),
@@ -107,7 +110,7 @@ public static class AuthFlow
         };
         var page = action switch { "signup" => "/signup", "verify" or "resend" => "/verify-email", "forgot" => "/forgot-password", "reset" => "/reset-password", _ => "/signin" };
         if (!Validator.TryValidateObject(request, new ValidationContext(request), null, true)) return Redirect(page, "invalid", returnTo);
-        if (action is "signin" or "verify")
+        if (action is "signin" or "verify" or "demo-switch")
         {
             var result = await api.PostAsync<AuthSession>(action, request, context.Connection.RemoteIpAddress, context.RequestAborted);
             if (result.Unavailable) return ServiceUnavailable();
@@ -121,6 +124,12 @@ public static class AuthFlow
             properties.StoreTokens([new AuthenticationToken { Name = "access_token", Value = session.AccessToken }]);
             try
             {
+                if (demo)
+                {
+                    var old = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    if (old.Properties?.GetTokenValue("access_token") is { } prior)
+                        await api.SignOutAsync(prior, context.RequestAborted);
+                }
                 await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);
             }

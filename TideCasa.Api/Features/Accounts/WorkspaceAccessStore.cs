@@ -51,7 +51,7 @@ public sealed class WorkspaceAccessStore(ApplicationDatabase database)
                         (c.status='active' AND (CASE WHEN json_valid(e.settings_json)
                           THEN COALESCE(json_type(e.settings_json,'$.enabled')='true',0) ELSE 0 END)=1 AND
                           (EXISTS (SELECT 1 FROM bartide_enhanced_members m WHERE m.tenant_id=c.id
-                                   AND m.user_id=@user AND m.active=1 AND m.role IN ('kitchen','driver'))
+                                   AND m.user_id=@user AND m.active=1 AND m.role IN ('manager','bartender','server','kitchen','driver'))
                            OR (c.vertical IN ('bartide','beach-glam','fit-tide') AND
                              EXISTS (SELECT 1 FROM fit_learners l WHERE l.tenant_id=c.id
                                      AND l.user_id=@user AND l.active=1)))))
@@ -65,7 +65,7 @@ public sealed class WorkspaceAccessStore(ApplicationDatabase database)
                       AND (@platform=1 OR c.user_id=@user OR
                         (c.status='active' AND (CASE WHEN COALESCE(tide_json(e.settings_json)->'enabled'='true'::jsonb,false) THEN 1 ELSE 0 END)=1 AND
                           (EXISTS (SELECT 1 FROM bartide_enhanced_members m WHERE m.tenant_id=c.id
-                                   AND m.user_id=@user AND m.active=1 AND m.role IN ('kitchen','driver'))
+                                   AND m.user_id=@user AND m.active=1 AND m.role IN ('manager','bartender','server','kitchen','driver'))
                            OR (c.vertical IN ('bartide','beach-glam','fit-tide') AND
                              EXISTS (SELECT 1 FROM fit_learners l WHERE l.tenant_id=c.id
                                      AND l.user_id=@user AND l.active=1)))))
@@ -95,7 +95,7 @@ public sealed class WorkspaceAccessStore(ApplicationDatabase database)
                         staff.Transaction = transaction;
                         staff.CommandText = """
                             SELECT id,role FROM bartide_enhanced_members
-                            WHERE tenant_id=@tenant AND user_id=@user AND active=1 AND role IN ('kitchen','driver')
+                            WHERE tenant_id=@tenant AND user_id=@user AND active=1 AND role IN ('manager','bartender','server','kitchen','driver')
                             ORDER BY id LIMIT 2
                             """;
                         staff.Parameters.AddWithValue("@tenant", tenant.Id);
@@ -125,6 +125,7 @@ public sealed class WorkspaceAccessStore(ApplicationDatabase database)
                         }
                     }
                 }
+                if (staffRole == "manager") { canPrepare = true; canEdit = true; }
                 result.Add(new(tenant.Id, tenant.Slug, tenant.Name, tenant.Status,
                     canPrepare, canEdit, staffRole, staffMemberId, learnerId, manages));
             }
@@ -154,7 +155,7 @@ public sealed class WorkspaceAccessStore(ApplicationDatabase database)
             connection.Sql("""
                 UPDATE bartide_enhanced_members SET user_id=@user
                 WHERE user_id IS NULL AND email=@email COLLATE NOCASE AND active=1
-                  AND role IN ('kitchen','driver') AND (@tenant IS NULL OR tenant_id=@tenant)
+                  AND role IN ('manager','bartender','server','kitchen','driver') AND (@tenant IS NULL OR tenant_id=@tenant)
                   AND EXISTS (SELECT 1 FROM bartide_customers c JOIN bartide_enhanced_configs e ON e.tenant_id=c.id
                               WHERE c.id=bartide_enhanced_members.tenant_id AND c.status='active'
                                 AND (CASE WHEN json_valid(e.settings_json)
@@ -162,7 +163,7 @@ public sealed class WorkspaceAccessStore(ApplicationDatabase database)
                 """, """
                 UPDATE bartide_enhanced_members SET user_id=@user
                 WHERE user_id IS NULL AND translate(email,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')=translate(@email,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz') COLLATE "C" AND active=1
-                  AND role IN ('kitchen','driver') AND (@tenant IS NULL OR tenant_id=@tenant)
+                  AND role IN ('manager','bartender','server','kitchen','driver') AND (@tenant IS NULL OR tenant_id=@tenant)
                   AND EXISTS (SELECT 1 FROM bartide_customers c JOIN bartide_enhanced_configs e ON e.tenant_id=c.id
                               WHERE c.id=bartide_enhanced_members.tenant_id AND c.status='active'
                                 AND (CASE WHEN COALESCE(tide_json(e.settings_json)->'enabled'='true'::jsonb,false) THEN 1 ELSE 0 END)=1)

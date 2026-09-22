@@ -9,12 +9,13 @@
     <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Your order desk</span></header>
     <main class="ordering-main">
         <p class="bt-one-kicker">KEEP EVERY ORDER MOVING</p><h1>@(workspace?.Name ?? "Restaurant orders")</h1>
-        <nav class="rm-workspace-nav" aria-label="Workspace"><a aria-current="page" href="@PagePath">Orders</a>@if (workspace?.Role == "owner") { <a href="@WorkspacePath("menu")">Menu and settings</a><a href="@WorkspacePath("ordering")">Table QR codes</a> }</nav>
+        <nav class="rm-workspace-nav" aria-label="Workspace"><a aria-current="page" href="@PagePath">Orders</a>@if (workspace?.Role is "owner" or "manager") { <a href="@WorkspacePath("menu")">Menu and settings</a><a href="@WorkspacePath("ordering")">Table QR codes</a> }</nav>
         @if (RestaurantManagementFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
         @if (error is not null) { <div class="ordering-notice" role="alert"><p>@error</p><a href="@PagePath">Try loading again</a></div> }
         @if (workspace is not null)
         {
             <div class="ordering-section-heading"><p>Review incoming orders, update their progress and record payments collected by your team.</p><a class="ordering-secondary" href="@PagePath">Refresh orders</a></div>
+            <p class="ordering-note">Current role: @(workspace.Role == "owner" ? "Owner" : RestaurantStaffRoles.Label(workspace.Role)). Updates apply to the whole order.</p>
             <p class="ordering-note">This page refreshes after each saved change. Use Refresh orders to check for new arrivals.</p>
             @if (workspace.Orders.Count == 0)
             {

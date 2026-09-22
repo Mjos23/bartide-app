@@ -10,6 +10,8 @@
 !TideCasa.Blazor/**
 !SharedHosting/
 !SharedHosting/**
+!fixtures/
+!fixtures/gulf-lantern.json
 !global.json
 !Directory.Build.props
 !Directory.Build.targets

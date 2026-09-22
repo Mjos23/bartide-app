@@ -20,6 +20,7 @@ using TideCasa.Api.Features.Referrals;
 using TideCasa.Api.Features.LaunchReview;
 using TideCasa.Api.Features.BusinessPosts;
 using TideCasa.Api.Features.SalesPipeline;
+using TideCasa.Api.Features.PublicDemo;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16 * 1024);
@@ -38,6 +39,7 @@ builder.Services.AddSingleton<FeatureMigrator>();
 builder.Services.AddSingleton<PostgresSchemaMigrator>();
 builder.Services.AddScoped<WorkspaceAccessStore>();
 builder.Services.AddScoped<WorkspaceRegistrationStore>();
+builder.Services.AddSingleton<PublicDemoOptions>();
 builder.Services.AddTideCasaAuthentication();
 builder.Services.AddSingleton<DemoRequestStore>();
 builder.Services.AddScoped<DemoRequestService>();
@@ -59,6 +61,9 @@ builder.Services.AddSingleton<SalesPipelineStore>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("public-demo-switch", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
+        { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
     options.AddPolicy("restaurant-ordering", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
         { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
@@ -84,6 +89,7 @@ app.Use(async (context, next) =>
     context.Response.Headers.XContentTypeOptions = "nosniff";
     await next();
 });
+app.UsePublicDemoBoundary();
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();

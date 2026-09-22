@@ -3,6 +3,7 @@
 @attribute [ExcludeFromInteractiveRouting]
 @using TideCasa.Blazor.Features.Media
 @inject MediaClient Api
+@inject IConfiguration Configuration
 <PageTitle>Photos and files | Tide Casa</PageTitle>
 <div class="bt-unified media-workspace">
     <header class="media-nav"><a href="/account">← Your account</a><span>BarTide · Photos and files</span></header>
@@ -16,6 +17,7 @@
         {
             @if (MediaFlow.Notice(Notice) is { } notice) { <p class="media-notice" role="status">@notice</p> }
             <p>Keep your menu photos, original menus and employee training videos together.</p>
+            @if (IsDemo) { <p class="media-notice">These sample photos and the training video stay fixed for presentations. You can choose them when editing a menu item or training lesson.</p> }
             <p class="media-note">Original menus and training videos stay private. Photos appear on your active menu when you add them to an item. Your team can watch a training video when it belongs to a published course assigned to them.</p>
             @if (!workspace.StorageReady) { <p class="media-notice" role="status">Private uploads are being connected. Your saved file list is available below.</p> }
             @foreach (var section in Sections)
@@ -24,8 +26,8 @@
                     <h2 id="@("media-" + section.Kind)">@section.Title</h2><p>@section.Help</p>
                     <form method="post" enctype="multipart/form-data" action="@($"/private-media/manage/{Uri.EscapeDataString(TenantId)}/{section.Kind}/upload")" data-enhance="false" class="media-upload">
                         <AntiforgeryToken /><input type="hidden" name="requestId" value="@section.RequestId" />
-                        <label class="desk-field">Choose a file<input type="file" name="file" accept="@section.Accept" required disabled="@(!workspace.StorageReady)" /></label>
-                        <button type="submit" class="bt-one-button" disabled="@(!workspace.StorageReady)">Upload @section.Label</button>
+                        <label class="desk-field">Choose a file<input type="file" name="file" accept="@section.Accept" required disabled="@(IsDemo || !workspace.StorageReady)" /></label>
+                        <button type="submit" class="bt-one-button" disabled="@(IsDemo || !workspace.StorageReady)">Upload @section.Label</button>
                     </form>
                     <div class="media-files">
                         @foreach (var file in workspace.Files.Where(file => file.Kind == section.Kind))
@@ -43,7 +45,7 @@
                                 else
                                 {
                                     <form method="post" action="@($"/private-media/manage/{Uri.EscapeDataString(TenantId)}/{file.Kind}/{file.Id}/delete")" data-enhance="false">
-                                        <AntiforgeryToken /><button type="submit" class="media-remove" disabled="@(!workspace.StorageReady)">Remove file</button>
+                                        <AntiforgeryToken /><button type="submit" class="media-remove" disabled="@(IsDemo || !workspace.StorageReady)">Remove file</button>
                                     </form>
                                 }
                             </article>
@@ -62,6 +64,7 @@
     [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
     private MediaWorkspace? workspace;
+    private bool IsDemo => PublicDemoWeb.Enabled(Configuration);
     private string? error;
     private string CurrentPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/media";
     private sealed record Section(string Kind, string Title, string Help, string Accept, string Label, string Empty, string RequestId);

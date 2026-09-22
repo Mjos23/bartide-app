@@ -1,0 +1,338 @@
+{
+  "id": "gulf-lantern",
+  "slug": "gulf-lantern",
+  "name": "Gulf Lantern Beach Bar",
+  "location": "St. Pete Beach, Florida",
+  "address": "Sunset patio, St. Pete Beach, FL 33706 - fictional venue",
+  "tagline": "Pull up a chair. Stay for the sunset.",
+  "description": "An easygoing neighborhood beach bar: Gulf-style plates, a friendly patio crew and live music as the lanterns come on.",
+  "hours": "Mon-Thu 11 am-10 pm; Fri-Sat 11 am-midnight; Sun 11 am-9 pm",
+  "phone": "(727) 555-0147",
+  "email": "hello@gulf-lantern.example.invalid",
+  "hero": "/sample-bar/gulf-lantern-hero.png",
+  "fictional": true,
+  "password": "GulfLantern-demo-only!",
+  "taxNote": "Illustrative 7% test tax, not a verified location-specific tax setting.",
+  "categories": [
+    {
+      "id": "share",
+      "label": "For the table"
+    },
+    {
+      "id": "kitchen",
+      "label": "Beach kitchen"
+    },
+    {
+      "id": "bar",
+      "label": "From the bar"
+    },
+    {
+      "id": "soft",
+      "label": "Zero-proof & refreshing"
+    }
+  ],
+  "menu": [
+    {
+      "id": "smoked-fish-dip",
+      "name": "Smoked fish dip",
+      "description": "Smoked Gulf-style fish, house crackers, pickled jalapeno and lemon.",
+      "priceCents": 1100,
+      "category": "share",
+      "image": "/demo/assets/menu/smoked-fish-dip.webp"
+    },
+    {
+      "id": "beer-cheese-pretzel",
+      "name": "Warm pretzel & beer cheese",
+      "description": "A soft salted pretzel with warm beer cheese and grain mustard.",
+      "priceCents": 1050,
+      "category": "share",
+      "image": "/demo/assets/menu/beer-cheese-pretzel.webp"
+    },
+    {
+      "id": "coconut-shrimp",
+      "name": "Coconut shrimp",
+      "description": "Crisp coconut shrimp with orange-chile dipping sauce.",
+      "priceCents": 1600,
+      "category": "share",
+      "image": "/demo/assets/menu/coconut-shrimp.webp"
+    },
+    {
+      "id": "calamari",
+      "name": "Crispy calamari",
+      "description": "Lightly fried rings, lemon, parsley and house marinara.",
+      "priceCents": 1400,
+      "category": "share",
+      "image": "/demo/assets/menu/calamari.webp"
+    },
+    {
+      "id": "street-corn",
+      "name": "Charred street corn",
+      "description": "Lime crema, cotija, cilantro and smoked paprika.",
+      "priceCents": 800,
+      "category": "share",
+      "image": "/demo/assets/menu/street-corn.webp"
+    },
+    {
+      "id": "loaded-fries",
+      "name": "Lantern loaded fries",
+      "description": "Golden fries, beer cheese, scallions and smoky house sauce.",
+      "priceCents": 1000,
+      "category": "share",
+      "image": "/demo/assets/menu/loaded-fries.webp"
+    },
+    {
+      "id": "gulf-tacos",
+      "name": "Gulf fish tacos",
+      "description": "Blackened fish, citrus slaw, lime crema and warm tortillas.",
+      "priceCents": 1700,
+      "category": "kitchen",
+      "image": "/demo/assets/menu/gulf-tacos.webp"
+    },
+    {
+      "id": "sunset-burger",
+      "name": "Sunset burger",
+      "description": "Smash-griddled beef, cheddar, lettuce, tomato and fries.",
+      "priceCents": 1800,
+      "category": "kitchen",
+      "image": "/demo/assets/menu/sunset-burger.webp"
+    },
+    {
+      "id": "citrus-wings",
+      "name": "Citrus-glazed wings",
+      "description": "Twelve wings tossed in orange-lime glaze with a little heat.",
+      "priceCents": 1750,
+      "category": "kitchen",
+      "image": "/demo/assets/menu/citrus-wings.webp"
+    },
+    {
+      "id": "margherita-flatbread",
+      "name": "Margherita flatbread",
+      "description": "Tomato, mozzarella, fresh basil and a crisp flatbread crust.",
+      "priceCents": 1500,
+      "category": "kitchen",
+      "image": "/demo/assets/menu/margherita-flatbread.webp"
+    },
+    {
+      "id": "daily-catch",
+      "name": "Grilled Gulf-style catch",
+      "description": "Seasonal grilled fish, vegetables and lemon-herb butter.",
+      "priceCents": 2600,
+      "category": "kitchen",
+      "image": "/demo/assets/menu/daily-catch.webp"
+    },
+    {
+      "id": "smash-sliders",
+      "name": "Beachside smash sliders",
+      "description": "Two cheddar sliders with pickles and a side of fries.",
+      "priceCents": 1600,
+      "category": "kitchen",
+      "image": "/demo/assets/menu/smash-sliders.webp"
+    },
+    {
+      "id": "shrimp-basket",
+      "name": "Coconut shrimp basket",
+      "description": "A larger serving of our coconut shrimp with fries and citrus slaw.",
+      "priceCents": 2100,
+      "category": "kitchen",
+      "image": "/demo/assets/menu/coconut-shrimp.webp"
+    },
+    {
+      "id": "wing-platter",
+      "name": "Wings for the table",
+      "description": "Twenty-four citrus-glazed wings, celery and two dips to share.",
+      "priceCents": 3200,
+      "category": "share",
+      "image": "/demo/assets/menu/citrus-wings.webp"
+    },
+    {
+      "id": "sunset-spritz",
+      "name": "Sunset spritz",
+      "description": "Aperitif, sparkling wine, orange and soda over ice.",
+      "priceCents": 1200,
+      "category": "bar",
+      "image": "/demo/assets/menu/sunset-spritz.webp"
+    },
+    {
+      "id": "spicy-margarita",
+      "name": "Spicy beach margarita",
+      "description": "Tequila, fresh lime, agave and jalapeno with a salted rim.",
+      "priceCents": 1300,
+      "category": "bar",
+      "image": "/demo/assets/menu/spicy-margarita.webp"
+    },
+    {
+      "id": "espresso-martini",
+      "name": "Lantern espresso martini",
+      "description": "Vodka, coffee liqueur and freshly pulled espresso.",
+      "priceCents": 1400,
+      "category": "bar",
+      "image": "/demo/assets/menu/espresso-martini.webp"
+    },
+    {
+      "id": "local-draft",
+      "name": "Rotating local-style draft",
+      "description": "A crisp rotating draft pour. Ask your bartender for the selection.",
+      "priceCents": 700,
+      "category": "bar",
+      "image": "/demo/assets/menu/local-draft.webp"
+    },
+    {
+      "id": "key-lime-fizz",
+      "name": "Key lime fizz",
+      "description": "Alcohol-free key lime, sparkling soda and a fresh lime wheel.",
+      "priceCents": 650,
+      "category": "soft",
+      "image": "/demo/assets/menu/key-lime-fizz.webp"
+    },
+    {
+      "id": "iced-tea",
+      "name": "Fresh-brewed iced tea",
+      "description": "Black tea over ice with lemon; sweet or unsweet.",
+      "priceCents": 400,
+      "category": "soft",
+      "image": "/demo/assets/menu/iced-tea.webp"
+    }
+  ],
+  "people": [
+    {
+      "key": "owner",
+      "id": "be839b47-6b15-53a1-8cb8-fda359cdf3e1",
+      "name": "Casey Brooks",
+      "title": "Owner",
+      "role": "owner",
+      "bio": "Business care, menu, billing and daily operations",
+      "email": "owner@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "manager",
+      "id": "18464824-b2b5-5daf-85fa-884c9c1c6149",
+      "name": "Jordan Ellis",
+      "title": "General manager",
+      "role": "manager",
+      "bio": "Run the shift, schedules, menu and events",
+      "email": "manager@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "bartender",
+      "id": "ce9b3046-cfc4-538a-b15c-f1fa365a5678",
+      "name": "Nico Rivera",
+      "title": "Bartender",
+      "role": "bartender",
+      "bio": "Order board, drinks, training and team updates",
+      "email": "bartender@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "server-maya",
+      "id": "ba144872-0b90-593a-a29a-3a11e8348339",
+      "name": "Maya Chen",
+      "title": "Server",
+      "role": "server",
+      "bio": "Tables, unpaid checks, service and team training",
+      "email": "server-maya@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "server-eli",
+      "id": "544811b6-d897-547d-bfb3-d17421fd9ea1",
+      "name": "Eli Parker",
+      "title": "Server",
+      "role": "server",
+      "bio": "Patio service, order handoff and customer care",
+      "email": "server-eli@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "kitchen",
+      "id": "a9b09cac-35ef-546f-8997-9f89a48daf2c",
+      "name": "Luis Santos",
+      "title": "Kitchen lead",
+      "role": "kitchen",
+      "bio": "Accept, prepare and ready the kitchen orders",
+      "email": "kitchen@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "driver",
+      "id": "9966c5a2-77b9-5570-b011-1e7a66708f86",
+      "name": "Zoe Reed",
+      "title": "Delivery staff",
+      "role": "driver",
+      "bio": "Assigned deliveries and delivery training",
+      "email": "driver@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "avery",
+      "id": "eefe928f-a53e-5d89-8d86-d070c10d62ba",
+      "name": "Avery Lane",
+      "title": "Customer",
+      "role": "customer",
+      "bio": "A regular, collecting rewards and bringing friends",
+      "email": "avery@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "morgan",
+      "id": "d51f07ca-7a39-55c4-bad1-6aea3a6cc117",
+      "name": "Morgan Blake",
+      "title": "Customer",
+      "role": "customer",
+      "bio": "A patio dinner and a sunset music reservation",
+      "email": "morgan@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "taylor",
+      "id": "30488753-4c87-58c1-baf6-0e2d8c65d823",
+      "name": "Taylor Quinn",
+      "title": "Customer",
+      "role": "customer",
+      "bio": "Pickup lunch with a food allergy note",
+      "email": "taylor@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "quinn",
+      "id": "7b5abec4-3c32-5ca0-9b20-f7e67e0f90ec",
+      "name": "Quinn Foster",
+      "title": "Customer",
+      "role": "customer",
+      "bio": "A delivery order and a weekend event",
+      "email": "quinn@gulf-lantern.example.invalid"
+    },
+    {
+      "key": "reese",
+      "id": "69738b48-0895-5265-a7c8-957f09a07881",
+      "name": "Reese Walker",
+      "title": "Customer",
+      "role": "customer",
+      "bio": "A first visit, alcohol-free drinks and rewards",
+      "email": "reese@gulf-lantern.example.invalid"
+    }
+  ],
+  "events": [
+    {
+      "id": "c79287bf-5694-5e4c-abc4-7a83e9033e45",
+      "title": "Sunset Strings",
+      "details": "A fictional acoustic duo on the patio. Easy coastal covers, space for conversation and a Gulf sunset.",
+      "location": "Gulf Lantern sunset patio (fictional)",
+      "startsAt": "2026-09-25T23:00:00+00:00",
+      "endsAt": "2026-09-26T01:00:00+00:00",
+      "timeZone": "America/New_York",
+      "capacity": 54
+    },
+    {
+      "id": "92b1a978-ad1c-56b2-848b-663ed251c7cc",
+      "title": "Lantern Afterglow",
+      "details": "A fictional soul-and-groove trio for a relaxed Saturday evening. Patio seating and full dinner menu.",
+      "location": "Gulf Lantern sunset patio (fictional)",
+      "startsAt": "2026-09-26T23:00:00+00:00",
+      "endsAt": "2026-09-27T01:00:00+00:00",
+      "timeZone": "America/New_York",
+      "capacity": 40
+    },
+    {
+      "id": "5ca354f3-b7d6-50eb-af81-11024ee297dd",
+      "title": "Sunday Saltwater Sessions",
+      "details": "A fictional afternoon jazz set with guitar and upright bass. Alcohol-free drinks welcome.",
+      "location": "Gulf Lantern sunset patio (fictional)",
+      "startsAt": "2026-09-27T16:00:00+00:00",
+      "endsAt": "2026-09-27T18:00:00+00:00",
+      "timeZone": "America/New_York",
+      "capacity": 32
+    }
+  ]
+}

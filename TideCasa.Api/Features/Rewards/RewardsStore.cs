@@ -51,7 +51,7 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
     {
         await using var db = await database.OpenAsync(ct);
         using var tx = db.BeginTransaction(deferred: false);
-        var b = await Tenant(db, tx, id, false, ct); Manager(b, user);
+        var b = await Tenant(db, tx, id, false, ct); await Manager(db, tx, b, user, ct);
         var members = await Rows(db, tx, "SELECT m.id,m.name,COALESCE(SUM(l.delta),0) FROM tide_loyalty_members m LEFT JOIN tide_loyalty_ledger l ON l.member_id=m.id AND l.tenant_id=m.tenant_id WHERE m.tenant_id=@t GROUP BY m.id ORDER BY m.name LIMIT 10000",
             r => new RewardMember(r.GetString(0), r.GetString(1), r.ReadInt64(2)), ct, ("@t", id));
         foreach (var member in members) await Reconcile(db, tx, id, member.Id, ct);
@@ -74,10 +74,10 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
         var b = await Tenant(db, tx, id, false, ct);
         // Establish the same verified-email-to-stable-ID binding used by the staff
         // workspace, so a first visit directly to this API does not depend on a UI route.
-        await Run(db, tx, db.Sql("UPDATE bartide_enhanced_members SET user_id=@u WHERE tenant_id=@t AND user_id IS NULL AND email=@email COLLATE NOCASE AND active=1 AND role IN('kitchen','driver')",
-            "UPDATE bartide_enhanced_members SET user_id=@u WHERE tenant_id=@t AND user_id IS NULL AND translate(email,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')=translate(@email,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz') COLLATE \"C\" AND active=1 AND role IN('kitchen','driver')"), ct,
+        await Run(db, tx, db.Sql("UPDATE bartide_enhanced_members SET user_id=@u WHERE tenant_id=@t AND user_id IS NULL AND email=@email COLLATE NOCASE AND active=1 AND role IN('manager','bartender','server','kitchen','driver')",
+            "UPDATE bartide_enhanced_members SET user_id=@u WHERE tenant_id=@t AND user_id IS NULL AND translate(email,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')=translate(@email,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz') COLLATE \"C\" AND active=1 AND role IN('manager','bartender','server','kitchen','driver')"), ct,
             ("@u", user.UserId), ("@t", id), ("@email", user.Email));
-        var members = await Rows(db, tx, "SELECT id FROM bartide_enhanced_members WHERE tenant_id=@t AND user_id=@u AND active=1 AND role IN('kitchen','driver')", r => r.GetString(0), ct, ("@t", id), ("@u", user.UserId));
+        var members = await Rows(db, tx, "SELECT id FROM bartide_enhanced_members WHERE tenant_id=@t AND user_id=@u AND active=1 AND role IN('manager','bartender','server','kitchen','driver')", r => r.GetString(0), ct, ("@t", id), ("@u", user.UserId));
         if (members.Count != 1) throw Forbidden();
         var member = members[0];
         var result = new EmployeeRewardsWallet(id, b.Name, member, await Number(db, tx, "SELECT COALESCE(SUM(delta),0) FROM tide_employee_reward_ledger WHERE tenant_id=@t AND member_id=@m", ct, ("@t", id), ("@m", member)), await EmployeeEntries(db, tx, id, member, ct));
@@ -270,7 +270,11 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
         {
             Required(request); var reference = Text(request!.SourceReference, "Verified source reference", 100); var reason = Text(request.Reason, "Reason", 500, multiline: true);
             if (request.Delta is < -10000 or > 10000 or 0) throw new RewardsException("Use a nonzero points change between −10,000 and 10,000.");
-            if (await Number(db, tx, "SELECT COUNT(*) FROM bartide_enhanced_members WHERE tenant_id=@t AND id=@m AND active=1 AND role IN('kitchen','driver')", token, ("@t", b.Id), ("@m", request.MemberId)) != 1) throw Missing();
+            if (await Number(db, tx, "SELECT COUNT(*) FROM bartide_enhanced_members WHERE tenant_id=@t AND id=@m AND active=1 AND role IN('manager','bartender','server','kitchen','driver')", token, ("@t", b.Id), ("@m", request.MemberId)) != 1) throw Missing();
+            if (!user.IsPlatformOwner && b.Owner != user.UserId && await Number(db, tx,
+                "SELECT COUNT(*) FROM bartide_enhanced_members WHERE tenant_id=@t AND id=@m AND user_id=@u", token,
+                ("@t", b.Id), ("@m", request.MemberId), ("@u", user.UserId)) != 0)
+                throw new RewardsException("Only the business owner can change your own employee points.", 403, "owner_required");
             if (await Number(db, tx, "SELECT COUNT(*) FROM tide_employee_reward_ledger WHERE tenant_id=@t AND source_reference=@source", token, ("@t", b.Id), ("@source", reference)) > 0)
                 throw new RewardsException("That employee reward source was already recorded.", 409, "employee_source_exists");
             var balance = await Number(db, tx, "SELECT COALESCE(SUM(delta),0) FROM tide_employee_reward_ledger WHERE tenant_id=@t AND member_id=@m", token, ("@t", b.Id), ("@m", request.MemberId));
@@ -288,7 +292,7 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
         await using var db = await database.OpenAsync(ct);
         using var tx = db.BeginTransaction(deferred: false);
         var b = await Tenant(db, tx, key, slug, ct);
-        if (manager) Manager(b, user);
+        if (manager) await Manager(db, tx, b, user, ct);
         var old = await Rows(db, tx, "SELECT request_hash,result_id,message FROM tide_reward_commands WHERE tenant_id=@t AND actor=@u AND request_id=@key", r => new[] { r.GetString(0), r.GetString(1), r.GetString(2) }, ct,
             ("@t", b.Id), ("@u", user.UserId), ("@key", requestId));
         if (old.Count == 1)
@@ -335,7 +339,8 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
         if (rows.Count != 1 || rows[0][4] != "active" || rows[0][5] != "bartide") throw Missing();
         var row = rows[0]; return new(row[0], row[1], row[2], row[3]);
     }
-    private static void Manager(Business b, AuthUser user) { if (!user.IsPlatformOwner && b.Owner != user.UserId) throw Forbidden(); }
+    private static async Task Manager(DbConnection db, DbTransaction tx, Business b, AuthUser user, CancellationToken ct)
+    { if (!user.IsPlatformOwner && b.Owner != user.UserId && !await TenantStaffAccess.IsManagerAsync(db, tx, b.Id, user, ct)) throw Forbidden(); }
     private static Task<string?> OwnMember(DbConnection db, DbTransaction tx, string tenant, AuthUser user, CancellationToken ct) => Value(db, tx, "SELECT id FROM tide_loyalty_members WHERE tenant_id=@t AND user_id=@u", ct, ("@t", tenant), ("@u", user.UserId));
     private static async Task<string> RequireOwnMember(DbConnection db, DbTransaction tx, string tenant, AuthUser user, CancellationToken ct) => await OwnMember(db, tx, tenant, user, ct) ?? throw new RewardsException("Join this business's rewards program first.", 409, "join_required");
     private static async Task Member(DbConnection db, DbTransaction tx, string tenant, string member, CancellationToken ct)

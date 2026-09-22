@@ -6,6 +6,7 @@
     <UserSecretsId>TideCasa-Blazor-Development</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="..\fixtures\gulf-lantern.json" Link="demo\gulf-lantern.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Include="..\SharedHosting\AppPlatformIngress.cs" Link="Hosting\AppPlatformIngress.cs" />
     <ProjectReference Include="..\TideCasa.Contracts\TideCasa.Contracts.csproj" />
     <PackageReference Include="Npgsql" Version="10.0.3" />

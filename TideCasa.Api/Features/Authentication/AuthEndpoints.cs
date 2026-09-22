@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authentication;
 using TideCasa.Contracts;
+using TideCasa.Api.Features.PublicDemo;
 
 namespace TideCasa.Api.Features.Authentication;
 
@@ -25,6 +26,9 @@ public static class AuthEndpoints
     public static void MapTideCasaAuthentication(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/auth").WithTags("Authentication").AddEndpointFilter<AuthRequestFilter>();
+        if (app.Services.GetRequiredService<PublicDemoOptions>().Enabled)
+            group.MapPost("/demo-switch", async (DemoSwitchRequest request, AuthService service, CancellationToken ct) =>
+                Results.Ok(await service.DemoSwitchAsync(request, ct))).RequireRateLimiting("public-demo-switch");
         group.MapPost("/signin", async (SignInRequest request, AuthService service, HttpContext context, CancellationToken ct) =>
             Results.Ok(await service.SignInAsync(request, Address(context), ct)));
         group.MapPost("/signup", async (SignUpRequest request, AuthService service, HttpContext context, CancellationToken ct) =>

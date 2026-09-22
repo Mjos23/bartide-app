@@ -17,7 +17,7 @@
         {
             @if (StaffTrainingFlow.Notice(Notice) is { } notice) { <p class="team-notice" role="status">@notice</p> }
             <p>Keep shifts, team conversations and onboarding lessons in one place.</p>
-            <nav class="team-links" aria-label="Team workspace sections"><a href="#team">Team</a><a href="#schedule">Schedule</a><a href="#messages">Messages</a><a href="#training">Training</a><a href="@CurrentPath">Refresh</a></nav>
+            <nav class="team-links" aria-label="Team workspace sections"><a href="@(CurrentPath + "#team")">Team</a><a href="@(CurrentPath + "#schedule")">Schedule</a><a href="@(CurrentPath + "#messages")">Messages</a><a href="@(CurrentPath + "#training")">Training</a><a href="@CurrentPath">Refresh</a></nav>
             <section id="team" class="team-panel">
                 <h2>Your team</h2>
                 @if (workspace.CanManage)
@@ -28,7 +28,7 @@
                         <AntiforgeryToken />
                         <label>Name<input name="name" required maxlength="80" autocomplete="off" /></label>
                         <label>Sign-in email<input type="email" name="email" required maxlength="254" autocomplete="off" /></label>
-                        <label>Role<select name="role"><option value="kitchen">Kitchen</option><option value="driver">Driver</option></select></label>
+                        <label>Role<select name="role"><option value="kitchen">Kitchen</option><option value="bartender">Bartender</option><option value="server">Server</option><option value="driver">Driver</option>@if (workspace.CanManageManagers) { <option value="manager">General manager</option> }</select></label>
                         <button type="submit" disabled="@(workspace.Members.Count >= 30)">Add employee</button>
                     </form>
                 }
@@ -43,7 +43,7 @@
                                 <p>@member.Email</p><p class="team-note">@(member.AccountLinked ? "Sign-in account connected" : "Waiting for their first verified sign-in")</p>
                                 <form method="post" action="@Action("member-state")" data-enhance="false">
                                     <AntiforgeryToken /><input type="hidden" name="id" value="@member.Id" /><input type="hidden" name="expected_active" value="@Flag(member.Active)" /><input type="hidden" name="active" value="@Flag(!member.Active)" />
-                                    <button type="submit" class="team-secondary">@(member.Active ? "Pause access" : "Restore access")</button>
+                                    <button type="submit" class="team-secondary" disabled="@(member.Role == "manager" && !workspace.CanManageManagers)">@(member.Active ? "Pause access" : "Restore access")</button>
                                 </form>
                             }
                         </article>
@@ -166,12 +166,12 @@
                                     <p><a href="@lesson.VideoSource" target="_blank" rel="noopener noreferrer">Open video in a separate tab</a></p>
                                 }
                                 else { <p class="team-note">This video is not available here yet. Ask your manager for the lesson material.</p> }
-                                @if (!workspace.CanManage)
+                                @if (workspace.MemberId is not null && course.Published && workspace.Assignments.Any(a => a.CourseId == course.Id && a.MemberId == workspace.MemberId && a.Active))
                                 {
                                     <p>@(complete ? "Completed" : "Ready when you are")</p>
                                     <form method="post" action="@Action("progress")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="id" value="@lesson.Id" /><input type="hidden" name="completed" value="@Flag(!complete)" /><button type="submit">@(complete ? "Mark not complete" : "I completed this lesson")</button></form>
                                 }
-                                else
+                                @if (workspace.CanManage)
                                 {
                                     <details><summary>Edit this lesson</summary>
                                         <form method="post" action="@Action("lesson")" data-enhance="false" class="team-form"><AntiforgeryToken /><input type="hidden" name="id" value="@lesson.Id" /><input type="hidden" name="course" value="@course.Id" /><input type="hidden" name="version" value="@lesson.Version" />
@@ -206,7 +206,7 @@
     private IEnumerable<TeamMember> ActiveMembers => workspace?.Members.Where(m => m.Active) ?? [];
     private string MemberName(string id) => workspace?.Members.FirstOrDefault(m => m.Id == id)?.Name ?? "Former team member";
     private static string Flag(bool flag) => flag ? "true" : "false";
-    private static string Role(string role) => role == "driver" ? "Driver" : "Kitchen";
+    private static string Role(string role) => RestaurantStaffRoles.Label(role);
     private static string Time(string stamp)
     {
         if (!DateTimeOffset.TryParse(stamp, out var value)) return stamp;

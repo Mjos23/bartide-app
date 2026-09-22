@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TideCasa.Contracts;
 
 public sealed record RestaurantCategory(string Id, string Name);
@@ -10,7 +12,8 @@ public sealed record RestaurantMenu(string Slug, string Name, int MenuVersion, s
     IReadOnlyList<RestaurantCategory> Categories, IReadOnlyList<RestaurantMenuItem> Items, RestaurantCheckoutOptions Checkout, RestaurantTable? Table);
 public sealed record OrderItemSelection(string ItemId, int Quantity);
 public sealed record RestaurantQuoteRequest(IReadOnlyList<OrderItemSelection> Items, string Fulfillment, string PaymentMethod,
-    string? TableToken = null, string? DeliveryZip = null, int TipPercent = 0, int? CustomTipCents = null);
+    string? TableToken = null, string? DeliveryZip = null, int TipPercent = 0, int? CustomTipCents = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TableLabel = null);
 public sealed record RestaurantOrderLine(string ItemId, string Name, int Quantity, int UnitCents);
 public sealed record RestaurantQuote(IReadOnlyList<RestaurantOrderLine> Lines, int SubtotalCents, int TaxCents, int DeliveryFeeCents,
     int TipCents, int TotalCents, string Currency, string Fulfillment, string PaymentMethod, string? TableLabel,

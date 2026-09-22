@@ -11,9 +11,9 @@ public sealed partial class RestaurantOrderingStore
     public async Task<RestaurantMenuEditor> EditorAsync(string id, AuthUser user, CancellationToken ct)
     {
         await using var db = await database.OpenAsync(ct);
-        using var tx = db.BeginTransaction(deferred: true);
+        using var tx = db.BeginTransaction(deferred: false);
         var venue = await ReadVenueAsync(db, tx, id, true, ct, allowPreparation: true);
-        RequireMenuOwner(venue, user);
+        await RequireMenuManagerAsync(db, tx, venue, user, ct);
         var raw = await RawMenuAsync(db, tx, id, ct);
         var profile = (JsonObject)raw["venue"]!;
         // Editor reports stored availability, not the temporary ordering block list.
@@ -25,6 +25,7 @@ public sealed partial class RestaurantOrderingStore
             await using var reader = await query.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct)) photos.Add(new(reader.GetString(0), reader.GetString(1)));
         }
+        await tx.CommitAsync(ct);
         return new(id, venue.Slug, venue.MenuVersion, new(venue.Name, String(profile, "area"), String(profile, "tagline"),
             String(profile, "hours_text"), String(profile, "website_url"), String(profile, "service_note")), venue.Categories, items, photos);
     }
@@ -111,7 +112,7 @@ public sealed partial class RestaurantOrderingStore
         await using var db = await database.OpenAsync(ct);
         using var tx = db.BeginTransaction(deferred: false);
         var venue = await ReadVenueAsync(db, tx, id, true, ct, allowPreparation: true);
-        RequireMenuOwner(venue, user);
+        await RequireMenuManagerAsync(db, tx, venue, user, ct);
         if (venue.MenuVersion != expectedVersion) throw new OrderingException("The menu changed. Reload before saving.", 409, "stale_menu");
         var menu = await RawMenuAsync(db, tx, id, ct);
         if (validate is not null) await validate(db, tx, ct);
@@ -128,16 +129,18 @@ public sealed partial class RestaurantOrderingStore
         await using var command = Command(db, tx, "SELECT menu_json FROM bartide_customers WHERE id=@id", ("@id", id));
         return Parse((string)(await command.ExecuteScalarAsync(ct) ?? throw Unavailable()));
     }
-    private static void RequireMenuOwner(Venue venue, AuthUser user)
+    private static async Task RequireMenuManagerAsync(DbConnection db, DbTransaction tx, Venue venue, AuthUser user, CancellationToken ct)
     {
-        if (!user.IsPlatformOwner && user.UserId != venue.OwnerId) throw new OrderingException("Business owner access is required.", 403, "forbidden");
+        if (!user.IsPlatformOwner && user.UserId != venue.OwnerId && !await TenantStaffAccess.IsManagerAsync(db, tx, venue.Id, user, ct))
+            throw new OrderingException("Business owner or manager access is required.", 403, "forbidden");
     }
 
     public async Task<RestaurantOrderingSettings> SettingsAsync(string id, AuthUser user, CancellationToken ct)
     {
-        await using var db = await database.OpenAsync(ct); using var tx = db.BeginTransaction(deferred: true);
-        var venue = await ReadVenueAsync(db, tx, id, true, ct); RequireOwner(venue, user);
+        await using var db = await database.OpenAsync(ct); using var tx = db.BeginTransaction(deferred: false);
+        var venue = await ReadVenueAsync(db, tx, id, true, ct); await RequireManagerAsync(db, tx, venue, user, ct);
         var c = venue.Config; var options = Options(venue);
+        await tx.CommitAsync(ct);
         return new(venue.ConfigVersion, Boolean(c, "accepting_orders", false), options.PickupEnabled, Boolean(c, "delivery_enabled", false),
             options.PayStaffEnabled, options.TipsEnabled, options.TaxBasisPoints, options.DeliveryFeeCents, options.DeliveryMinimumCents,
             Integer(c, "delivery_capacity", 1, 30, 5), options.DeliveryZips, options.PickupInstructions, options.PaymentInstructions);
@@ -155,7 +158,7 @@ public sealed partial class RestaurantOrderingStore
         var pickup = Text(request.PickupInstructions, "Pickup instructions", 500, true, true);
         var payment = Text(request.PaymentInstructions, "Payment instructions", 500, true, true);
         await using var db = await database.OpenAsync(ct); using var tx = db.BeginTransaction(deferred: false);
-        var venue = await ReadVenueAsync(db, tx, id, true, ct); RequireOwner(venue, user);
+        var venue = await ReadVenueAsync(db, tx, id, true, ct); await RequireManagerAsync(db, tx, venue, user, ct);
         if (venue.ConfigVersion != request.ExpectedVersion) throw new OrderingException("Settings changed. Reload before saving.", 409, "stale_settings");
         var c = venue.Config; var checkout = c["checkout"] as JsonObject;
         if (checkout is null) { checkout = new(); c["checkout"] = checkout; }
@@ -172,11 +175,11 @@ public sealed partial class RestaurantOrderingStore
 
     public async Task<RestaurantOperationsWorkspace> OperationsAsync(string id, AuthUser user, CancellationToken ct)
     {
-        await using var db = await database.OpenAsync(ct); using var tx = db.BeginTransaction(deferred: true);
+        await using var db = await database.OpenAsync(ct); using var tx = db.BeginTransaction(deferred: false);
         var venue = await ReadVenueAsync(db, tx, id, true, ct);
         var access = await OperatorAsync(db, tx, venue, user, ct);
         var drivers = new List<RestaurantDriver>();
-        if (access.Role == "owner")
+        if (access.Role is "owner" or "manager")
         {
             await using var command = Command(db, tx, "SELECT id,name FROM bartide_enhanced_members WHERE tenant_id=@id AND role='driver' AND active=1 ORDER BY name", ("@id", id));
             await using var reader = await command.ExecuteReaderAsync(ct);
@@ -195,6 +198,7 @@ public sealed partial class RestaurantOrderingStore
                 orders.Add(new(order, driver, AllowedActions(order.Receipt, access.Role, driver)));
             }
         }
+        await tx.CommitAsync(ct);
         return new(id, venue.Name, access.Role, drivers, orders);
     }
 
@@ -259,18 +263,18 @@ public sealed partial class RestaurantOrderingStore
         if (role != "driver")
         {
             if (status == "new") actions.Add("accepted");
-            if (status == "accepted") actions.Add("preparing");
-            if (status == "preparing") actions.Add("ready");
+            if (role != "server" && status == "accepted") actions.Add("preparing");
+            if (role != "server" && status == "preparing") actions.Add("ready");
         }
-        if (delivery && status == "ready" && driver is not null) actions.Add("out_for_delivery");
-        if ((delivery ? status == "out_for_delivery" : status == "ready" && role != "driver") && receipt.PaymentStatus is "paid" or "paid_in_person") actions.Add("completed");
-        if (role == "owner")
+        if (role != "server" && delivery && status == "ready" && driver is not null) actions.Add("out_for_delivery");
+        if ((delivery ? status == "out_for_delivery" && role != "server" : status == "ready" && role != "driver") && receipt.PaymentStatus is "paid" or "paid_in_person") actions.Add("completed");
+        if (role is "owner" or "manager")
         {
             // Cancelling a paid order requires a separately verified refund workflow.
             if (receipt.PaymentStatus == "unpaid") actions.Add("cancelled");
             if (delivery) actions.Add("assign-driver");
-            if (receipt.Quote.PaymentMethod == "staff" && receipt.PaymentStatus == "unpaid") actions.Add("mark-paid");
         }
+        if ((role is "owner" or "manager" or "server") && receipt.Quote.PaymentMethod == "staff" && receipt.PaymentStatus == "unpaid") actions.Add("mark-paid");
         return actions;
     }
 
@@ -278,11 +282,8 @@ public sealed partial class RestaurantOrderingStore
     {
         if (!Boolean(venue.Config, "enabled", false)) throw new OrderingException("Restaurant operations are unavailable.", 403, "forbidden");
         if (user.IsPlatformOwner || user.UserId == venue.OwnerId) return ("owner", null);
-        await using var command = Command(db, tx, "SELECT id,role FROM bartide_enhanced_members WHERE tenant_id=@tenant AND user_id=@user AND active=1 AND role IN ('kitchen','driver') LIMIT 2", ("@tenant", venue.Id), ("@user", user.UserId));
-        await using var reader = await command.ExecuteReaderAsync(ct);
-        if (!await reader.ReadAsync(ct)) throw new OrderingException("Active team access is required.", 403, "forbidden");
-        var result = (reader.GetString(1), reader.GetString(0));
-        if (await reader.ReadAsync(ct)) throw new OrderingException("Your team access needs review.", 409, "ambiguous_membership");
-        return result;
+        var member = await TenantStaffAccess.FindAsync(db, tx, venue.Id, user, ct);
+        if (member is null) throw new OrderingException("Active team access is required.", 403, "forbidden");
+        return (member.Role, member.Id);
     }
 }

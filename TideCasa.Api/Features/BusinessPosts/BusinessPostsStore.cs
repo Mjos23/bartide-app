@@ -154,7 +154,7 @@ public sealed partial class BusinessPostsStore(ApplicationDatabase database, Bus
             if (user is null) throw new BusinessPostFailure("Sign in to continue.", 401, "sign_in");
             if (row[3].Length == 0 && !user.IsPlatformOwner && row[4].Equals(user.Email.Trim(), StringComparison.OrdinalIgnoreCase))
             { await Run(db, tx, "UPDATE bartide_customers SET user_id=@user WHERE id=@id AND user_id IS NULL", ct, ("@user", user.UserId), ("@id", row[0])); row[3] = user.UserId; }
-            if (!user.IsPlatformOwner && row[3] != user.UserId) throw new BusinessPostFailure("Business owner access is required.", 403, "owner_required");
+            if (!user.IsPlatformOwner && row[3] != user.UserId && !await TenantStaffAccess.IsManagerAsync(db, tx, row[0], user, ct)) throw new BusinessPostFailure("Business owner or manager access is required.", 403, "owner_required");
         }
         return new(row[0], row[1], row[2], active);
     }

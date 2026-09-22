@@ -1,0 +1,66 @@
+@page "/sample-bar"
+@attribute [ExcludeFromInteractiveRouting]
+@using System.Text.Json
+@using System.Net
+@inject IWebHostEnvironment HostEnvironment
+@inject IConfiguration Configuration
+<PageTitle>Gulf Lantern | Working sample bar</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /><link rel="stylesheet" href="/sample-bar/sample-bar.css" /></HeadContent>
+@if (bar is null)
+{
+    <h1>Not found</h1>
+}
+else
+{
+    <div class="sample-bar">
+        <header class="sb-top"><a href="/sample-bar" class="sb-brand">GULF LANTERN<span>BEACH BAR · ST. PETE BEACH</span></a><nav aria-label="Sample bar"><a href="/sample-bar#perspectives">People & perspectives</a><a href="/sample-bar#menu">Menu</a><a href="/sample-bar#events">Live music</a></nav></header>
+        <aside class="sb-fixture"><strong>Fictional sample bar.</strong> Real app workflows with shared sample data. No real orders, charges, emails or texts. Use fictional contact details.</aside>
+        <main>
+            <section class="sb-hero"><img src="@bar.Hero" alt="Illustration of Gulf Lantern's warm sunset patio beside the Gulf" width="1672" height="941" fetchpriority="high" /><div class="sb-hero-copy"><p>ST. PETE BEACH, FLORIDA</p><h1>Pull up a chair.<br />Stay for the sunset.</h1><p>@bar.Description</p><a class="sb-button" href="/order/gulf-lantern">Explore the working menu</a><a class="sb-button sb-outline" href="/sample-bar#perspectives">Try a perspective</a></div></section>
+            <div class="sb-facts"><div><strong>20</strong><span>food & drink choices</span></div><div><strong>5 + GM</strong><span>people on the team</span></div><div><strong>5</strong><span>sample customers</span></div><div><strong>3</strong><span>upcoming live events</span></div></div>
+            <section class="sb-section" id="perspectives"><div class="sb-heading"><div><p class="sb-kicker">MEET THE PEOPLE</p><h2>One bar. Every perspective.</h2></div><p>Choose a person to sign in through the app's normal login. Return here to switch. Each person has their own sample identity.</p></div>
+                <div class="sb-people">@foreach (var person in bar.People)
+                {
+                    <article class="sb-person"><div class="sb-person-top"><span class="sb-avatar" aria-hidden="true">@Initials(person.Name)</span><div><h3>@person.Name</h3><span class="sb-role">@person.Title</span></div></div><p>@person.Bio</p><form method="post" action="@(PublicDemo ? "/auth/session/demo-switch" : "/auth/session/signin")" data-enhance="false"><AntiforgeryToken />@if (PublicDemo) { <input type="hidden" name="person_key" value="@person.Key" /> } else { <input type="hidden" name="email" value="@person.Email" /><input type="hidden" name="password" value="@bar.Password" /> }<input type="hidden" name="return_to" value="@(person.Role == "customer" ? "/rewards/gulf-lantern" : "/account")" /><button class="sb-button" type="submit">Try @person.Name.Split(' ')[0]'s view</button></form></article>
+                }</div>
+                <p class="sb-small">The general manager and staff use restaurant permissions. The sample owner is a business owner, not a Tide Casa platform administrator. Customer card checkout remains disabled; sample orders use Pay staff.</p>
+                @if (PublicDemo) { <p class="sb-small">This is a shared practice bar: changes are visible to other visitors. Photos and training video stay fixed for presentations. Add this page to your home screen, then use “Switch sample person” to change roles.</p> }
+            </section>
+            <section class="sb-section sb-menu-section" id="menu"><div class="sb-heading"><div><p class="sb-kicker">GOOD FOOD. GULF BREEZE.</p><h2>Something for your table.</h2></div><a class="sb-link" href="/order/gulf-lantern">Open ordering & quantities →</a></div>
+                @foreach (var category in bar.Categories)
+                {
+                    <h3 class="sb-category">@category.Label</h3><div class="sb-menu">@foreach (var item in bar.Menu.Where(item => item.Category == category.Id))
+                    {
+                        <article class="sb-dish"><img src="@item.Image" alt="@item.Name" loading="lazy" decoding="async" width="360" height="240" /><div><div class="sb-dish-heading"><h4>@item.Name</h4><strong>@Money(item.PriceCents)</strong></div><p>@item.Description</p></div></article>
+                    }</div>
+                }
+            </section>
+            <section class="sb-section" id="events"><div class="sb-heading"><div><p class="sb-kicker">WHEN THE LANTERNS COME ON</p><h2>Three reasons to stay a little longer.</h2></div><a class="sb-link" href="/events/gulf-lantern">Open events & reservations →</a></div><div class="sb-events">@foreach (var item in bar.Events)
+                {
+                    <article><p class="sb-kicker">@LocalDate(item.StartsAt)</p><h3>@item.Title</h3><p>@item.Details</p><span>@item.Capacity seats · Eastern time</span><a href="/events/gulf-lantern">View event & RSVP →</a></article>
+                }</div></section>
+            <section class="sb-section sb-visit"><div><p class="sb-kicker">YOUR FICTIONAL NEIGHBORHOOD SPOT</p><h2>Beach days turn into lantern nights.</h2><p>@bar.Hours</p><p>@bar.Address</p></div><div><h3>Keep exploring</h3><a href="/order/gulf-lantern">Order food & drinks</a><a href="/rewards/gulf-lantern">Customer rewards</a><a href="/events/gulf-lantern">Music & reservations</a><a href="/updates/gulf-lantern">Restaurant updates</a><a href="/account">Current person's account</a></div></section>
+        </main><footer class="sb-footer">Gulf Lantern is a fictional Tide Casa test venue. Photos are illustrative. @bar.TaxNote</footer>
+    </div>
+}
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private SampleVenue? bar;
+    private bool PublicDemo => TideCasa.Blazor.Services.PublicDemoWeb.Enabled(Configuration);
+    protected override void OnInitialized()
+    {
+        if (!PublicDemo && (!HostEnvironment.IsDevelopment() || Configuration["SampleBar:Enabled"] != "true" || !IPAddress.IsLoopback(HttpContext.Connection.RemoteIpAddress ?? IPAddress.None)))
+        { HttpContext.Response.StatusCode = 404; return; }
+        var path = Configuration["SampleBar:FixturePath"];
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) { HttpContext.Response.StatusCode = 404; return; }
+        bar = JsonSerializer.Deserialize<SampleVenue>(File.ReadAllText(path), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    }
+    private static string Initials(string name) => string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => part[0]));
+    private static string Money(int cents) => "$" + (cents / 100m).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    private static string LocalDate(string date) => TimeZoneInfo.ConvertTime(DateTimeOffset.Parse(date), TimeZoneInfo.FindSystemTimeZoneById("America/New_York")).ToString("ddd, MMM d · h:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+    private sealed record SampleVenue(string Name, string Description, string Hero, string Hours, string Address, string Password, string TaxNote, Person[] People, Category[] Categories, MenuItem[] Menu, SampleEvent[] Events);
+    private sealed record Person(string Key, string Name, string Title, string Role, string Bio, string Email);
+    private sealed record Category(string Id, string Label);
+    private sealed record MenuItem(string Id, string Name, string Description, int PriceCents, string Category, string Image);
+    private sealed record SampleEvent(string Title, string Details, string StartsAt, int Capacity);
+}

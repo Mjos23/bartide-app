@@ -8,11 +8,11 @@
 <dialog id="home-screen-dialog" class="tc-install-dialog" aria-labelledby="home-screen-title">
     <button type="button" class="tc-install-close" data-install-close aria-label="Close home screen instructions">×</button>
     <img class="tc-install-logo" src="@(IsBarTide ? "/app-icons/icon-180.png" : "/tide-casa/app-icons/icon-180.png")" alt="" width="64" height="64" />
-    <h2 id="home-screen-title">Keep @(IsBarTide ? "BarTide" : "Tide Casa") one tap away.</h2>
+    <h2 id="home-screen-title">Keep @(DemoName ?? (IsBarTide ? "BarTide" : "Tide Casa")) one tap away.</h2>
     <p>Add our app icon to your phone or computer. It opens the website in its own window on supported devices.</p>
     <button type="button" class="tc-install-primary" data-install-prompt hidden>Add to home screen</button>
     <ol class="tc-install-instructions"><li><strong>iPhone or iPad</strong><span>Open this page in Safari. Tap Share, then Add to Home Screen. If shown, turn on Open as Web App, then tap Add.</span></li><li><strong>Android</strong><span>Open this page in Chrome. Tap the browser menu, then Add to home screen or Install app.</span></li><li><strong>Computer</strong><span>Choose Install app in your browser’s address bar or menu. In Safari on Mac, choose File → Add to Dock.</span></li></ol>
     <p class="tc-install-note">An internet connection is needed. Available options depend on your device and browser.</p>
     <p class="tc-install-note" data-install-message role="status"></p>
 </dialog>
-@code { [Parameter] public bool IsBarTide { get; set; } }
+@code { [Parameter] public bool IsBarTide { get; set; } [Parameter] public string? DemoName { get; set; } }

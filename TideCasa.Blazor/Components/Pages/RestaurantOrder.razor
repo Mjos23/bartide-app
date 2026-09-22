@@ -81,11 +81,15 @@
                 <aside class="ordering-panel ordering-checkout" aria-labelledby="your-order-title">
                     <h2 id="your-order-title">Your order</h2>
                     <fieldset class="ordering-options" disabled="@Locked"><legend>How would you like your order?</legend>
-                        <label><input type="radio" name="fulfillment" value="dine-in" checked="@(fulfillment == "dine-in")" @onchange='() => SetFulfillmentAsync("dine-in")' disabled="@(!menu.Checkout.DineInEnabled || menu.Table is null)" /><span>Dine in @if (menu.Table is not null) { <small>@menu.Table.Label</small> }</span></label>
+                        <label><input type="radio" name="fulfillment" value="dine-in" checked="@(fulfillment == "dine-in")" @onchange='() => SetFulfillmentAsync("dine-in")' disabled="@(!menu.Checkout.DineInEnabled)" /><span>Dine in @if (menu.Table is not null) { <small>@menu.Table.Label</small> }</span></label>
                         <label><input type="radio" name="fulfillment" value="pickup" checked="@(fulfillment == "pickup")" @onchange='() => SetFulfillmentAsync("pickup")' disabled="@(!menu.Checkout.PickupEnabled)" /><span>Pickup</span></label>
                         <label><input type="radio" name="fulfillment" value="delivery" checked="@(fulfillment == "delivery")" @onchange='() => SetFulfillmentAsync("delivery")' disabled="@(!menu.Checkout.DeliveryEnabled)" /><span>Delivery</span></label>
                     </fieldset>
-                    @if (menu.Table is null) { <p class="ordering-note">For dine in, scan the QR code at your table.</p> }
+                    @if (fulfillment == "dine-in" && menu.Table is null)
+                    {
+                        <label class="desk-field">Table number or name<input type="text" value="@tableLabel" @onchange="SetTableLabelAsync" maxlength="40" autocomplete="off" placeholder="e.g. 4 or Patio 1" disabled="@Locked" required /></label>
+                        <p class="ordering-note">Use the number or name shown at your table, or scan its QR code.</p>
+                    }
                     @if (fulfillment == "pickup" && !string.IsNullOrWhiteSpace(menu.Checkout.PickupInstructions)) { <p>@menu.Checkout.PickupInstructions</p> }
                     @if (fulfillment == "delivery")
                     {
@@ -94,7 +98,7 @@
                     }
                     <fieldset class="ordering-options" disabled="@Locked"><legend>How would you like to pay?</legend>
                         <label><input type="radio" name="payment" value="staff" checked="@(payment == "staff")" @onchange='() => SetPaymentAsync("staff")' disabled="@(!menu.Checkout.PayStaffEnabled)" /><span>Pay staff<small>Pay the restaurant directly.</small></span></label>
-                        <label><input type="radio" name="payment" value="phone" checked="@(payment == "phone")" @onchange='() => SetPaymentAsync("phone")' /><span>Pay on my phone<small>@(menu.Checkout.PhonePaymentAvailable ? "Secure card checkout · sandbox" : "Not available yet.")</small></span></label>
+                        <label><input type="radio" name="payment" value="phone" checked="@(payment == "phone")" @onchange='() => SetPaymentAsync("phone")' disabled="@(!menu.Checkout.PhonePaymentAvailable)" /><span>Pay on my phone<small>@(menu.Checkout.PhonePaymentAvailable ? "Secure card checkout · sandbox" : "Not available yet.")</small></span></label>
                     </fieldset>
                     @if (payment == "phone") { <p class="ordering-notice" role="status">@(menu.Checkout.PhonePaymentAvailable ? "You will continue to Stripe's sandbox to pay by card. Use test card details only; real payments are not enabled." : "Phone payments are being prepared. Choose Pay staff if available to send an unpaid order to the restaurant.")</p> }
                     @if (!string.IsNullOrWhiteSpace(menu.Checkout.PaymentInstructions)) { <p class="ordering-note">@menu.Checkout.PaymentInstructions</p> }
@@ -113,6 +117,7 @@
                     @if (quoting) { <p role="status">Checking availability and your total…</p> }
                     @if (quote is not null)
                     {
+                        @if (quote.TableLabel is not null) { <p class="ordering-note">Deliver to: <strong>@quote.TableLabel</strong></p> }
                         <ul class="ordering-summary-lines">@foreach (var line in quote.Lines) { <li><span>@line.Quantity × @line.Name</span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
                         <dl class="ordering-totals">
                             <div><dt>Food and drinks</dt><dd>@Money(quote.SubtotalCents)</dd></div><div><dt>Tax</dt><dd>@Money(quote.TaxCents)</dd></div>

@@ -1,4 +1,6 @@
 @inject OrderingRequestContext OrderingContext
+@inject IWebHostEnvironment HostEnvironment
+@inject IConfiguration Configuration
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link rel="icon" href="/tide-casa/favicon.svg" />
-    <link rel="manifest" href="@(IsBarHost ? "/bartide.webmanifest" : "/tide-casa.webmanifest")" />
+    <link rel="manifest" href="@(IsPublicDemo ? "/sample-bar/gulf-lantern.webmanifest" : IsBarHost ? "/bartide.webmanifest" : "/tide-casa.webmanifest")" />
     <link rel="apple-touch-icon" sizes="180x180" href="@(IsBarHost ? "/app-icons/icon-180.png" : "/tide-casa/app-icons/icon-180.png")" />
     <meta name="theme-color" content="#123b48" />
     <link rel="stylesheet" href="/brand.css" />
@@ -25,7 +27,11 @@
     <HeadOutlet @rendermode="PageRenderMode" />
 </head>
 <body>
-    <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="@IsBarHost" />
+    @if (IsPublicDemo || (HostEnvironment.IsDevelopment() && Configuration["SampleBar:Enabled"] == "true" && System.Net.IPAddress.IsLoopback(HttpContext.Connection.RemoteIpAddress ?? System.Net.IPAddress.None)))
+    {
+        <aside style="padding:10px 16px;background:#dcebe1;color:#143f3a;text-align:center;font:600 14px/1.5 system-ui"><a href="/sample-bar#perspectives" style="color:inherit">Gulf Lantern · Switch sample person</a> · Fictional shared activity</aside>
+    }
+    <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="@IsBarHost" DemoName="@(IsPublicDemo ? "Gulf Lantern" : null)" />
     <Routes ProtectedOrderingContext="@protectedOrderingContext" @rendermode="PageRenderMode" />
     <script src="/app.js"></script>
     <script src="/merchant-payments.js"></script>
@@ -39,5 +45,6 @@
     private IComponentRenderMode? PageRenderMode => HttpContext.AcceptsInteractiveRouting() ? InteractiveServer : null;
     private string? protectedOrderingContext;
     private bool IsBarHost => HttpContext.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase);
+    private bool IsPublicDemo => TideCasa.Blazor.Services.PublicDemoWeb.Enabled(Configuration);
     protected override void OnInitialized() => protectedOrderingContext = OrderingContext.ProtectForCircuit();
 }

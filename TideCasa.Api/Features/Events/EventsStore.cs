@@ -168,7 +168,7 @@ public sealed class EventsStore(ApplicationDatabase database)
             {
                 await Run(db, tx, "UPDATE bartide_customers SET user_id=@user WHERE id=@id AND user_id IS NULL", ct, ("@user", user.UserId), ("@id", row[0])); row[3] = user.UserId;
             }
-            if (!user.IsPlatformOwner && row[3] != user.UserId) throw new EventFailure("Business owner access is required.", 403, "owner_required");
+            if (!user.IsPlatformOwner && row[3] != user.UserId && !await TenantStaffAccess.IsManagerAsync(db, tx, row[0], user, ct)) throw new EventFailure("Business owner or manager access is required.", 403, "owner_required");
         }
         return new(row[0], row[1], row[2], row[3]);
     }

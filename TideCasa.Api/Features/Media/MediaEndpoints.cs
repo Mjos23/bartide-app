@@ -14,7 +14,9 @@ public static class MediaEndpoints
 {
     public static IServiceCollection AddTideCasaMedia(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        services.AddSingleton<IPrivateObjectStore, PrivateObjectStore>();
+        if (configuration["PublicDemo:Enabled"] == "true" && configuration["Media:Provider"] == "demo-bundled")
+            services.AddSingleton<IPrivateObjectStore, BundledDemoObjectStore>();
+        else services.AddSingleton<IPrivateObjectStore, PrivateObjectStore>();
         services.AddScoped<MediaStore>();
         services.AddHostedService<MediaCleanup>();
         return services;

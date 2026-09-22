@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using TideCasa.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
+PublicDemoWeb.Validate(builder.Configuration, builder.Environment);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 var protection = builder.Services.AddDataProtection().SetApplicationName("TideCasa.Blazor");
 if (builder.Configuration["DataProtection:Provider"] == "PostgreSql")
@@ -147,6 +148,7 @@ builder.Services.AddHttpClient<SalesPipelineClient>(client =>
 var app = builder.Build();
 app.UseAppPlatformIngress(builder.Configuration, api: false);
 app.UseForwardedHeaders();
+app.UsePublicDemoWeb();
 app.UseGuestPurchaseCookie();
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
 app.UsePublicSeo();

@@ -22,7 +22,7 @@ public partial class RestaurantOrder
     private RestaurantOrderRequest? pending;
     private readonly Dictionary<string, int> cart = new(StringComparer.Ordinal);
     private string fulfillment = "pickup", payment = "staff", tipChoice = "0", customTip = "", deliveryZip = "";
-    private string customerName = "", phone = "", address = "", note = "";
+    private string customerName = "", phone = "", address = "", note = "", tableLabel = "";
     private string? error, loadedSlug, loadedTable;
     private bool loading, quoting, busy, uncertain, reviewing, connected;
     private int quoteRevision, menuRevision;
@@ -95,7 +95,7 @@ public partial class RestaurantOrder
         loadedSlug = Slug; loadedTable = TableToken;
         loading = true; error = null; menu = null; quote = null; receipt = null; pending = null;
         checkout = null; cart.Clear(); reviewing = false; uncertain = false; busy = false; quoting = false;
-        tipChoice = "0"; customTip = ""; payment = "staff"; deliveryZip = ""; address = "";
+        tipChoice = "0"; customTip = ""; payment = "staff"; deliveryZip = ""; address = ""; tableLabel = "";
         if (Slug.Length > 128 || (TableToken?.Length ?? 0) > 128)
         { loading = false; error = "This restaurant or table link could not be found."; return; }
         var result = await Api.GetMenuAsync(Slug, TableToken);
@@ -107,7 +107,7 @@ public partial class RestaurantOrder
             return;
         }
         menu = value;
-        fulfillment = menu.Table is not null && menu.Checkout.DineInEnabled ? "dine-in" : menu.Checkout.PickupEnabled ? "pickup" : menu.Checkout.DeliveryEnabled ? "delivery" : "";
+        fulfillment = menu.Table is not null && menu.Checkout.DineInEnabled ? "dine-in" : menu.Checkout.PickupEnabled ? "pickup" : menu.Checkout.DeliveryEnabled ? "delivery" : menu.Checkout.DineInEnabled ? "dine-in" : "";
     }
 
     private int Quantity(string id) => cart.GetValueOrDefault(id);
@@ -126,21 +126,30 @@ public partial class RestaurantOrder
 
     private async Task SetFulfillmentAsync(string value)
     {
-        if (Locked || menu is null || (value == "dine-in" && (!menu.Checkout.DineInEnabled || menu.Table is null))
+        if (Locked || menu is null || (value == "dine-in" && !menu.Checkout.DineInEnabled)
             || (value == "pickup" && !menu.Checkout.PickupEnabled) || (value == "delivery" && !menu.Checkout.DeliveryEnabled)) return;
         fulfillment = value;
         if (value != "delivery") { deliveryZip = ""; address = ""; }
         await RefreshQuoteAsync();
     }
-    private async Task SetPaymentAsync(string value) { if (Locked) return; payment = value; await RefreshQuoteAsync(); }
+    private async Task SetPaymentAsync(string value)
+    {
+        if (Locked || menu is null || value is not ("staff" or "phone")
+            || (value == "staff" && !menu.Checkout.PayStaffEnabled)
+            || (value == "phone" && !menu.Checkout.PhonePaymentAvailable)) return;
+        payment = value; await RefreshQuoteAsync();
+    }
     private async Task SetTipAsync(string value) { if (Locked) return; tipChoice = value; await RefreshQuoteAsync(); }
     private async Task SetZipAsync(ChangeEventArgs args) { if (Locked) return; deliveryZip = args.Value?.ToString()?.Trim() ?? ""; await RefreshQuoteAsync(); }
+    private async Task SetTableLabelAsync(ChangeEventArgs args) { if (Locked) return; tableLabel = args.Value?.ToString()?.Trim() ?? ""; await RefreshQuoteAsync(); }
     private async Task SetCustomTipAsync(ChangeEventArgs args) { if (Locked) return; customTip = args.Value?.ToString()?.Trim() ?? ""; await RefreshQuoteAsync(); }
 
     private RestaurantQuoteRequest? MakeQuoteRequest()
     {
         if (cart.Count == 0 || menu is null) return null;
         if (fulfillment.Length == 0) { error = "The restaurant has no available ordering method right now."; return null; }
+        if (fulfillment == "dine-in" && menu.Table is null && string.IsNullOrWhiteSpace(tableLabel))
+        { error = "Enter your table number or name before reviewing your order."; return null; }
         if (fulfillment == "delivery" && (deliveryZip.Length != 5 || !deliveryZip.All(char.IsAsciiDigit)))
         { error = "Enter a five-digit delivery ZIP code to confirm your total."; return null; }
         int? customCents = null;
@@ -153,7 +162,8 @@ public partial class RestaurantOrder
         }
         else if (menu.Checkout.TipsEnabled && tipChoice is "15" or "20" or "25") percent = int.Parse(tipChoice, CultureInfo.InvariantCulture);
         return new(cart.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new OrderItemSelection(pair.Key, pair.Value)).ToArray(), fulfillment, payment,
-            fulfillment == "dine-in" ? menu.Table?.Token : null, fulfillment == "delivery" ? deliveryZip : null, percent, customCents);
+            fulfillment == "dine-in" ? menu.Table?.Token : null, fulfillment == "delivery" ? deliveryZip : null, percent, customCents,
+            fulfillment == "dine-in" && menu.Table is null ? tableLabel : null);
     }
 
     private async Task RefreshQuoteAsync()
@@ -272,6 +282,10 @@ public partial class RestaurantOrder
 
     private static string FriendlyError(string? code, int status) => code switch
     {
+        "table_required" => "Enter your table number or scan the QR code at your table.",
+        "invalid_table" => "Use the table number or name shown at your table.",
+        "table_unavailable" => "That table is unavailable. Check its number or ask a staff member.",
+        "table_mismatch" => "The entered table does not match your QR code. Scan your table again or ask staff.",
         "client_context_unavailable" => "This ordering session needs to be refreshed. Reload the page before placing an order.",
         "merchant_busy" => "The saved payment is being checked. Try again shortly.",
         "stale_quote" => "Your total changed. Review the updated order before paying.",

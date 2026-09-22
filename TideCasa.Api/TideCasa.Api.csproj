@@ -6,6 +6,8 @@
     <UserSecretsId>TideCasa-Api-Development</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="..\fixtures\gulf-lantern.json" Link="demo\gulf-lantern.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="DemoMedia\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Include="..\SharedHosting\AppPlatformIngress.cs" Link="Hosting\AppPlatformIngress.cs" />
     <EmbeddedResource Include="Migrations\*.sql;Migrations\manifest.json" LogicalName="TideCasa.Api.Migrations.%(Filename)%(Extension)" />
     <EmbeddedResource Include="FeatureMigrations\*.sql" LogicalName="TideCasa.Api.FeatureMigrations.%(Filename)%(Extension)" />

@@ -1,9 +1,11 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using TideCasa.Api.Features.PublicDemo;
 using TideCasa.Contracts;
 
 namespace TideCasa.Api.Features.Authentication;
 
-public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IConfiguration configuration)
+public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IConfiguration configuration, PublicDemoOptions demo)
 {
     private static string Email(string email) => email.Trim().ToLowerInvariant();
     private AuthUser WithOwner(AuthUser user) => user with
@@ -14,6 +16,7 @@ public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IC
 
     public async Task<AuthSession> SignInAsync(SignInRequest request, string address, CancellationToken ct)
     {
+        RequireNormalAuthentication();
         var email = Email(request.Email);
         await store.LimitAsync("signin", email, address, ct);
         var data = await provider.SendAsync("/token?grant_type=password", new { email, password = request.Password }, null, HttpMethod.Post, ct);
@@ -22,6 +25,7 @@ public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IC
 
     public async Task<AuthNotice> SignUpAsync(SignUpRequest request, string address, CancellationToken ct)
     {
+        RequireNormalAuthentication();
         var email = Email(request.Email);
         await store.LimitAsync("signup", email, address, ct);
         try { await provider.SendAsync("/signup", new { email, password = request.Password }, null, HttpMethod.Post, ct); }
@@ -32,6 +36,7 @@ public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IC
 
     public async Task<AuthSession> VerifyAsync(VerifyEmailRequest request, string address, CancellationToken ct)
     {
+        RequireNormalAuthentication();
         var email = Email(request.Email);
         await store.LimitAsync("verify", email, address, ct);
         var data = await provider.SendAsync("/verify", new { email, token = request.Code, type = "signup" }, null, HttpMethod.Post, ct);
@@ -40,6 +45,7 @@ public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IC
 
     public async Task<AuthNotice> SendCodeAsync(EmailRequest request, string action, string address, CancellationToken ct)
     {
+        RequireNormalAuthentication();
         var email = Email(request.Email);
         await store.LimitAsync(action, email, address, ct);
         object body = action == "forgot" ? new { email } : new { email, type = "signup" };
@@ -50,6 +56,7 @@ public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IC
 
     public async Task<AuthNotice> ResetAsync(ResetPasswordRequest request, string address, CancellationToken ct)
     {
+        RequireNormalAuthentication();
         var email = Email(request.Email);
         await store.LimitAsync("reset", email, address, ct);
         var data = await provider.SendAsync("/verify", new { email, token = request.Code, type = "recovery" }, null, HttpMethod.Post, ct);
@@ -75,6 +82,16 @@ public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IC
     public async Task SignOutAsync(string? token, CancellationToken ct)
     {
         if (!SupabaseAuthClient.ValidToken(token)) return;
+        if (demo.Enabled)
+        {
+            if (PublicDemoOptions.IsDemoToken(token!))
+            {
+                using var revoke = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                await store.RevokeAsync(token!, revoke.Token);
+            }
+            return;
+        }
+        if (token!.StartsWith("demo.", StringComparison.Ordinal)) return;
         using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         await store.RevokeAsync(token!, cleanup.Token);
         try { await provider.SendAsync("/logout?scope=local", new { }, token, HttpMethod.Post, cleanup.Token); }
@@ -83,6 +100,17 @@ public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IC
 
     public async Task<AuthUser?> AuthenticateAsync(string token, CancellationToken ct)
     {
+        if (demo.Enabled)
+        {
+            if (!PublicDemoOptions.IsDemoToken(token)) return null;
+            var registered = await store.FindSessionAsync(token, ct);
+            if (registered is null || demo.Identity(registered.ProviderUserId) is not { } person) return null;
+            var user = await DemoUserAsync(person, ct);
+            var current = await store.FindSessionAsync(token, ct);
+            return current?.ProviderUserId == person.Id ? user : null;
+        }
+        // A copied demo registry/token can never become a normal provider session.
+        if (token.StartsWith("demo.", StringComparison.Ordinal)) return null;
         var session = await store.FindSessionAsync(token, ct);
         if (session is null) return null;
         var identity = await provider.VerifyAsync(token, ct);
@@ -91,6 +119,30 @@ public sealed class AuthService(SupabaseAuthClient provider, AuthStore store, IC
         var fresh = await store.FindSessionAsync(token, ct);
         if (fresh is null || fresh.ProviderUserId != identity.Id) return null;
         return WithOwner(await store.ResolveAsync(identity, ct));
+    }
+
+    public async Task<AuthSession> DemoSwitchAsync(DemoSwitchRequest request, CancellationToken ct)
+    {
+        if (!demo.Enabled) throw new AuthFailureException("Not found.", 404);
+        var person = demo.Person(request.PersonKey) ?? throw new AuthFailureException("Choose a person from the fictional sample bar.", 400);
+        var user = await DemoUserAsync(person, ct);
+        var token = "demo." + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)) + ".session";
+        const int expires = 1800;
+        await store.RegisterSessionAsync(token, person.Id, expires, ct);
+        return new(token, "Bearer", expires, user);
+    }
+
+    private async Task<AuthUser> DemoUserAsync(VerifiedIdentity person, CancellationToken ct)
+    {
+        var user = await store.ResolveAsync(person, ct);
+        if (user.UserId != "supabase:" + person.Id || user.Email != person.Email)
+            throw new AuthFailureException("The fictional sample identity needs a reset.", 503);
+        return user with { IsPlatformOwner = false };
+    }
+
+    private void RequireNormalAuthentication()
+    {
+        if (demo.Enabled) throw new AuthFailureException("Use the fictional sample people to switch perspectives.", 403);
     }
 
     private async Task<AuthSession> IssueAsync(JsonElement data, string expectedEmail, CancellationToken ct)
