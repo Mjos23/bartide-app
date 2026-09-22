@@ -1,6 +1,13 @@
 # Gulf Lantern on a phone
 
-Target address: https://demo.tide.casa/sample-bar
+Customer menu: https://demo.tide.casa (opens the working ordering page).
+People and perspectives: https://demo.tide.casa/sample-bar.
+
+On phones, adding an item reveals a fixed cart bar with the current quantity and
+total. **View cart & checkout** jumps directly to checkout; **Continue browsing**
+returns to the menu without clearing selections. Desktop checkout stays beside
+the menu while browsing. The perspective hub's menu photos link to their matching
+orderable items. Existing QR links still open ordering directly.
 
 Gulf Lantern is a fictional, shared practice bar. Pick a person to use the actual
 customer, owner, general-manager, bartender, server, kitchen or driver screens.

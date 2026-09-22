@@ -5,3 +5,22 @@ h1[tabindex="-1"]:focus{outline:none}
 @media(max-width:760px){.ordering-layout{grid-template-columns:1fr;gap:20px}.ordering-main{padding:28px 18px 40px}.ordering-nav{padding:14px 18px;gap:14px}.ordering-nav span{font-size:.78rem;text-align:right}.ordering-panel{padding:22px 18px}.ordering-menu-item{gap:12px}.ordering-menu-item h3{font-size:1rem}.ordering-quantity{gap:5px}.ordering-quantity button{padding:6px 10px;min-width:36px}.ordering-table-form{flex-direction:column;align-items:stretch}.ordering-table-form .desk-field{max-width:none}.ordering-orders,.ordering-tables{grid-template-columns:1fr}.ordering-section-heading{flex-wrap:wrap}.ordering-options label{padding:10px}.ordering-summary-lines{font-size:.93rem}}
 
 .bt-contact-aside .booking-text-choice{margin:0 0 22px;padding:16px;border:1px solid #cddbd2;border-radius:12px;background:#eef3ed}.bt-contact-aside .booking-text-choice>label{display:flex;align-items:flex-start;gap:10px;font-weight:600;margin:0}.bt-contact-aside .booking-text-choice input[type=checkbox]{width:20px;height:20px;padding:0;margin:2px 0 0;flex:0 0 20px;accent-color:#123f3e}.booking-text-choice small{font-weight:400}.bt-contact-aside .booking-text-choice p{margin:10px 0 0;font-size:.9rem;line-height:1.5;color:#49635e}
+
+/* Keep checkout reachable while browsing, without changing the order flow. */
+.ordering-checkout,.ordering-menu,.ordering-menu-item{scroll-margin-top:20px}
+.ordering-cart-bar,.ordering-back-menu{display:none}
+.ordering-cart-preview{font-weight:700;color:#245454;border-bottom:1px solid #d6e1d9;padding-bottom:14px}
+@media(min-width:761px){
+  .ordering-checkout{position:sticky;top:16px;max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+}
+@media(max-width:760px){
+  .restaurant-ordering:has(.ordering-cart-bar){padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+  .ordering-cart-bar{display:flex;position:fixed;z-index:20;bottom:0;left:0;right:0;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px calc(14px + env(safe-area-inset-bottom,0px));background:#fff;border-top:1px solid #b8cfc1;box-shadow:0 -4px 20px #16353512}
+  .ordering-cart-bar>div{min-width:0;line-height:1.35}
+  .ordering-cart-bar strong{display:block;font-size:.95rem;font-variant-numeric:tabular-nums}
+  .ordering-cart-bar small{display:block;color:#526860;font-size:.73rem;margin-top:4px}
+  .ordering-cart-bar .bt-one-button{flex:0 0 46%;padding:12px 10px;min-height:48px;font-size:.86rem;text-align:center;white-space:normal}
+  .ordering-back-menu{display:inline-block;color:#196657;font-weight:650;margin:0 0 8px}
+  .ordering-checkout{scroll-margin-top:12px}
+  .ordering-checkout input,.ordering-checkout textarea,.ordering-checkout button{scroll-margin-bottom:130px}
+}

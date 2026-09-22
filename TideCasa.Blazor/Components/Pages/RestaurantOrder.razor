@@ -53,14 +53,14 @@
             @if (menu.Table is not null) { <p class="ordering-table-badge">You scanned @menu.Table.Label.</p> }
             @if (!menu.Checkout.AcceptingOrders) { <p class="ordering-notice" role="status">The restaurant is not accepting new online orders right now. You can still browse the menu.</p> }
             <div class="ordering-layout">
-                <section aria-label="Menu" class="ordering-menu">
+                <section id="ordering-menu" aria-label="Menu" class="ordering-menu" tabindex="-1">
                     @foreach (var category in MenuGroups)
                     {
                         <section class="ordering-category" aria-labelledby="@("category-" + category.Key)">
                             <h2 id="@("category-" + category.Key)">@CategoryName(category.Key)</h2>
                             @foreach (var item in category)
                             {
-                                <article class="ordering-menu-item">
+                                <article class="ordering-menu-item" id="@("item-" + item.Id)">
                                     <div>@if (item.PhotoId is not null) { <img class="ordering-item-photo" src="@($"/media/{Uri.EscapeDataString(item.PhotoId)}")" alt="@item.Name" loading="lazy" width="160" height="120" /> }<h3>@item.Name</h3><p>@item.Description</p><strong>@(item.PriceCents is { } price ? Money(price) : item.PriceLabel ?? "Ask staff")</strong>
                                         @if (!item.Available) { <p class="ordering-note">Currently unavailable</p> }
                                     </div>
@@ -78,8 +78,13 @@
                     }
                     @if (menu.Items.Count == 0) { <p>No menu items are available right now.</p> }
                 </section>
-                <aside class="ordering-panel ordering-checkout" aria-labelledby="your-order-title">
+                <aside id="ordering-checkout" class="ordering-panel ordering-checkout" aria-labelledby="your-order-title" tabindex="-1">
                     <h2 id="your-order-title">Your order</h2>
+                    <a class="ordering-back-menu" href="@SectionLink("ordering-menu")">Continue browsing ↑</a>
+                    @if (CartItemCount > 0)
+                    {
+                        <p class="ordering-cart-preview" role="status">@CartItemCount @(CartItemCount == 1 ? "item" : "items") · @Money(CartAmountCents) @CartAmountLabel.ToLowerInvariant()</p>
+                    }
                     <fieldset class="ordering-options" disabled="@Locked"><legend>How would you like your order?</legend>
                         <label><input type="radio" name="fulfillment" value="dine-in" checked="@(fulfillment == "dine-in")" @onchange='() => SetFulfillmentAsync("dine-in")' disabled="@(!menu.Checkout.DineInEnabled)" /><span>Dine in @if (menu.Table is not null) { <small>@menu.Table.Label</small> }</span></label>
                         <label><input type="radio" name="fulfillment" value="pickup" checked="@(fulfillment == "pickup")" @onchange='() => SetFulfillmentAsync("pickup")' disabled="@(!menu.Checkout.PickupEnabled)" /><span>Pickup</span></label>
@@ -153,6 +158,16 @@
                     }
                 </aside>
             </div>
+            @if (CartItemCount > 0)
+            {
+                <nav class="ordering-cart-bar" aria-label="Your cart">
+                    <div role="status" aria-live="polite" aria-atomic="true">
+                        <strong>@CartItemCount @(CartItemCount == 1 ? "item" : "items") · @Money(CartAmountCents)</strong>
+                        <small>@(quoting ? "Checking total…" : quote is null ? "Items subtotal · confirm at checkout" : "Total including tax and tip")</small>
+                    </div>
+                    <a class="bt-one-button" href="@SectionLink("ordering-checkout")">View cart &amp; checkout</a>
+                </nav>
+            }
         }
     </main>
     <footer class="ordering-footer">Powered by BarTide</footer>

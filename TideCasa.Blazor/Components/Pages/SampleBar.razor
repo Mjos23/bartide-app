@@ -5,7 +5,7 @@
 @inject IWebHostEnvironment HostEnvironment
 @inject IConfiguration Configuration
 <PageTitle>Gulf Lantern | Working sample bar</PageTitle>
-<HeadContent><meta name="robots" content="noindex,nofollow" /><link rel="stylesheet" href="/sample-bar/sample-bar.css" /></HeadContent>
+<HeadContent><meta name="robots" content="noindex,nofollow" /><link rel="stylesheet" href="/sample-bar/sample-bar.css?v=ordering-20260922" /></HeadContent>
 @if (bar is null)
 {
     <h1>Not found</h1>
@@ -13,7 +13,7 @@
 else
 {
     <div class="sample-bar">
-        <header class="sb-top"><a href="/sample-bar" class="sb-brand">GULF LANTERN<span>BEACH BAR · ST. PETE BEACH</span></a><nav aria-label="Sample bar"><a href="/sample-bar#perspectives">People & perspectives</a><a href="/sample-bar#menu">Menu</a><a href="/sample-bar#events">Live music</a></nav></header>
+        <header class="sb-top"><a href="/sample-bar" class="sb-brand">GULF LANTERN<span>BEACH BAR · ST. PETE BEACH</span></a><nav aria-label="Sample bar"><a href="/sample-bar#perspectives">People & perspectives</a><a href="/order/gulf-lantern">Menu &amp; order</a><a href="/sample-bar#events">Live music</a></nav></header>
         <aside class="sb-fixture"><strong>Fictional sample bar.</strong> Real app workflows with shared sample data. No real orders, charges, emails or texts. Use fictional contact details.</aside>
         <main>
             <section class="sb-hero"><img src="@bar.Hero" alt="Illustration of Gulf Lantern's warm sunset patio beside the Gulf" width="1672" height="941" fetchpriority="high" /><div class="sb-hero-copy"><p>ST. PETE BEACH, FLORIDA</p><h1>Pull up a chair.<br />Stay for the sunset.</h1><p>@bar.Description</p><a class="sb-button" href="/order/gulf-lantern">Explore the working menu</a><a class="sb-button sb-outline" href="/sample-bar#perspectives">Try a perspective</a></div></section>
@@ -31,7 +31,7 @@ else
                 {
                     <h3 class="sb-category">@category.Label</h3><div class="sb-menu">@foreach (var item in bar.Menu.Where(item => item.Category == category.Id))
                     {
-                        <article class="sb-dish"><img src="@item.Image" alt="@item.Name" loading="lazy" decoding="async" width="360" height="240" /><div><div class="sb-dish-heading"><h4>@item.Name</h4><strong>@Money(item.PriceCents)</strong></div><p>@item.Description</p></div></article>
+                        <article class="sb-dish"><a class="sb-dish-order" href="@($"/order/gulf-lantern#item-{Uri.EscapeDataString(item.Id)}")" aria-label="@($"Order {item.Name}")"><img src="@item.Image" alt="@item.Name" loading="lazy" decoding="async" width="360" height="240" /><div><div class="sb-dish-heading"><h4>@item.Name</h4><strong>@Money(item.PriceCents)</strong></div><p>@item.Description</p><span class="sb-dish-action">Choose quantity &amp; order →</span></div></a></article>
                     }</div>
                 }
             </section>

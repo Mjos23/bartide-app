@@ -23,7 +23,8 @@ public static class PublicDemoWeb
         app.Use(async (context, next) =>
         {
             var path = context.Request.Path.Value ?? "/";
-            if (path is "/" or "/signin") { context.Response.Redirect("/sample-bar"); return; }
+            if (path == "/") { context.Response.Redirect("/order/gulf-lantern"); return; }
+            if (path == "/signin") { context.Response.Redirect("/sample-bar"); return; }
             if (path.StartsWith("/owner", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/start", StringComparison.OrdinalIgnoreCase)
                 || path.StartsWith("/account/referrals", StringComparison.OrdinalIgnoreCase)
                 || path.StartsWith("/workspace/", StringComparison.OrdinalIgnoreCase) && (path.Contains("/billing", StringComparison.OrdinalIgnoreCase) || path.Contains("/payments", StringComparison.OrdinalIgnoreCase))

@@ -52,7 +52,10 @@ def main():
     run=ROOT/'.tools/hosted-demo-verification'/datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S');run.mkdir(parents=True)
     try:
         status,raw,url,head=request('/')
-        check('Demo opens its sample hub',status==200 and url.endswith('/sample-bar') and b'Gulf Lantern' in raw)
+        check('Demo home opens the orderable menu',status==200 and url.endswith('/order/gulf-lantern') and b'Add one Smoked fish dip' in raw)
+        status,raw,url,head=request('/sample-bar')
+        check('Perspective hub remains accessible',status==200 and b'Gulf Lantern' in raw)
+        check('Hub menu photos open ordering',raw.count(b'class="sb-dish-order"')==20 and b'href="/order/gulf-lantern#item-' in raw)
         check('Demo is marked fictional and not indexed',b'Fictional sample bar' in raw and 'noindex' in head.get('X-Robots-Tag',''))
         check('Public hub contains no password inputs',b'name="password"' not in raw)
         status,raw,_,_=request('/sample-bar/gulf-lantern.webmanifest'); manifest=json.loads(raw)

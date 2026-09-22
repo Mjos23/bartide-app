@@ -28,6 +28,10 @@ public partial class RestaurantOrder
     private int quoteRevision, menuRevision;
     private bool Locked => !connected || busy || uncertain;
     private bool CanReview => !Locked && !quoting && quote is { CanSubmit: true } && menu?.Checkout.AcceptingOrders == true;
+    private int CartItemCount => cart.Values.Sum();
+    private int CartAmountCents => quote?.TotalCents ?? menu?.Items.Sum(item => (item.PriceCents ?? 0) * Quantity(item.Id)) ?? 0;
+    private string CartAmountLabel => quote is null ? "Items subtotal" : "Total";
+    private string SectionLink(string id) => Navigation.Uri.Split('#')[0] + "#" + id;
     private static readonly (string Value, string Label)[] TipChoices = [("0", "No tip"), ("15", "15%"), ("20", "20%"), ("25", "25%"), ("custom", "Custom")];
     private IEnumerable<IGrouping<string, RestaurantMenuItem>> MenuGroups => menu?.Items.GroupBy(item => item.CategoryId) ?? Enumerable.Empty<IGrouping<string, RestaurantMenuItem>>();
     private string ReceiptStatus => receipt?.Status switch { "awaiting_payment" => "Complete payment before the restaurant can accept this order.", "paid_needs_review" or "payment_review" => "The restaurant is reviewing this payment. Please contact staff before ordering again.", "new" => "Awaiting the restaurant’s acceptance.", "accepted" => "The restaurant has accepted your order.", "preparing" => "Your order is being prepared.", "ready" => "Your order is ready.", "out_for_delivery" => "Your order is out for delivery.", "completed" => "Your order is complete.", "cancelled" or "canceled" => "Your order was cancelled.", _ => "Current order status: " + receipt?.Status };
