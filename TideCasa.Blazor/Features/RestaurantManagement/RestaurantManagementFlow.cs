@@ -60,7 +60,7 @@ public static partial class RestaurantManagementFlow
                 Checkbox(form, "delivery_enabled"), Checkbox(form, "pay_staff_enabled"), Checkbox(form, "tips_enabled"),
                 Amount(form, "tax_percent", 2500, true), Amount(form, "delivery_fee", 5000)!.Value,
                 Amount(form, "delivery_minimum", 100000)!.Value, capacity, zips,
-                Text(form, "pickup_instructions", 500, multiline: true), Text(form, "payment_instructions", 500, multiline: true));
+                Text(form, "pickup_instructions", 500, multiline: true), Text(form, "payment_instructions", 500, multiline: true), Checkbox(form, "delivery_workflow_enabled"), Text(form, "contact_phone", 30));
             return Response(tenantId, "menu", await api.SaveSettingsAsync(tenantId, settings, read.Token!, context.RequestAborted));
         }
         catch (FormFailure failure) { return Redirect(tenantId, "menu", failure.Notice); }
@@ -92,7 +92,7 @@ public static partial class RestaurantManagementFlow
         {
             var form = read.Form!;
             var action = Text(form, "action", 40, true);
-            if (action is not ("accepted" or "preparing" or "ready" or "out_for_delivery" or "completed" or "cancelled" or "assign-driver" or "mark-paid")) throw new FormFailure("invalid");
+            if (action is not ("accepted" or "preparing" or "ready" or "out_for_delivery" or "completed" or "cancelled" or "assign-driver" or "mark-paid" or "acknowledge-delivery" or "report-delivery-problem" or "resolve-delivery-problem" or "confirm-delivery")) throw new FormFailure("invalid");
             if (action == "cancelled" && !Checkbox(form, "confirm_cancel")) throw new FormFailure("confirm-cancel");
             var collected = action == "mark-paid" && Checkbox(form, "payment_collected");
             if (action == "mark-paid" && !collected) throw new FormFailure("confirm-payment");
@@ -102,10 +102,10 @@ public static partial class RestaurantManagementFlow
                 driverId = Text(form, "driver_id", 128, true);
                 if (!Identifier().IsMatch(driverId)) throw new FormFailure("driver");
             }
-            var request = new ChangeRestaurantOrderRequest(Version(form), action, driverId, collected);
-            return Response(tenantId, "operations", await api.ChangeOrderAsync(tenantId, orderId, request, read.Token!, context.RequestAborted));
+            var request = new ChangeRestaurantOrderRequest(Version(form), action, driverId, collected, Text(form, "delivery_note", 300, multiline: true), Text(form, "problem_code", 40));
+            return Response(tenantId, read.Form!["return_page"] == "deliveries" ? "deliveries" : "operations", await api.ChangeOrderAsync(tenantId, orderId, request, read.Token!, context.RequestAborted));
         }
-        catch (FormFailure failure) { return Redirect(tenantId, "operations", failure.Notice); }
+        catch (FormFailure failure) { return Redirect(tenantId, read.Form!["return_page"] == "deliveries" ? "deliveries" : "operations", failure.Notice); }
     }
 
     private static async Task<FormRead> ReadAsync(HttpContext context, IAntiforgery antiforgery)

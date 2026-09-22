@@ -8,7 +8,7 @@ h1[tabindex="-1"]:focus{outline:none}
 
 /* Keep checkout reachable while browsing, without changing the order flow. */
 .ordering-checkout,.ordering-menu,.ordering-menu-item{scroll-margin-top:20px}
-.ordering-cart-bar,.ordering-back-menu{display:none}
+.ordering-back-menu{display:none}
 .sample-ordering .ordering-main{padding-top:24px}
 .ordering-venue-nav{padding-top:13px;padding-bottom:13px}
 .ordering-venue-nav>a{font-size:14px;font-weight:800;letter-spacing:.09em;text-decoration:none;line-height:1.3}
@@ -55,10 +55,11 @@ h1[tabindex="-1"]:focus{outline:none}
 }
 .ordering-cart-preview{font-weight:700;color:#245454;border-bottom:1px solid #d6e1d9;padding-bottom:14px}
 @media(min-width:761px){
-  .ordering-checkout{position:sticky;top:16px;max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+  .ordering-checkout{position:sticky;top:16px;max-height:calc(100dvh - 125px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
 }
-@media(max-width:760px){
+/* A checkout shortcut stays in view at every screen width, including an empty cart. */
   .restaurant-ordering:has(.ordering-cart-bar){padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+  body:has(.ordering-cart-bar) .sample-demo-bottom{padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))}
   .ordering-cart-bar{display:flex;position:fixed;z-index:20;bottom:0;left:0;right:0;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px calc(14px + env(safe-area-inset-bottom,0px));background:#fff;border-top:1px solid #b8cfc1;box-shadow:0 -4px 20px #16353512}
   .ordering-cart-bar>div{min-width:0;line-height:1.35}
   .ordering-cart-bar strong{display:block;font-size:.95rem;font-variant-numeric:tabular-nums}
@@ -67,4 +68,11 @@ h1[tabindex="-1"]:focus{outline:none}
   .ordering-back-menu{display:inline-block;color:#196657;font-weight:650;margin:0 0 8px}
   .ordering-checkout{scroll-margin-top:12px}
   .ordering-checkout input,.ordering-checkout textarea,.ordering-checkout button{scroll-margin-bottom:130px}
+@media(min-width:761px){
+  .ordering-cart-bar{padding-left:max(24px,calc((100vw - 1152px)/2));padding-right:max(24px,calc((100vw - 1152px)/2))}
+  .ordering-cart-bar .bt-one-button{flex-basis:auto;min-width:220px}
 }
+.ordering-item-content{width:100%;min-width:0}.ordering-item-media{position:relative;margin-bottom:14px}.ordering-item-media.has-photo .ordering-item-photo{width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;margin:0;border-radius:16px}.ordering-item-media.has-photo .ordering-quantity{position:absolute;right:12px;bottom:12px;padding:5px;border:1px solid #cddbd1;border-radius:14px;background:#fffffff5;box-shadow:0 3px 18px #102f3929;gap:7px}.ordering-item-media .ordering-quantity button{min-width:44px;min-height:44px;margin:0;border-radius:10px}.ordering-item-media .ordering-quantity output{font-weight:750;color:#163535}.ordering-item-media:not(.has-photo) .ordering-quantity{justify-content:flex-end}
+
+/* Delivery phase one: scoped staff controls. */
+.delivery-lanes{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.delivery-lanes a{padding:10px 14px;border:1px solid #cdded5;border-radius:12px;color:#164b45;text-decoration:none}.delivery-lanes a[aria-current=page]{background:#164b45;color:#fff}.delivery-lanes strong{margin-left:6px}.delivery-progress{border-block:1px solid #dce7e0;padding:14px 0;margin:14px 0}.delivery-progress p{margin:7px 0}.delivery-action{margin:12px 0}.delivery-timeline{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}.delivery-timeline li{padding:8px 12px;background:#eff2ef;border-radius:8px}.delivery-timeline .done{background:#d9ebdf;color:#124e32}

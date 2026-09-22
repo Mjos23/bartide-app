@@ -76,3 +76,13 @@ document.addEventListener('submit', event => {
   });
   sync();
 })();
+// Repeatable checkout jump, even when the URL already contains this section hash.
+window.tideOrderingCheckout = {
+  open() {
+    const checkout = document.getElementById('ordering-checkout');
+    if (!checkout) return;
+    checkout.scrollTop = 0;
+    checkout.scrollIntoView({ block: 'start', behavior: 'instant' });
+    checkout.focus({ preventScroll: true });
+  }
+};

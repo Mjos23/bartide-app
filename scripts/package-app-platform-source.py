@@ -37,7 +37,7 @@ def main():
     target = ROOT / '.tools/release-source' / stamp
     target.mkdir(parents=True, exist_ok=False)
     inputs = [p for folder in FOLDERS for p in (ROOT / folder).rglob('*') if p.is_file() and selected(p)]
-    inputs += [ROOT / name for name in ('.dockerignore', 'global.json', 'TideCasa.slnx', 'docs/postgresql-schema.md', 'docs/GULF-LANTERN-HOSTED-DEMO.md', 'docs/ENGINEERING-STUDIO.md', 'fixtures/gulf-lantern.json')]
+    inputs += [ROOT / name for name in ('.dockerignore', 'global.json', 'TideCasa.slnx', 'docs/postgresql-schema.md', 'docs/GULF-LANTERN-HOSTED-DEMO.md', 'docs/ENGINEERING-STUDIO.md', 'docs/DELIVERY-ROADMAP.md', 'docs/DELIVERY-PHASE-ONE.md', 'fixtures/gulf-lantern.json')]
     inputs += [p for p in (ROOT / 'scripts').glob('*.py') if not p.name.startswith(('start-local', 'prepare-ordering', 'package-tested'))]
     manifest = {}
     for path in sorted(set(inputs)):

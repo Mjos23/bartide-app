@@ -41,7 +41,27 @@
                     <div><dt>Tip</dt><dd>@Money(receipt.Quote.TipCents)</dd></div>
                     <div class="ordering-total"><dt>Total to pay</dt><dd>@Money(receipt.Quote.TotalCents)</dd></div>
                 </dl>
-                <p>Save your order number and keep this page open to check its status.</p>
+                @if (receipt.Delivery is { } delivery)
+                {
+                    <section aria-label="Delivery updates" class="delivery-progress">
+                        <h3>Your delivery</h3>
+                        @if (!string.IsNullOrWhiteSpace(menu.Checkout.ContactPhone)) { <p><a href="@("tel:" + Uri.EscapeDataString(menu.Checkout.ContactPhone))">Contact @menu.Name · @menu.Checkout.ContactPhone</a></p> }
+                        else if (IsSampleOrdering) { <p>Fictional delivery rehearsal · <a href="/sample-bar#perspectives">Open the manager view for restaurant help</a></p> }
+                        <ul class="delivery-timeline">
+                            <li class="@(receipt.Status is "accepted" or "preparing" or "ready" or "out_for_delivery" or "delivered" or "completed" ? "done" : null)">Restaurant acceptance</li>
+                            <li class="@(delivery.AssignedAt is not null ? "done" : null)">Driver assigned</li>
+                            <li class="@(delivery.AcknowledgedAt is not null ? "done" : null)">Driver acknowledged</li>
+                            <li class="@(delivery.CollectedAt is not null ? "done" : null)">On the way</li>
+                            <li class="@(delivery.DeliveredAt is not null ? "done" : null)">Delivered</li>
+                        </ul>
+                        @if (delivery.DriverName is not null) { <p>Your driver: <strong>@delivery.DriverName</strong></p> }
+                        @if (delivery.ProblemCode is not null) { <p role="status">The restaurant is resolving a delivery issue. Please contact the restaurant with your order number.</p> }
+                        <p class="ordering-note">Last change: @DateTimeOffset.Parse(delivery.UpdatedAt).ToString("MMM d, h:mm tt 'UTC'"). @(ShouldPollDelivery ? "Updates automatically while this page is open." : "Delivery updates finished.")</p>
+                        @if (deliveryCheckedAt is { } checkedAt) { <small>Last checked @checkedAt.ToString("h:mm:ss tt 'UTC'")</small> }
+                        @if (deliveryRefreshError is not null) { <p role="alert" class="ordering-error">@deliveryRefreshError</p> }
+                    </section>
+                }
+                <p>Keep this private receipt and your order number for help from the restaurant.</p>
                 <button class="ordering-secondary" type="button" @onclick="RefreshReceiptAsync" disabled="@busy">@(busy ? "Checking…" : "Check order status")</button>
                 @if (checkout?.State == "open")
                 {
@@ -75,9 +95,9 @@
                             @foreach (var item in category)
                             {
                                 <article class="ordering-menu-item" id="@("item-" + item.Id)">
-                                    <div>@if (item.PhotoId is not null) { <img class="ordering-item-photo" src="@($"/media/{Uri.EscapeDataString(item.PhotoId)}")" alt="@item.Name" loading="lazy" width="160" height="120" /> }<h3>@item.Name</h3><p>@item.Description</p><strong>@(item.PriceCents is { } price ? Money(price) : item.PriceLabel ?? "Ask staff")</strong>
-                                        @if (!item.Available) { <p class="ordering-note">Currently unavailable</p> }
-                                    </div>
+                                    <div class="ordering-item-content">
+                                    <div class="ordering-item-media @(item.PhotoId is not null ? "has-photo" : null)">
+                                    @if (item.PhotoId is not null) { <img class="ordering-item-photo" src="@($"/media/{Uri.EscapeDataString(item.PhotoId)}")" alt="@item.Name" loading="lazy" width="640" height="480" /> }
                                     @if (item.Available && item.PriceCents is >= 0)
                                     {
                                         <div class="ordering-quantity" aria-label="@($"Quantity of {item.Name}")">
@@ -86,6 +106,10 @@
                                             <button type="button" class="ordering-secondary" aria-label="@($"Add one {item.Name}")" disabled="@(Locked || Quantity(item.Id) >= 20 || cart.Values.Sum() >= 50 || (Quantity(item.Id) == 0 && cart.Count >= 20))" @onclick="() => ChangeQuantityAsync(item.Id, 1)">+</button>
                                         </div>
                                     }
+                                    </div>
+                                    <h3>@item.Name</h3><p>@item.Description</p><strong>@(item.PriceCents is { } price ? Money(price) : item.PriceLabel ?? "Ask staff")</strong>
+                                    @if (!item.Available) { <p class="ordering-note">Currently unavailable</p> }
+                                    </div>
                                 </article>
                             }
                         </section>
@@ -172,16 +196,13 @@
                     }
                 </aside>
             </div>
-            @if (CartItemCount > 0)
-            {
                 <nav class="ordering-cart-bar" aria-label="Your cart">
                     <div role="status" aria-live="polite" aria-atomic="true">
                         <strong>@CartItemCount @(CartItemCount == 1 ? "item" : "items") · @Money(CartAmountCents)</strong>
-                        <small>@(quoting ? "Checking total…" : quote is null ? "Items subtotal · confirm at checkout" : "Total including tax and tip")</small>
+                        <small>@(CartItemCount == 0 ? "Add your favorites from the menu" : quoting ? "Checking total…" : quote is null ? "Items subtotal · confirm at checkout" : "Total including tax and tip")</small>
                     </div>
-                    <a class="bt-one-button" href="@SectionLink("ordering-checkout")">View cart &amp; checkout</a>
+                    <a class="bt-one-button" href="@SectionLink("ordering-checkout")" @onclick="GoToCheckoutAsync" @onclick:preventDefault="true">View cart &amp; checkout</a>
                 </nav>
-            }
         }
     </main>
     <footer class="ordering-footer">

@@ -36,9 +36,10 @@ public partial class RestaurantOrder
     private int CartAmountCents => quote?.TotalCents ?? menu?.Items.Sum(item => (item.PriceCents ?? 0) * Quantity(item.Id)) ?? 0;
     private string CartAmountLabel => quote is null ? "Items subtotal" : "Total";
     private string SectionLink(string id) => Navigation.Uri.Split('#')[0] + "#" + id;
+    private async Task GoToCheckoutAsync() => await JS.InvokeVoidAsync("tideOrderingCheckout.open");
     private static readonly (string Value, string Label)[] TipChoices = [("0", "No tip"), ("15", "15%"), ("20", "20%"), ("25", "25%"), ("custom", "Custom")];
     private IEnumerable<IGrouping<string, RestaurantMenuItem>> MenuGroups => menu?.Items.GroupBy(item => item.CategoryId) ?? Enumerable.Empty<IGrouping<string, RestaurantMenuItem>>();
-    private string ReceiptStatus => receipt?.Status switch { "awaiting_payment" => "Complete payment before the restaurant can accept this order.", "paid_needs_review" or "payment_review" => "The restaurant is reviewing this payment. Please contact staff before ordering again.", "new" => "Awaiting the restaurant’s acceptance.", "accepted" => "The restaurant has accepted your order.", "preparing" => "Your order is being prepared.", "ready" => "Your order is ready.", "out_for_delivery" => "Your order is out for delivery.", "completed" => "Your order is complete.", "cancelled" or "canceled" => "Your order was cancelled.", _ => "Current order status: " + receipt?.Status };
+    private string ReceiptStatus => receipt?.Status switch { "awaiting_payment" => "Complete payment before the restaurant can accept this order.", "paid_needs_review" or "payment_review" => "The restaurant is reviewing this payment. Please contact staff before ordering again.", "new" => "Awaiting the restaurant’s acceptance.", "accepted" => "The restaurant has accepted your order.", "preparing" => "Your order is being prepared.", "ready" => "Your order is ready.", "out_for_delivery" => "Your order is out for delivery.", "completed" => "Your order is complete.", "delivered" => "Your delivery has arrived. Payment is still outstanding.", "cancelled" or "canceled" => "Your order was cancelled.", _ => "Current order status: " + receipt?.Status };
     private string ReceiptPayment => receipt?.PaymentStatus switch { "paid_in_person" => "Paid to staff", "paid" => "Paid", "refunded" => "Refunded", "pending" => "Awaiting card payment", "partially_refunded" => "Partially refunded", "refund_pending" => "Refund in progress", _ => "Unpaid" };
 
     protected override Task OnParametersSetAsync()
@@ -49,22 +50,32 @@ public partial class RestaurantOrder
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await SyncDeliveryPollingAsync();
         if (!firstRender) return;
         connected = true;
         try
         {
             var saved = await JS.InvokeAsync<SavedCheckout?>("tideMerchantCheckout.read", Slug);
-            if (saved is { Version: 1 } && saved.Slug == Slug && saved.Request?.Order?.PaymentMethod == "phone"
+            if (saved is { Version: 1 } && saved.Slug == Slug && saved.Request?.Order?.PaymentMethod is "phone" or "staff"
                 && saved.Request.TrackingKey is { Length: 64 } tracking && tracking.All(char.IsAsciiHexDigit) && Guid.TryParse(saved.Request.RequestKey, out _))
             {
                 pending = saved.Request;
                 if (saved.OrderId is not null)
                 {
+                    if (pending.Order.PaymentMethod == "staff")
+                    {
+                        var tracked = await Api.TrackAsync(Slug, new(saved.OrderId, pending.TrackingKey));
+                        if (tracked.Succeeded) receipt = tracked.Value;
+                        else { uncertain = true; error = "Your saved order could not be checked. Retry safely or ask the restaurant."; }
+                    }
+                    else
+                    {
                     var response = await Api.TrackCheckoutAsync(Slug, new(saved.OrderId, pending.TrackingKey));
                     if (response.Succeeded && response.Value is { } paymentValue) ApplyCheckout(paymentValue);
                     else { uncertain = true; error = "Your payment result is not confirmed yet. Retry this saved order safely."; }
+                    }
                 }
-                else { uncertain = true; error = "You have a saved payment request. Retry it to confirm the result safely."; }
+                else { uncertain = true; error = "You have a saved order request. Retry it to confirm the result safely."; }
             }
             else if (PaymentReturn is not null) error = "This browser tab no longer has your private receipt. Ask the restaurant for help; do not pay again until your payment is checked.";
         }
@@ -245,13 +256,16 @@ public partial class RestaurantOrder
             try { await JS.InvokeVoidAsync("tideMerchantCheckout.clear", Slug); } catch (JSException) { }
             await RefreshQuoteAsync(); error = FriendlyError(phoneResult.Code, (int)phoneResult.Status); return;
         }
+        if (pending.Order.Fulfillment == "delivery" && !await SaveCheckoutAsync(null))
+        { busy = false; if (!uncertain) pending = null; error = "Allow this tab to save your delivery receipt before placing the order."; return; }
         var result = await Api.OrderAsync(Slug, pending);
         busy = false;
         if (result.Succeeded && result.Value is { } value)
-        { receipt = value; uncertain = false; reviewing = false; return; }
+        { receipt = value; uncertain = false; reviewing = false; if (value.Quote.Fulfillment == "delivery") await SaveCheckoutAsync(value.OrderId); return; }
         if (result.Uncertain || result.Code == "request_conflict")
         { uncertain = true; error = "We couldn’t confirm whether the restaurant received your order. Retry this same order to confirm it safely."; return; }
         pending = null; uncertain = false; reviewing = false;
+        try { await JS.InvokeVoidAsync("tideMerchantCheckout.clear", Slug); } catch (JSException) { }
         if (result.Code == "stale_quote")
         {
             await RefreshQuoteAsync();
@@ -264,7 +278,7 @@ public partial class RestaurantOrder
 
     private async Task RefreshReceiptAsync()
     {
-        if (busy || receipt is null || pending is null) return;
+        if (busy || deliveryPolling || receipt is null || pending is null) return;
         busy = true; error = null;
         if (pending.Order.PaymentMethod == "phone")
         {
@@ -276,7 +290,7 @@ public partial class RestaurantOrder
         }
         var result = await Api.TrackAsync(Slug, new(receipt.OrderId, pending.TrackingKey));
         busy = false;
-        if (result.Succeeded && result.Value is { } value) receipt = value;
+        if (result.Succeeded && result.Value is { } value) { receipt = value; deliveryCheckedAt = DateTimeOffset.UtcNow; deliveryRefreshError = null; deliveryFailures = 0; }
         else error = "We couldn’t refresh the order’s status. Your saved receipt is still shown. Please try again or ask staff.";
     }
 
