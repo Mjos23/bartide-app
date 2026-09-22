@@ -35,9 +35,9 @@
     "gitBlobSha": "dca8281048959ade6cf98c071efcf521eb9a2583"
   },
   "docs/GULF-LANTERN-HOSTED-DEMO.md": {
-    "bytes": 5625,
-    "sha256": "bbf737df806b54e048e32460acfde065d7ccffaf06f574849b0c4d5480cef60e",
-    "gitBlobSha": "c59b9eedda0f1bedb331cd6cfeddac355ccef1a6"
+    "bytes": 5694,
+    "sha256": "8bf943c35d22306c5f2babba72c75b5f30209ff95d52dd8a6cc6bec7e93202ca",
+    "gitBlobSha": "b6707dd5aaf37f6762ad13560d035ba59fd34137"
   },
   "docs/postgresql-schema.md": {
     "bytes": 10017,
@@ -865,9 +865,9 @@
     "gitBlobSha": "5e96651ecd266b788421043def2882edf804a6b8"
   },
   "TideCasa.Blazor/Components/App.razor": {
-    "bytes": 3402,
-    "sha256": "4fffa80865e8fa162244d0b0b92b7f0bba1d7c54b3952c5232e2dc6c591af4d7",
-    "gitBlobSha": "4ba915c2a97eb470d38272dbdebfe00f7a2c1e48"
+    "bytes": 3418,
+    "sha256": "8ba4754a994d0db96285d9b8e2fc404634fa41292301ff1707a9d74548360e5e",
+    "gitBlobSha": "b58134dbd028b8366e8af46a124d2e9e0843070d"
   },
   "TideCasa.Blazor/Components/Marketing/BarTideHome.razor": {
     "bytes": 16193,

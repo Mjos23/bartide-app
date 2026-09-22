@@ -27,7 +27,11 @@
     <HeadOutlet @rendermode="PageRenderMode" />
 </head>
 <body>
-    @if (!IsSampleDemo)
+    @if (IsSampleDemo)
+    {
+        <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="false" DemoName="Gulf Lantern" />
+    }
+    else
     {
         <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="@IsBarHost" />
     }
@@ -41,7 +45,6 @@
                 <small>Owner · manager · bartender · server · customer</small>
                 <small>Fictional shared demo · No real orders or charges</small>
             </aside>
-            <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="false" DemoName="Gulf Lantern" />
         </div>
     }
     <script src="/app.js"></script>
