@@ -1,6 +1,6 @@
 # Engineering Studio
 
-Engineering Studio is a beginner practice workspace at `/engineering/index.html` on the demo site. It pairs short C# lessons with a browser editor, notebook prompts, and a separate HTML/CSS/JavaScript prototype preview. It is a learning surface; changes made in its editors do not modify the TideCasa application source or deploy application changes.
+Engineering Studio is a parked internal prototype, preserved in a separate local project while the restaurant app launches. Public hosting returns 404 for all `/engineering` paths. The app copy remains available in Development mode at `/engineering/index.html`. It pairs short C# lessons with a browser editor, notebook prompts, and a separate HTML/CSS/JavaScript prototype preview. Changes made in its editors do not modify the TideCasa application source or deploy application changes.
 
 ## Learning workflow
 

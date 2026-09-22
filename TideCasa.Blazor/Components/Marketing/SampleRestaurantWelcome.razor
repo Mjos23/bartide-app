@@ -1,0 +1,62 @@
+@implements IDisposable
+@inject EventsClient Events
+@inject PersistentComponentState ComponentState
+<section class="sample-order-intro" aria-label="Welcome to Gulf Lantern">
+    <div>
+        <p class="sample-order-kicker">YOUR RESTAURANT’S OWN APP</p>
+        <h1>@RestaurantName</h1>
+        <p>Beach plates, sunset drinks &amp; live music.<br />Order directly with Gulf Lantern.</p>
+        <small>Sample restaurant · No real charges</small>
+    </div>
+    <img src="/sample-bar/gulf-lantern-hero.png" alt="Illustration of Gulf Lantern’s sunset patio beside the Gulf" width="180" height="130" fetchpriority="high" />
+</section>
+@if (nextEvent is not null)
+{
+    <a class="sample-order-event" href="/events/gulf-lantern" aria-label="@($"Event details: {nextEvent.Title}")">
+        <span class="sample-event-label">WHAT’S ON</span>
+        <span><strong>@nextEvent.Title</strong><small>@When(nextEvent)</small></span>
+        <span class="sample-event-arrow" aria-hidden="true">→</span>
+    </a>
+}
+else
+{
+    <p class="sample-order-event-link"><a href="/events/gulf-lantern">See what’s coming up at the bar →</a></p>
+}
+@code {
+    [Parameter] public string RestaurantName { get; set; } = "Gulf Lantern Beach Bar";
+    private RestaurantEvent? nextEvent;
+    private PersistingComponentStateSubscription persistence;
+    private const string StateKey = "gulf-lantern-order-welcome";
+    private sealed record WelcomeState(RestaurantEvent? Event);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ComponentState.TryTakeFromJson<WelcomeState>(StateKey, out var saved)) nextEvent = saved?.Event;
+        else
+        {
+            // Events are optional: a slow event service must not hold up ordering.
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var result = await Events.ListAsync("gulf-lantern", false, null, timeout.Token);
+            if (result.Succeeded && result.Value is { Slug: "gulf-lantern" } venue)
+            {
+                var now = DateTimeOffset.UtcNow;
+                nextEvent = venue.Events.Where(item => item.State == "published"
+                    && DateTimeOffset.TryParse(item.EndsAt, out var end) && end > now
+                    && DateTimeOffset.TryParse(item.StartsAt, out _))
+                    .OrderBy(item => DateTimeOffset.Parse(item.StartsAt)).FirstOrDefault();
+            }
+        }
+        // Reuse this public event during hydration instead of fetching it twice.
+        persistence = ComponentState.RegisterOnPersisting(() =>
+        {
+            ComponentState.PersistAsJson(StateKey, new WelcomeState(nextEvent));
+            return Task.CompletedTask;
+        });
+    }
+    private static string When(RestaurantEvent item)
+    {
+        var local = TimeZoneInfo.ConvertTime(DateTimeOffset.Parse(item.StartsAt), TimeZoneInfo.FindSystemTimeZoneById("America/New_York"));
+        return local.ToString("ddd, MMM d · h:mm tt", System.Globalization.CultureInfo.GetCultureInfo("en-US")) + " Eastern";
+    }
+    public void Dispose() => persistence.Dispose();
+}

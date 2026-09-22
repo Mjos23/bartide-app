@@ -53,13 +53,15 @@ def main():
     try:
         status,raw,url,head=request('/')
         check('Demo home opens the orderable menu',status==200 and url.endswith('/order/gulf-lantern') and b'Add one Smoked fish dip' in raw)
+        check('Restaurant welcome leads directly to the menu',b'class="sample-order-intro"' in raw and raw.index(b'class="sample-order-intro"') < raw.index(b'id="ordering-menu"'))
+        check('Additional perspectives appear below ordering',b'See additional views' in raw and raw.index(b'class="sample-perspectives-footer"') > raw.index(b'id="ordering-checkout"'))
         status,raw,url,head=request('/sample-bar')
         check('Perspective hub remains accessible',status==200 and b'Gulf Lantern' in raw)
         check('Hub menu photos open ordering',raw.count(b'class="sb-dish-order"')==20 and b'href="/order/gulf-lantern#item-' in raw)
         check('Demo is marked fictional and not indexed',b'Fictional sample bar' in raw and 'noindex' in head.get('X-Robots-Tag',''))
         check('Public hub contains no password inputs',b'name="password"' not in raw)
         status,raw,_,_=request('/sample-bar/gulf-lantern.webmanifest'); manifest=json.loads(raw)
-        check('Phone shortcut opens Gulf Lantern hub',status==200 and manifest['start_url']=='/sample-bar' and manifest['display']=='standalone')
+        check('Phone shortcut opens direct Gulf Lantern ordering',status==200 and manifest['start_url']=='/order/gulf-lantern' and manifest['display']=='standalone')
         people=json.loads((ROOT/'fixtures/gulf-lantern.json').read_text())['people']
         if options.person:
             people=[person for person in people if person['key']==options.person]
@@ -81,6 +83,9 @@ def main():
         check('Role switch rejects another site origin',request(form['action'],form['fields'],'https://example.invalid')[0]==400)
         for route in ('/owner/sales','/signup','/purchase/business'):
             check('Demo hides '+route,request(route)[0]==404)
+        if uri.scheme=='https':
+            for route in ('/engineering/','/engineering/index.html','/engineering/studio.js'):
+                check('Internal studio is unavailable publicly '+route,request(route)[0]==404)
         status,raw,_,_=request('/order/gulf-lantern')
         check('Functional order page renders table entry',status==200 and b'table' in raw.lower() and b'Gulf Lantern' in raw)
         for route in ('/events/gulf-lantern','/updates/gulf-lantern'):

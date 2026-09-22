@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="/tide-casa/homepage.css?v=payment-first-20260921" />
     <link rel="stylesheet" href="/bartide-night.css" />
     <link rel="stylesheet" href="/install.css" />
-    <link rel="stylesheet" href="/app.css?v=cart-20260922" />
+    <link rel="stylesheet" href="/app.css?v=restaurant-first-20260922" />
     <link rel="stylesheet" href="/restaurant-management.css" />
     <link rel="stylesheet" href="/media.css" />
     <link rel="stylesheet" href="/rewards.css" />
@@ -27,12 +27,23 @@
     <HeadOutlet @rendermode="PageRenderMode" />
 </head>
 <body>
-    @if (IsPublicDemo || (HostEnvironment.IsDevelopment() && Configuration["SampleBar:Enabled"] == "true" && System.Net.IPAddress.IsLoopback(HttpContext.Connection.RemoteIpAddress ?? System.Net.IPAddress.None)))
+    @if (!IsSampleDemo)
     {
-        <aside style="padding:10px 16px;background:#dcebe1;color:#143f3a;text-align:center;font:600 14px/1.5 system-ui"><a href="/sample-bar#perspectives" style="color:inherit">Gulf Lantern · Switch sample person</a> · Fictional shared activity</aside>
+        <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="@IsBarHost" />
     }
-    <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="@IsBarHost" DemoName="@(IsPublicDemo ? "Gulf Lantern" : null)" />
     <Routes ProtectedOrderingContext="@protectedOrderingContext" @rendermode="PageRenderMode" />
+    @if (IsSampleDemo)
+    {
+        <div class="sample-demo-bottom">
+            <aside class="sample-perspectives-footer" aria-label="Demo perspectives">
+                <p>Explore the people behind the restaurant.</p>
+                <a href="/sample-bar#perspectives">See additional views →</a>
+                <small>Owner · manager · bartender · server · customer</small>
+                <small>Fictional shared demo · No real orders or charges</small>
+            </aside>
+            <TideCasa.Blazor.Components.Marketing.InstallControl IsBarTide="false" DemoName="Gulf Lantern" />
+        </div>
+    }
     <script src="/app.js"></script>
     <script src="/merchant-payments.js"></script>
     <script src="/business-posts.js"></script>
@@ -46,5 +57,6 @@
     private string? protectedOrderingContext;
     private bool IsBarHost => HttpContext.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase);
     private bool IsPublicDemo => TideCasa.Blazor.Services.PublicDemoWeb.Enabled(Configuration);
+    private bool IsSampleDemo => IsPublicDemo || (HostEnvironment.IsDevelopment() && Configuration["SampleBar:Enabled"] == "true" && System.Net.IPAddress.IsLoopback(HttpContext.Connection.RemoteIpAddress ?? System.Net.IPAddress.None));
     protected override void OnInitialized() => protectedOrderingContext = OrderingContext.ProtectForCircuit();
 }

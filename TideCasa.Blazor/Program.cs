@@ -157,7 +157,8 @@ app.Use(async (context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/engineering"))
     {
-        if (!PublicDemoWeb.Enabled(builder.Configuration) && !app.Environment.IsDevelopment())
+        // Parked internal prototype: available locally, never on public hosting.
+        if (!app.Environment.IsDevelopment())
         { context.Response.StatusCode = 404; return; }
         context.Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
         context.Response.Headers["X-Frame-Options"] = "DENY";

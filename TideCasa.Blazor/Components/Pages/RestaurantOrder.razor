@@ -1,9 +1,16 @@
 @page "/order/{Slug}"
 @page "/menu/{Slug}/order"
 @inject RestaurantOrderingClient Api
-<PageTitle>@(menu?.Name ?? "Your order") | BarTide</PageTitle>
-<div class="bt-unified restaurant-ordering">
-    <header class="ordering-nav"><a href="/" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="140" height="47" /></a><span>Good food. Your way.</span></header>
+<PageTitle>@(menu?.Name ?? "Your order") | @(IsSampleOrdering ? "Order direct" : "BarTide")</PageTitle>
+<div class="bt-unified restaurant-ordering @(IsSampleOrdering ? "sample-ordering" : null)">
+    @if (IsSampleOrdering)
+    {
+        <header class="ordering-nav ordering-venue-nav"><a href="@SectionLink("ordering-menu")">GULF LANTERN<small>BEACH BAR · ST. PETE BEACH</small></a><span>Order direct</span></header>
+    }
+    else
+    {
+        <header class="ordering-nav"><a href="/" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="140" height="47" /></a><span>Good food. Your way.</span></header>
+    }
     <main class="ordering-main">
         @if (loading)
         {
@@ -47,8 +54,15 @@
         }
         else
         {
-            <p class="bt-one-kicker">ORDER FROM YOUR TABLE OR ON THE GO</p><h1>@menu.Name</h1>
-            <nav class="rm-workspace-nav" aria-label="Restaurant"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")">Customer rewards</a><a href="@($"/events/{Uri.EscapeDataString(Slug)}")">Events and RSVP</a><a href="@($"/updates/{Uri.EscapeDataString(Slug)}")">Latest updates · Phone alerts</a></nav>
+            @if (IsSampleOrdering)
+            {
+                <SampleRestaurantWelcome RestaurantName="@menu.Name" />
+            }
+            else
+            {
+                <p class="bt-one-kicker">ORDER FROM YOUR TABLE OR ON THE GO</p><h1>@menu.Name</h1>
+                <nav class="rm-workspace-nav" aria-label="Restaurant"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")">Customer rewards</a><a href="@($"/events/{Uri.EscapeDataString(Slug)}")">Events and RSVP</a><a href="@($"/updates/{Uri.EscapeDataString(Slug)}")">Latest updates · Phone alerts</a></nav>
+            }
             @if (!connected) { <p class="ordering-note" role="status">Connecting to the restaurant…</p> }
             @if (menu.Table is not null) { <p class="ordering-table-badge">You scanned @menu.Table.Label.</p> }
             @if (!menu.Checkout.AcceptingOrders) { <p class="ordering-notice" role="status">The restaurant is not accepting new online orders right now. You can still browse the menu.</p> }
@@ -170,5 +184,12 @@
             }
         }
     </main>
-    <footer class="ordering-footer">Powered by BarTide</footer>
+    <footer class="ordering-footer">
+        @if (IsSampleOrdering)
+        {
+            <nav class="sample-customer-links" aria-label="More from Gulf Lantern"><a href="/rewards/gulf-lantern">Customer rewards</a><a href="/events/gulf-lantern">Events &amp; RSVP</a><a href="/updates/gulf-lantern">Latest updates</a></nav>
+            <span>Gulf Lantern’s own restaurant app · Powered by Tide Casa</span>
+        }
+        else { <span>Powered by BarTide</span> }
+    </footer>
 </div>

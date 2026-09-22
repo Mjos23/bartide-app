@@ -11,7 +11,7 @@ orderable items. Existing QR links still open ordering directly.
 
 Gulf Lantern is a fictional, shared practice bar. Pick a person to use the actual
 customer, owner, general-manager, bartender, server, kitchen or driver screens.
-Use the banner's **Switch sample person** link to return to the selector. Sessions
+Use **See additional views** at the bottom of the page to return to the selector. Sessions
 last 30 minutes; choose a person again when a session expires. Two devices can
 show customer ordering and the staff order board together. Refresh the board to
 see activity from the other device.
@@ -80,3 +80,8 @@ boundary. `scripts/verify-hosted-demo.py --base https://demo.tide.casa` checks
 native forms, every fictional identity, the install manifest and the public hub.
 See the private deployment evidence for the actual deployed source revision and
 verification results; this guide alone is not proof of deployment.
+
+
+## Restaurant-first QR presentation
+
+The existing QR destination and demo root open /order/gulf-lantern. The customer sees Gulf Lantern branding, a compact restaurant introduction and patio illustration, the next published event, then orderable menu items. The event is optional, uses a two-second request budget and passes public prerendered state into the interactive view to avoid a second event fetch. Ended or cancelled events are not featured. The phone cart and table QR parameters retain their existing behavior. Other perspectives and the installation control are below the ordering experience. The home-screen manifest also starts at /order/gulf-lantern. Engineering Studio is parked separately and unavailable on public hosting.

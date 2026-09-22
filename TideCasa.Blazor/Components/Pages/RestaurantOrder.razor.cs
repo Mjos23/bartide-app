@@ -14,6 +14,10 @@ public partial class RestaurantOrder
     [SupplyParameterFromQuery(Name = "payment_return")] public string? PaymentReturn { get; set; }
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private IConfiguration Configuration { get; set; } = default!;
+    [Inject] private IWebHostEnvironment HostEnvironment { get; set; } = default!;
+    private bool IsSampleOrdering => Slug == "gulf-lantern" && (PublicDemoWeb.Enabled(Configuration)
+        || HostEnvironment.IsDevelopment() && Configuration["SampleBar:Enabled"] == "true");
     private sealed record SavedCheckout(int Version, string Slug, RestaurantOrderRequest Request, string? OrderId);
     private RestaurantPhoneCheckout? checkout;
     private RestaurantMenu? menu;
