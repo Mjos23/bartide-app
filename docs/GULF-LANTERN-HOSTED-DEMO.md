@@ -18,13 +18,14 @@ see activity from the other device.
 
 On iPhone, open the address in Safari, tap Share, then Add to Home Screen. On
 Android, open it in Chrome and use Install app or Add to home screen in the menu.
-The shortcut opens the sample hub. An internet connection is required.
+The shortcut opens the restaurant's ordering page. An internet connection is required.
 
 ## A short presentation
 
-1. Choose Avery's customer view. Open the menu, choose a dish and quantity, enter
-   a configured table number (1–12), review the total and place a fictional order
-   with Pay staff. Use fictional contact details.
+1. Scan the customer QR. Show the restaurant introduction, upcoming event and
+   menu. Choose a dish and quantity, select Dine in, enter a sample table number,
+   review the total and place a fictional order with Pay staff. No customer login
+   is needed to order. Use fictional contact details.
 2. Switch to Maya's server view. Open restaurant operations and accept the order.
 3. Switch to Nico or Luis to demonstrate preparation and ready status. Return to
    Maya to record a fictional staff payment and complete the ready order.

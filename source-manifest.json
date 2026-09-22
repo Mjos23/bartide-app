@@ -35,9 +35,9 @@
     "gitBlobSha": "dca8281048959ade6cf98c071efcf521eb9a2583"
   },
   "docs/GULF-LANTERN-HOSTED-DEMO.md": {
-    "bytes": 5529,
-    "sha256": "ab65f59d13780d77526b9713e927ce4b1399c7a0c6dbf5221f21e86070dac9bf",
-    "gitBlobSha": "bd33be6563849b2a74196c4f89d6d041986fb6f3"
+    "bytes": 5625,
+    "sha256": "bbf737df806b54e048e32460acfde065d7ccffaf06f574849b0c4d5480cef60e",
+    "gitBlobSha": "c59b9eedda0f1bedb331cd6cfeddac355ccef1a6"
   },
   "docs/postgresql-schema.md": {
     "bytes": 10017,
