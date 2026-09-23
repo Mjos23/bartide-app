@@ -15,28 +15,28 @@
                 <ol class="bt-purchase-timeline">
                     <li><h3>Choose and pay.</h3><p>Review your total and optional app-store support. Stripe handles your payment securely.</p></li>
                     <li><h3>Set up your account.</h3><p>After payment, use your checkout email to create an account and share your business details.</p></li>
-                    <li><h3>Build and review together.</h3><p>Confirmed initial payment starts seven calendar days of private building and review. We work with you to prepare the content and approve your app before launch.</p></li>
+                    <li><h3>Build and review together.</h3><p>Confirmed initial payment starts 30 calendar days of private building and review. We work with you to prepare the content and approve your app before launch.</p></li>
                 </ol>
-                <div class="tide-maintenance-detail"><h3>What the $50/month covers</h3><p>Hosting, basic upkeep and your content editor. Major new features, outside services and store-account fees are separate.</p><p>Maintenance begins with your first payment and renews each month. Cancel before your next renewal; service continues through the paid period.</p></div>
+                <div class="tide-maintenance-detail"><h3>What the $149/month covers</h3><p>Hosting, basic upkeep and your content editor. Major new features, outside services and store-account fees are separate.</p><p>Maintenance begins 30 days after your initial purchase and renews each month. Cancel before your next renewal; service continues through the paid period.</p></div>
                 <p>This package covers your Tide Casa app setup and maintenance. Restaurant customer-payment checkout is currently disabled and is separate from this purchase.</p>
             </section>
             <aside class="purchase-summary" aria-label="Payment details">
                 <p class="bt-one-kicker">YOUR BUSINESS APP</p><h2>$600<span>one-time setup</span></h2>
-                <p class="tide-monthly-line"><strong>+ $50 / month</strong><br />Hosting and maintenance</p>
+                <p class="tide-monthly-line"><strong>+ $149 / month</strong><br />Hosting and maintenance, starting after 30 days</p>
                 <label class="tide-store-option"><input type="checkbox" @bind="appStores" @bind:after="RefreshQuoteAsync" disabled="@loading" /><span><strong>Add app-store integration · $300 once</strong><small>Packaging and submission support for eligible stores, including Apple and Google. Store approval is separate; developer-account fees are paid by you.</small></span></label>
                 @if (quote is not null)
                 {
                     <dl class="tide-price-breakdown">
                         <div><dt>App setup</dt><dd>@Usd(quote.SetupCents)</dd></div>
                         @if (quote.AppStoresCents > 0) { <div><dt>App-store package</dt><dd>@Usd(quote.AppStoresCents)</dd></div> }
-                        <div><dt>First maintenance month</dt><dd>@Usd(quote.FirstMonthCents)</dd></div>
+                        <div><dt>Maintenance due today</dt><dd>@Usd(quote.FirstMonthCents)</dd></div>
                         <div class="tide-first-total"><dt>First payment</dt><dd>@Usd(quote.FirstPaymentCents)</dd></div>
                         <div><dt>Then each month</dt><dd>@Usd(quote.MonthlyCents)</dd></div>
                     </dl>
                 }
                 @if (loading) { <p role="status">Updating your total…</p> }
                 @if (error is not null) { <p role="alert">@error</p> }
-                <p class="purchase-tax-note">USD. The app-store service is charged once. Monthly maintenance stays $50.</p>
+                <p class="purchase-tax-note">USD. The app-store service is charged once. Monthly maintenance stays $149.</p>
                 @if (Notice is not null) { <p class="purchase-preview-note" role="status">@PurchaseNotice</p> }
                 @if (Notice is "guest_options_saved" or "checkout_closed")
                 {
@@ -56,7 +56,7 @@
                         <AntiforgeryToken />
                         <input type="hidden" name="plan" value="@Plan" /><input type="hidden" name="appStores" value="@appStores.ToString().ToLowerInvariant()" />
                         <input type="hidden" name="termsVersion" value="@options?.TermsVersion" />
-                        <label class="purchase-consent"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I agree to pay <strong>@Usd(quote.FirstPaymentCents) now</strong>, then <strong>$50 each month</strong> until I cancel renewal, under the <a href="/service-terms" target="_blank" rel="noopener">service terms</a>.</span></label>
+                        <label class="purchase-consent"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I agree to pay <strong>@Usd(quote.FirstPaymentCents) now</strong>, then <strong>$149 each month starting 30 days after purchase</strong> until I cancel renewal, under the <a href="/service-terms" target="_blank" rel="noopener">service terms</a>.</span></label>
                         <button class="bt-one-button" type="submit" disabled="@(loading || options?.CheckoutAvailable != true || Plan is not ("business" or "restaurant"))">Pay @Usd(quote.FirstPaymentCents) securely</button>
                     </form>
                     <p class="purchase-tax-note">No account needed to pay. Enter your billing email and payment details at Stripe; business setup comes next.</p>

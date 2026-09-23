@@ -15,6 +15,15 @@ public sealed class FeatureMigrator(ApplicationDatabase database)
         var resources = assembly.GetManifestResourceNames().Where(name => name.StartsWith(prefix, StringComparison.Ordinal)
             && name.EndsWith(".sql", StringComparison.Ordinal)).Order(StringComparer.Ordinal).ToArray();
         await using var db = await database.OpenAsync(ct);
+        // SQLite table rebuilds require disabling enforcement before the transaction.
+        // Every relationship is still checked before commit, including existing data.
+        await using (var suspend = db.CreateCommand())
+        {
+            suspend.CommandText = "PRAGMA foreign_keys=OFF";
+            await suspend.ExecuteNonQueryAsync(ct);
+        }
+        try
+        {
         using var tx = db.BeginTransaction(deferred: false);
         await using (var create = db.CreateCommand())
         {
@@ -68,5 +77,11 @@ public sealed class FeatureMigrator(ApplicationDatabase database)
             if (await reader.ReadAsync(ct)) throw new InvalidOperationException("Feature migrations failed the database relationship check.");
         }
         await tx.CommitAsync(ct);
+        }
+        finally
+        {
+            await using var restore = db.CreateCommand(); restore.CommandText = "PRAGMA foreign_keys=ON";
+            await restore.ExecuteNonQueryAsync(CancellationToken.None);
+        }
     }
 }

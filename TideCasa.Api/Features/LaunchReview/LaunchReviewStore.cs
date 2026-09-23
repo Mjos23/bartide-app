@@ -16,8 +16,8 @@ public sealed class LaunchReviewException(string message, int status = 400, stri
 public sealed class LaunchReviewStore(ApplicationDatabase database)
 {
     private sealed record Project(string Id, string Name, string Vertical, string Status, int Version,
-        string? EnrolledAt, string? BuildReadyAt, string Menu);
-    private const string Columns = "id,name,vertical,status,version,enrolled_at,build_ready_at,menu_json";
+        string? EnrolledAt, string? BuildReadyAt, string Menu, int BuildDays);
+    private const string Columns = "id,name,vertical,status,version,enrolled_at,build_ready_at,menu_json,CASE WHEN EXISTS(SELECT 1 FROM tide_service_orders s WHERE s.tenant_id=bartide_customers.id AND s.status='paid' AND s.monthly_cents=14900) THEN 30 ELSE 7 END";
     private static readonly Regex Id = new("^[A-Za-z0-9_-]{1,128}$", RegexOptions.CultureInvariant);
     private static readonly Regex ItemId = new("^[a-z][a-z0-9-]{0,63}$", RegexOptions.CultureInvariant);
     private static readonly Regex ZonedDate = new("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,7})?(?:Z|[+-]\\d{2}:\\d{2})$", RegexOptions.CultureInvariant);
@@ -72,8 +72,8 @@ public sealed class LaunchReviewStore(ApplicationDatabase database)
         if (project.Status == "draft") blocked = "Awaiting verified live setup payment. The build has not started.";
         else if (project.Status == "building")
         {
-            if (enrolled is null || due is null || due.Value - enrolled.Value < TimeSpan.FromDays(7)) blocked = "The enrollment and seven-day build dates need review.";
-            else if (now < due.Value) blocked = "The seven-day build period is still in progress.";
+            if (enrolled is null || due is null || due.Value - enrolled.Value < TimeSpan.FromDays(project.BuildDays)) blocked = "The enrollment and scheduled build dates need review.";
+            else if (now < due.Value) blocked = "The scheduled build period is still in progress.";
             else if (items == 0) blocked = "Add the finished menu or service items before launch. Uploaded source files alone are not a finished app.";
         }
         return new(project.Id, project.Name, project.Vertical, project.Status, project.Version, enrolled?.ToUniversalTime().ToString("O"), due?.ToUniversalTime().ToString("O"), items, project.Status == "building" && blocked is null, blocked);
@@ -93,7 +93,7 @@ public sealed class LaunchReviewStore(ApplicationDatabase database)
         }
         catch (JsonException) { return 0; }
     }
-    private static Project Read(DbDataReader reader) => new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.ReadInt32(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.GetString(7));
+    private static Project Read(DbDataReader reader) => new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.ReadInt32(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.GetString(7), reader.ReadInt32(8));
     private static void RequireOwner(AuthUser user)
     { if (!user.IsPlatformOwner) throw new LaunchReviewException("Platform owner access is required.", 403, "launch_forbidden"); }
     private static DbCommand Command(DbConnection db, DbTransaction tx, string sql, params (string Name, object Value)[] values)

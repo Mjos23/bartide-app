@@ -20,6 +20,7 @@ using TideCasa.Api.Features.Referrals;
 using TideCasa.Api.Features.LaunchReview;
 using TideCasa.Api.Features.BusinessPosts;
 using TideCasa.Api.Features.SalesPipeline;
+using TideCasa.Api.Features.EmailTracking;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16 * 1024);
@@ -56,6 +57,8 @@ builder.Services.AddScoped<ReferralStore>();
 builder.Services.AddTideCasaLaunchReview();
 builder.Services.AddTideCasaBusinessPosts(builder.Configuration);
 builder.Services.AddSingleton<SalesPipelineStore>();
+builder.Services.AddSingleton<EmailTrackingSchema>();
+builder.Services.AddSingleton<EmailTrackingStore>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -113,6 +116,7 @@ app.MapReferrals();
 app.MapTideCasaLaunchReview();
 app.MapTideCasaBusinessPosts();
 app.MapSalesPipeline();
+if (!builder.Configuration.GetValue<bool>("PublicDemo:Enabled")) app.MapEmailTracking();
 if (app.Services.GetRequiredService<ApplicationDatabase>().IsPostgreSql)
     await app.Services.GetRequiredService<PostgresSchemaMigrator>().InitializeAsync();
 else
@@ -122,6 +126,18 @@ else
     await app.Services.GetRequiredService<FeatureMigrator>().InitializeAsync();
 }
 await app.Services.GetRequiredService<SalesPipelineStore>().InitializeAsync();
+if (!builder.Configuration.GetValue<bool>("PublicDemo:Enabled"))
+{
+    await app.Services.GetRequiredService<EmailTrackingSchema>().InitializeAsync();
+    await app.Services.GetRequiredService<EmailTrackingStore>().InitializeAsync();
+}
+// Allow the schema owner to apply reviewed migrations without starting HTTP or background workers.
+if (builder.Configuration.GetValue<bool>("Storage:MigrateOnly"))
+{
+    app.Logger.LogInformation("Database initialization completed; migration-only mode is exiting.");
+    await app.DisposeAsync();
+    return;
+}
 app.Run();
 
 public partial class Program;

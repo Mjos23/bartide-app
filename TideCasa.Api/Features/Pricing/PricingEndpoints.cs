@@ -1,4 +1,5 @@
 using TideCasa.Contracts;
+using TideCasa.Api.Features.ServiceBilling;
 
 namespace TideCasa.Api.Features.Pricing;
 
@@ -12,7 +13,7 @@ public static class PricingEndpoints
             if (!string.IsNullOrWhiteSpace(request.ReferralCode))
                 return Results.Problem(statusCode: 503, title: "Referral validation is not connected yet. Your code has not been applied.");
             var stores = request.AppStores ? 30000 : 0;
-            return Results.Ok(new PackageQuote(60000, stores, 0, 5000, 65000 + stores, 5000, "usd", "2026-09-maintenance-v1"));
+            return Results.Ok(new PackageQuote(60000, stores, 0, 0, 60000 + stores, ServiceBillingProvider.MonthlyCents, "usd", ServiceBillingProvider.TermsVersion));
         }).WithName("QuotePackage").WithTags("Pricing").Produces<PackageQuote>().ProducesProblem(503);
     }
 }

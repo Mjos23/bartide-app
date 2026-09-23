@@ -14,7 +14,9 @@ public sealed class BillingException(string message, int status = 409, string co
 public sealed class ServiceBillingProvider : IDisposable
 {
     public const string ApiVersion = "2026-08-26.dahlia";
-    public const string TermsVersion = "2026-09-maintenance-v1";
+    public const string TermsVersion = "2026-09-maintenance-v2";
+    public const int MonthlyCents = 14900;
+    public const int MaintenanceDelayDays = 30;
     public const string Purpose = "tide_service_v2";
     private readonly StripeClient? stripe;
     private readonly HttpClient? http;

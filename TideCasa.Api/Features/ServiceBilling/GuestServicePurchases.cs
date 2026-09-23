@@ -57,6 +57,8 @@ public sealed partial class ServiceBillingStore
                 if (!B(doc.RootElement, "guest") || S(doc.RootElement, "checkoutHash") != hash) throw Missing();
                 if (existing.Status == "paid" && existing.SessionId is not null)
                     return new(existing.Id, "/purchase/complete/" + existing.Id + "/" + existing.SessionId, existing.Environment, true);
+                if (S(doc.RootElement, "termsVersion") != TermsVersion)
+                    throw new BillingException("Pricing has changed. Close this unpaid checkout and review the current terms.", 409, "guest_options_saved");
                 // Changing options must first close the old unpaid Stripe session.
                 if (existing.AppStores != request.AppStores || S(doc.RootElement, "plan") != request.Plan)
                     throw new BillingException("A checkout is already open. Return to its saved options or close it before choosing again.", 409, "guest_options_saved");
@@ -73,9 +75,9 @@ public sealed partial class ServiceBillingStore
                 if (await Count(db, tx, "SELECT COUNT(*) FROM bartide_customers WHERE id=@id AND user_id IS NULL AND email=@email AND status='draft'", ct, ("@id", tenant), ("@email", hash + "@purchase.invalid")) != 1) throw Review();
                 var initial = 60000 + (request.AppStores ? 30000 : 0);
                 var snapshot = JsonSerializer.Serialize(new { guest = true, checkoutHash = hash, plan = request.Plan, origin = provider.Origin, expires = DateTimeOffset.UtcNow.AddHours(23).ToUnixTimeSeconds(), termsVersion = TermsVersion, consentedAt = now, appStores = request.AppStores,
-                    methodConfigurationId = provider.MethodConfiguration, quote = new { setupCents = 60000, storesCents = request.AppStores ? 30000 : 0, initialCents = initial, monthlyCents = 5000, firstCents = initial + 5000, discountCents = 0 } });
-                await Run(db, tx, "INSERT INTO tide_service_orders(id,tenant_id,environment,request_json,initial_cents,monthly_cents,total_cents,app_stores,created_at,updated_at) VALUES(@id,@tenant,@environment,@request,@initial,5000,@total,@stores,@now,@now)", ct,
-                    ("@id", id), ("@tenant", tenant), ("@environment", provider.Environment), ("@request", snapshot), ("@initial", initial), ("@total", initial + 5000), ("@stores", request.AppStores ? 1 : 0), ("@now", now));
+                    methodConfigurationId = provider.MethodConfiguration, quote = new { setupCents = 60000, storesCents = request.AppStores ? 30000 : 0, initialCents = initial, monthlyCents = MonthlyCents, maintenanceDelayDays = MaintenanceDelayDays, firstCents = initial, discountCents = 0 } });
+                await Run(db, tx, "INSERT INTO tide_service_orders(id,tenant_id,environment,request_json,initial_cents,monthly_cents,total_cents,app_stores,created_at,updated_at) VALUES(@id,@tenant,@environment,@request,@initial,@monthly,@total,@stores,@now,@now)", ct,
+                    ("@id", id), ("@tenant", tenant), ("@environment", provider.Environment), ("@request", snapshot), ("@initial", initial), ("@total", initial), ("@monthly", MonthlyCents), ("@stores", request.AppStores ? 1 : 0), ("@now", now));
                 order = (await Orders(db, tx, "WHERE id=@id", ct, ("@id", id))).Single();
             }
             await tx.CommitAsync(ct);

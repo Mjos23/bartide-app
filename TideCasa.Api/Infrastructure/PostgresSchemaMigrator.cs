@@ -24,6 +24,12 @@ public sealed class PostgresSchemaMigrator(ApplicationDatabase database)
         if (!database.IsPostgreSql)
             throw new InvalidOperationException("The PostgreSQL migrator requires the PostgreSQL storage provider.");
         var bundle = LoadBaseline();
+        const string upgradeResource = ResourcePrefix + "0002_service_pricing.sql";
+        using var upgradeStream = typeof(PostgresSchemaMigrator).Assembly.GetManifestResourceStream(upgradeResource)
+            ?? throw new InvalidOperationException("Missing pricing migration.");
+        using var upgradeMemory = new MemoryStream(); upgradeStream.CopyTo(upgradeMemory);
+        var upgradeBytes = upgradeMemory.ToArray(); var upgradeHash = Hash(upgradeBytes);
+        var upgradeSql = new UTF8Encoding(false, true).GetString(upgradeBytes);
         await using var connection = await database.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
@@ -78,7 +84,7 @@ public sealed class PostgresSchemaMigrator(ApplicationDatabase database)
             {
                 history.Add(new(Convert.ToInt32(reader.GetValue(0), CultureInfo.InvariantCulture),
                     reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4)));
-                if (history.Count > 1)
+                if (history.Count > 2)
                     throw new InvalidOperationException("The PostgreSQL migration history contains unknown versions. A reviewed migration is required.");
             }
         }
@@ -114,8 +120,22 @@ public sealed class PostgresSchemaMigrator(ApplicationDatabase database)
                 entry.Sha256 != bundle.Entry.Sha256 || entry.ManifestSha256 != bundle.ManifestHash)
                 throw new InvalidOperationException("The PostgreSQL migration history or immutable checksums differ from the embedded baseline. No schema changes were applied.");
             ValidateBaseline(metadata, bundle.Manifest);
-            if (entry.SchemaSha256 != SchemaHash(metadata))
+            if (history.Count == 2 && (history[1].Version != 2 || history[1].ResourceName != upgradeResource
+                || history[1].Sha256 != upgradeHash || history[1].ManifestSha256 != upgradeHash))
+                throw new InvalidOperationException("The pricing migration checksum differs from its recorded history.");
+            if (history[^1].SchemaSha256 != SchemaHash(metadata))
                 throw new InvalidOperationException("The recorded PostgreSQL schema has drifted. Review table, column, constraint, index, trigger and parsing-function definitions before starting.");
+        }
+        if (history.Count < 2)
+        {
+            await ExecuteAsync(connection, transaction, upgradeSql, cancellationToken);
+            metadata = await ReadMetadataAsync(connection, transaction, bundle.Manifest, cancellationToken);
+            ValidateBaseline(metadata, bundle.Manifest);
+            await using var record = connection.CreateCommand(); record.Transaction = transaction;
+            record.CommandText = "INSERT INTO tide_postgres_migrations(version,resource_name,sha256,manifest_sha256,schema_sha256,applied_at) VALUES(2,@resource,@hash,@hash,@schema,@now)";
+            record.Parameters.AddWithValue("@resource", upgradeResource); record.Parameters.AddWithValue("@hash", upgradeHash);
+            record.Parameters.AddWithValue("@schema", SchemaHash(metadata)); record.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            await record.ExecuteNonQueryAsync(cancellationToken);
         }
         await transaction.CommitAsync(cancellationToken);
     }
@@ -143,7 +163,7 @@ public sealed class PostgresSchemaMigrator(ApplicationDatabase database)
             throw new InvalidOperationException("The PostgreSQL migration manifest has an unexpected version or checksum.");
         var scripts = assembly.GetManifestResourceNames()
             .Where(name => name.StartsWith(ResourcePrefix, StringComparison.Ordinal) && name.EndsWith(".sql", StringComparison.Ordinal)).ToArray();
-        if (scripts.Length != 1 || scripts[0] != entry.ResourceName)
+        if (scripts.Length != 2 || !scripts.Contains(entry.ResourceName) || !scripts.Contains(ResourcePrefix + "0002_service_pricing.sql"))
             throw new InvalidOperationException("The embedded PostgreSQL scripts do not match their manifest.");
         static bool Identifier(string value) => Regex.IsMatch(value, "^[a-z][a-z0-9_]{0,62}$", RegexOptions.CultureInvariant);
         if (manifest.Tables.Select(table => table.Name).Distinct(StringComparer.Ordinal).Count() != manifest.Tables.Count ||

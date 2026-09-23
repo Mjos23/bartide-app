@@ -10,7 +10,7 @@
         @if (error is not null) { <p class="ordering-notice" role="alert">@error</p> }
         @if (workspace is not null)
         {
-            <p>Approve a finished app after its seven-day build period and a review with the customer. Publishing changes its availability in this app; it does not deploy a website or change billing.</p>
+            <p>Approve a finished app after its scheduled build period and a review with the customer. Publishing changes its availability in this app; it does not deploy a website or change billing.</p>
             @if (LaunchReviewFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
             @if (workspace.Projects.Count == 0) { <p>No projects are available on this page.</p> }
             @foreach (var project in workspace.Projects)

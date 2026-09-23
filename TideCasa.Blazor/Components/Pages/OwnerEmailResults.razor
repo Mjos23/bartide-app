@@ -1,0 +1,64 @@
+@page "/owner/email-results"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.EmailTracking
+@inject EmailTrackingClient Api
+<PageTitle>Email results | Tide Casa</PageTitle>
+<HeadContent><link rel="stylesheet" href="/email-results.css" /></HeadContent>
+<div class="bt-unified rewards-page email-results"><header class="rewards-nav"><a href="/account">← Your account</a><a href="/owner/sales">Sales pipeline</a></header><main class="rewards-main">
+    <p class="bt-one-kicker">FROM EMAIL TO YOUR APP.</p><h1>Email results.</h1>
+    <p>See visits from your email links and the next links people select.</p>
+    @if (error is not null) { <p role="alert">@error</p> }
+    @if (report is not null)
+    {
+        @if (Notice == "saved") { <p class="rewards-notice" role="status">Campaign saved. Its link is ready to add to your email. No email was sent.</p> }
+        @if (Notice is "failed" or "expired") { <p class="rewards-notice" role="alert">The campaign could not be saved. Refresh and check your entries before trying again.</p> }
+        <nav class="email-tabs" aria-label="Email result type"><a href="/owner/email-results" aria-current="@(!Tests ? "page" : null)">Production campaigns</a><a href="/owner/email-results?tests=true" aria-current="@(Tests ? "page" : null)">Test campaigns</a></nav>
+        <p class="rewards-note">@(Tests ? "TEST DATA — These visits are excluded from production results." : "Production results exclude every test campaign.") Results cover the last 90 days.</p>
+        <details class="rewards-panel"><summary>Create an email campaign</summary>
+            <form method="post" action="/owner/email-results/create" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="requestKey" value="@requestKey" />
+                <label>Campaign name<input name="name" required maxlength="100" placeholder="BarTide introduction — September" /></label>
+                <label>Campaign type<select name="mode"><option value="test">Test — excluded from production</option><option value="production">Production</option></select></label>
+                <button type="submit">Create tracking link</button>
+            </form><p class="rewards-note">This creates a link only. It does not send email.</p>
+        </details>
+        @if (report.Campaigns.Count == 0) { <p>No campaigns here yet. Use the test view to check the prepared email.</p> }
+        else
+        {
+            <form method="get" action="/owner/email-results" class="email-select" data-enhance="false"><input type="hidden" name="tests" value="@Tests.ToString().ToLowerInvariant()" /><label>Campaign<select name="campaign">@foreach (var c in report.Campaigns) { <option value="@c.Id" selected="@(c.Id == report.SelectedId)">@c.Name</option> }</select></label><button type="submit">Show results</button></form>
+            @if (report.Campaigns.FirstOrDefault(c => c.Id == report.SelectedId) is { } selected)
+            {
+                <h2>@selected.Name</h2>
+                <div class="email-metrics"><article><strong>@selected.Visits</strong><span>Email-link visits</span></article><article><strong>@selected.DemoClicks</strong><span>Visits selecting a demo</span></article><article><strong>@selected.PurchaseClicks</strong><span>Visits selecting purchase</span></article><article><strong>@selected.ContactClicks</strong><span>Visits selecting contact</span></article><article><strong>@selected.SampleClicks</strong><span>Visits selecting the sample</span></article></div>
+                <section class="rewards-panel"><h3>Email CTA link</h3><label>Copy this full address into your email’s link field<input class="email-link" readonly value="@EmailCampaignDefaults.Link(selected.LinkToken)" aria-label="Email campaign link" /></label>
+                    <p><a href="@EmailCampaignDefaults.Link(selected.LinkToken)" target="_blank" rel="noopener">Preview the campaign destination ↗</a></p><p class="rewards-note">Opening this link records a visit. Use a test campaign while checking your email.</p>
+                </section>
+                <h3>Click pathways</h3>
+                @if (report.Pathways.Count == 0) { <p>No visits recorded yet.</p> }
+                else { <div class="email-table"><table><thead><tr><th>Path selected</th><th>Visits</th></tr></thead><tbody>@foreach (var path in report.Pathways) { <tr><td>@path.Path</td><td>@path.Visits</td></tr> }</tbody></table></div> }
+                <p class="rewards-note">The 20 most common paths among up to 1,000 recent visits are shown. Totals above cover all visits in the last 90 days. Each visit lasts up to 30 minutes; repeated consecutive clicks are counted once. Selections of Tide Casa and hosted-demo links are included; activity after leaving BarTide is not joined to this visit. Clicks are link selections, not proof of a submitted demo request or completed payment.</p>
+            }
+        }
+        <section class="rewards-panel email-coverage"><h2>What these results measure</h2><p><strong>Sent, delivered, opened and bounced:</strong> unavailable. Gmail drafts and manual sends do not report those events to this dashboard.</p><p>Visits are anonymous browser sessions, not unique people. Email security scanners and automated traffic may count. Click tracking needs JavaScript and first-party cookies; privacy settings and network failures can leave gaps. No email addresses, page-query details or visitor IP addresses are stored in these reports.</p><p>Only home, pricing, demo, contact, purchase and sample-app links are tracked after an email visit. Demo submissions and completed payments are not reported as conversions here.</p></section>
+    }
+</main></div>
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "tests")] public bool Tests { get; set; }
+    [SupplyParameterFromQuery(Name = "campaign")] public string? Campaign { get; set; }
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    private EmailCampaignReport? report;
+    private string? error;
+    private readonly string requestKey = Guid.NewGuid().ToString();
+    protected override async Task OnInitializedAsync()
+    {
+        if ((HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.User.IsPlatformOwner != true) { HttpContext.Response.StatusCode = 403; error = "This report requires Tide Casa owner access."; return; }
+        if (Campaign?.Length > 100) { error = "Choose a valid campaign."; return; }
+        if (HttpContext.Items[AuthFlow.TokenItem] is string token)
+        {
+            var result = await Api.SendAsync<EmailCampaignReport>(EmailTrackingFlow.OwnerApi + "?tests=" + Tests.ToString().ToLowerInvariant() + "&campaign=" + Uri.EscapeDataString(Campaign ?? ""), HttpMethod.Get, null, token, HttpContext.RequestAborted);
+            if (result.Succeeded && result.Value is not null) report = result.Value;
+            else { error = "Email results could not be loaded. Please refresh shortly."; HttpContext.Response.StatusCode = (int)result.Status == 403 ? 403 : 503; }
+        }
+    }
+}

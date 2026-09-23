@@ -10,12 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 FOLDERS = (
     'TideCasa.Api', 'TideCasa.Blazor', 'TideCasa.Contracts', 'SharedHosting',
     'TideCasa.Domain', 'TideCasa.Domain.Checks', 'TideCasa.MigrationTool',
-    'TideCasa.Persistence.Checks', 'deploy/app-platform',
+    'TideCasa.Persistence.Checks', 'TideCasa.EmailTracking.Checks', 'deploy/app-platform',
 )
 EXCLUDED_DIRS = {'bin', 'obj', 'app_data', '.git', '.tools', 'secrets', 'usersecrets', 'properties', 'simulation', '__pycache__'}
 EXCLUDED_NAMES = {'restaurantshowcase.razor', 'restaurantshowcasegallery.razor', 'restaurant-showcase.css'}
 ALLOWED_SUFFIXES = {'.cs', '.csproj', '.razor', '.css', '.js', '.json', '.sql', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.ico', '.woff', '.woff2', '.ttf', '.webmanifest', '.pdf', '.html', '.mp4', '.md', '.py', '.yaml'}
-TEXT_SUFFIXES = {'.cs', '.csproj', '.razor', '.css', '.js', '.json', '.sql', '.svg', '.webmanifest', '.html', '.md', '.py', '.yaml', '.slnx', '.crt'}
+TEXT_SUFFIXES = {'.cs', '.csproj', '.razor', '.css', '.js', '.cjs', '.json', '.sql', '.svg', '.webmanifest', '.html', '.md', '.py', '.yaml', '.slnx', '.crt'}
 PUBLIC_CERTIFICATES = {'deploy/app-platform/supabase-prod-ca-2021.crt': '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7'}
 SECRET = re.compile(rb'(?:[sr]k_(?:live|test)_[A-Za-z0-9]{16,}|AKIA[A-Z0-9]{16}|-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----)')
 
@@ -37,7 +37,8 @@ def main():
     target = ROOT / '.tools/release-source' / stamp
     target.mkdir(parents=True, exist_ok=False)
     inputs = [p for folder in FOLDERS for p in (ROOT / folder).rglob('*') if p.is_file() and selected(p)]
-    inputs += [ROOT / name for name in ('.dockerignore', 'global.json', 'TideCasa.slnx', 'docs/postgresql-schema.md')]
+    inputs += [ROOT / name for name in ('.dockerignore', 'global.json', 'TideCasa.slnx', 'docs/postgresql-schema.md', 'docs/EMAIL-RESULTS.md', 'docs/PRICING-EMAIL-RELEASE.md')]
+    inputs += [ROOT / 'scripts/verify-email-click-paths.cjs']
     inputs += [p for p in (ROOT / 'scripts').glob('*.py') if not p.name.startswith(('start-local', 'prepare-ordering', 'package-tested'))]
     manifest = {}
     for path in sorted(set(inputs)):

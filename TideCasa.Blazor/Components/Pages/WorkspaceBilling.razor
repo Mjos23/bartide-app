@@ -39,17 +39,17 @@
                         <dl class="billing-total">
                             <div><dt>App setup · one time</dt><dd>@Money(quote.SetupCents)</dd></div>
                             @if (quote.AppStores) { <div><dt>App-store submission support · one time</dt><dd>@Money(quote.StoresCents)</dd></div> }
-                            <div><dt>First month of maintenance</dt><dd>$50.00</dd></div>
+                            <div><dt>Maintenance due today</dt><dd>$0.00</dd></div>
                             @if (quote.DiscountCents > 0) { <div class="billing-discount"><dt>Referral savings included</dt><dd>@Money(quote.DiscountCents)</dd></div> }
                             <div class="billing-grand"><dt>First payment</dt><dd>@Money(quote.FirstPaymentCents)</dd></div>
                         </dl>
-                        <p class="billing-renewal">Then <strong>$50 each month</strong> for hosting and basic app upkeep, until you cancel renewal.</p>
+                        <p class="billing-renewal">Starting 30 days after purchase, <strong>$149 each month</strong> for hosting and basic app upkeep, until you cancel renewal.</p>
                         <form method="post" action="@($"/service-billing/{TenantId}/checkout")" data-enhance="false" class="billing-consent">
                             <AntiforgeryToken /><input type="hidden" name="requestId" value="@RequestId" />
                             <input type="hidden" name="appStores" value="@(quote.AppStores ? "true" : "false")" />
                             <input type="hidden" name="referralCode" value="@(quote.ReferralCode ?? "")" />
                             <input type="hidden" name="quoteFingerprint" value="@quote.Fingerprint" /><input type="hidden" name="termsVersion" value="@quote.TermsVersion" />
-                            <label class="billing-choice"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I agree to pay @Money(quote.FirstPaymentCents) now, followed by an automatic $50 monthly renewal until canceled. I have reviewed the <a href="/service-terms" target="_blank" rel="noopener">service terms</a>.</span></label>
+                            <label class="billing-choice"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I agree to pay @Money(quote.FirstPaymentCents) now, followed by automatic $149 monthly payments starting 30 days after purchase until canceled. My app has a 30-day build lead time. I have reviewed the <a href="/service-terms" target="_blank" rel="noopener">service terms</a>.</span></label>
                             <button class="bt-one-button" type="submit" disabled="@(!workspace.CheckoutAvailable)">Continue to secure checkout</button>
                         </form>
                         @if (!workspace.CheckoutAvailable) { <p class="billing-note">@workspace.AvailabilityMessage</p> }
@@ -70,7 +70,7 @@
                         {
                             <form method="post" action="@($"/service-billing/{TenantId}/orders/{order.Id}/resume-checkout")" data-enhance="false" class="billing-action">
                                 <AntiforgeryToken /><input type="hidden" name="requestId" value="@Guid.NewGuid().ToString("D")" />
-                                <label class="billing-choice"><input type="checkbox" name="confirmed" value="true" required /><span>Continue my saved @Money(order.FirstPaymentCents) checkout, then $50/month until renewal is canceled.</span></label>
+                                <label class="billing-choice"><input type="checkbox" name="confirmed" value="true" required /><span>Continue my saved @Money(order.FirstPaymentCents) checkout, then @Money(order.MonthlyCents)/month @(order.FirstPaymentCents == order.InitialCents ? "starting 30 days after purchase" : "after the first included month") until renewal is canceled.</span></label>
                                 <button class="bt-one-button" type="submit">Continue saved checkout</button>
                             </form>
                         }
@@ -93,7 +93,7 @@
                     @foreach (var invoice in order.Invoices)
                     {
                         <article class="billing-invoice">
-                            <div><strong>@(invoice.Kind == "initial" ? "Setup and first month" : "Monthly maintenance")</strong><p>@Status(invoice.Status) · @Money(invoice.AmountCents)</p></div>
+                            <div><strong>@(invoice.Kind == "initial" ? (order.FirstPaymentCents == order.InitialCents ? "App setup" : "Setup and first month") : "Monthly maintenance")</strong><p>@Status(invoice.Status) · @Money(invoice.AmountCents)</p></div>
                             @if (invoice.Url is not null) { <a href="@invoice.Url" target="_blank" rel="noopener noreferrer">Open invoice ↗</a> }
                             @if (invoice.RefundedCents > 0) { <p class="billing-note">Refunded: @Money(invoice.RefundedCents)</p> }
                             @if (invoice.RefundPendingCents > 0) { <p class="billing-note">Refund pending: @Money(invoice.RefundPendingCents)</p> }

@@ -11,7 +11,7 @@ else
 {
     @if (dashboard.Owner)
     {
-        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Sales engineer applications</h2><p>Approve profiles and choose their customer discount. Discounts apply only to initial setup and the optional app-store package. Maintenance stays $50/month.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
+        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Sales engineer applications</h2><p>Approve profiles and choose their customer discount. Discounts apply only to initial setup and the optional app-store package. Maintenance stays $149/month.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
         @if (dashboard.Applications.Count == 0) { <p>No applications yet.</p> }
         @if (dashboard.Applications.Count == 200) { <p>The latest 200 applications are shown, with pending applications first.</p> }
         @foreach (var application in dashboard.Applications)

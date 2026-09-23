@@ -15,6 +15,7 @@ using TideCasa.Blazor.Features.Referrals;
 using TideCasa.Blazor.Features.LaunchReview;
 using TideCasa.Blazor.Features.BusinessPosts;
 using TideCasa.Blazor.Features.SalesPipeline;
+using TideCasa.Blazor.Features.EmailTracking;
 using TideCasa.Blazor.Components;
 using TideCasa.Blazor.Services;
 using System.Net;
@@ -144,9 +145,14 @@ builder.Services.AddHttpClient<SalesPipelineClient>(client =>
 {
     client.BaseAddress = authApiBase; client.Timeout = TimeSpan.FromSeconds(20); client.MaxResponseContentBufferSize = 2 * 1024 * 1024;
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }).RemoveAllLoggers();
+builder.Services.AddHttpClient<EmailTrackingClient>(client =>
+{
+    client.BaseAddress = authApiBase; client.Timeout = TimeSpan.FromSeconds(3); client.MaxResponseContentBufferSize = 2 * 1024 * 1024;
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }).RemoveAllLoggers();
 var app = builder.Build();
 app.UseAppPlatformIngress(builder.Configuration, api: false);
 app.UseForwardedHeaders();
+app.UseEmailTracking();
 app.UseGuestPurchaseCookie();
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
 app.UsePublicSeo();
@@ -198,6 +204,7 @@ app.MapReferralForms();
 app.MapTideCasaLaunchReview();
 app.MapBusinessPostForms();
 app.MapSalesPipelineForms();
+app.MapEmailTrackingForms();
 app.MapGet("/start", (HttpContext context) => Results.LocalRedirect("/start/" + (context.Request.Query["business"] == "general" ? "business" : "restaurant")
     + "?referralCode=" + Uri.EscapeDataString(context.Request.Query["ref"].ToString()[..Math.Min(context.Request.Query["ref"].ToString().Length, 32)])));
 app.MapPublicSeo();
