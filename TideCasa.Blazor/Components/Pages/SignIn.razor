@@ -4,7 +4,7 @@
 @inherits AuthPageBase
 
 <PageTitle>Welcome back. | Tide Casa</PageTitle>
-<AuthFrame Title="Welcome back." Description="Sign in to your business workspace.">
+<AuthFrame Title="Welcome back." Description="Sign in for your orders, rewards or team workspace.">
     @if (NoticeText is not null) { <p role="status">@NoticeText</p> }
     <form method="post" action="/auth/session/signin" data-enhance="false">
         <AntiforgeryToken />

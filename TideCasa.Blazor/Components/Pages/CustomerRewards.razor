@@ -6,6 +6,7 @@
 <PageTitle>Your rewards | BarTide</PageTitle>
 <div class="bt-unified rewards-page"><header class="rewards-nav"><a href="@($"/order/{Uri.EscapeDataString(Slug)}")">← Menu and ordering</a><a href="/account">Your account</a></header><main class="rewards-main">
 <p class="bt-one-kicker">COME BACK FOR MORE</p><h1>@(wallet?.Name ?? "Your rewards")</h1>
+<p><a href="@($"/customer/{Uri.EscapeDataString(Slug)}")">My orders &amp; cooking progress →</a></p>
 @if (RewardsFlow.Notice(Notice) is { } notice) { <p class="rewards-notice" role="status">@notice</p> }
 @if (error is not null) { <p role="alert">@error</p> }
 @if (wallet is not null)

@@ -1,0 +1,54 @@
+@page "/customer/{Slug}"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@inject RestaurantOrderingClient Api
+@inject IConfiguration Configuration
+<PageTitle>My orders &amp; rewards | @(orders?.RestaurantName ?? "BarTide")</PageTitle>
+<div class="bt-unified customer-home" data-enhance-nav="false"><main>
+    <a class="customer-back" href="@($"/order/{Uri.EscapeDataString(Slug)}")">← Menu &amp; ordering</a>
+    <p class="bt-one-kicker">@(orders?.RestaurantName ?? "Your restaurant")</p><h1>My orders &amp; rewards</h1>
+    <p>Signed in as <strong>@account?.User.DisplayName</strong>.</p>
+    @if (Demo) { <p class="customer-note">Shared fictional account · sample orders and rewards only. <a href="/access/gulf-lantern/customer">Switch customer</a></p> }
+    <nav class="customer-actions" aria-label="Your restaurant account"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")">My rewards →</a><a href="@($"/events/{Uri.EscapeDataString(Slug)}")">Events &amp; reservations →</a><a href="@($"/access/{Uri.EscapeDataString(Slug)}/staff")">Staff login →</a></nav>
+    <section class="customer-card" data-customer-save-panel hidden><h2>Have an order open on this device?</h2><p>Save its private receipt to this account so you can return to it later, including from another signed-in device.</p><button class="bt-one-button" type="button" data-customer-save>Save my current order</button><p role="status" data-customer-save-message></p></section>
+    <section data-customer-orders data-slug="@Slug" data-user="@account?.User.UserId">
+        <div class="customer-section-title"><h2>My orders</h2><a href="@($"/customer/{Uri.EscapeDataString(Slug)}")">Refresh</a></div>
+        @if (error is not null) { <p role="alert">@error</p> }
+        else if (orders?.Orders.Count == 0) { <section class="customer-card"><h3>Your next good meal starts here.</h3><p>Orders you place while signed in will appear here. Already ordered as a guest? Save your current receipt above.</p><a href="@($"/order/{Uri.EscapeDataString(Slug)}")">Browse the menu →</a></section> }
+        else if (orders is not null)
+        {
+            <p class="customer-note">Latest 30 saved orders from the last 90 days. Active orders refresh every 30 seconds while this page is open.</p>
+            <p class="customer-note" role="status" data-customer-status>Checked just now.</p>
+            @foreach (var order in orders.Orders)
+            {
+                <article class="customer-card" data-order="@order.OrderId" data-active="@(!CustomerOrderStatus.Finished(order.Status) ? "true" : "false")">
+                    <div class="customer-section-title"><h3>Order @order.Number</h3><span>@Money(order.Quote.TotalCents)</span></div>
+                    <p><time datetime="@order.CreatedAt">@DateTimeOffset.Parse(order.CreatedAt).ToString("MMM d, yyyy · h:mm tt 'UTC'")</time> · @order.Quote.Fulfillment</p>
+                    <strong class="customer-order-state" data-order-state>@CustomerOrderStatus.Label(order.Status)</strong>
+                    <p class="customer-note">Sent → Accepted → Cooking → Ready@(order.Quote.Fulfillment == "delivery" ? " → On the way → Delivered" : " → Complete")</p>
+                    <ul>@foreach (var line in order.Quote.Lines) { <li>@line.Quantity × @line.Name<OrderLineChoices Line="line" /></li> }</ul>
+                    <p class="customer-note">For changes or payment questions, please contact the restaurant. Rewards are credited after staff verify eligible purchases.</p>
+                </article>
+            }
+        }
+    </section>
+    <form method="post" action="/auth/session/signout" data-enhance="false"><AntiforgeryToken /><button class="customer-signout" type="submit">Sign out</button></form>
+</main></div>
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private AccountOverview? account;
+    private CustomerOrders? orders;
+    private string? error;
+    private bool Demo => PublicDemoWeb.Enabled(Configuration);
+    private static string Money(int cents) => (cents / 100m).ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+    protected override async Task OnInitializedAsync()
+    {
+        HttpContext.Response.Headers.CacheControl = "no-store";
+        account = HttpContext.Items[AuthFlow.AccountItem] as AccountOverview;
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to see your orders."; return; }
+        var result = await Api.CustomerOrdersAsync(Slug, token, HttpContext.RequestAborted);
+        if (result.Succeeded) orders = result.Value;
+        else { error = "We couldn’t check your orders. Refresh to try again."; HttpContext.Response.StatusCode = result.Uncertain ? 503 : 404; }
+    }
+}

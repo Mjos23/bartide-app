@@ -78,7 +78,7 @@ public static class AuthFlow
         { return Failure(400, "The form has expired. Reload the page and try again."); }
 
         var returnTo = SafeReturnPath(form["return_to"].ToString());
-        if (demo && returnTo is not ("/account" or "/rewards/gulf-lantern")) returnTo = "/account";
+        if (demo && returnTo is not ("/account" or "/rewards/gulf-lantern" or "/customer/gulf-lantern")) returnTo = "/account";
         if (action == "signout")
         {
             var auth = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);

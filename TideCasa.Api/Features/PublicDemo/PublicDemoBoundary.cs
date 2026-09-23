@@ -58,7 +58,8 @@ public static class PublicDemoBoundary
         Add("POST", tenant, "/delivery-location/settings", "/delivery-location/{orderId}/start", "/delivery-location/{orderId}/point", "/delivery-location/{orderId}/stop");
         Add("DELETE", tenant, "/team/shifts/{shiftId}", "/team/lessons/{lessonId}");
         const string restaurant = "/api/v1/restaurants/{slug}";
-        Add("GET", restaurant, "/menu", "/tables/{token}/qr", "/events", "/events/mine", "/rewards", "/posts");
+        Add("GET", restaurant, "/my-orders", "/menu", "/tables/{token}/qr", "/events", "/events/mine", "/rewards", "/posts");
+        Add("POST", restaurant, "/my-orders");
         Add("POST", restaurant, "/delivery-location", "/quote", "/orders", "/track", "/events/{eventId}/rsvp", "/rewards/join", "/rewards/redemptions/{rewardId}/request", "/rewards/points-redemptions");
         Add("GET", "/api/v1/tenants/{tenant}/media", "", "/{kind}/{id}");
         Add("HEAD", "/api/v1/tenants/{tenant}/media", "/{kind}/{id}");

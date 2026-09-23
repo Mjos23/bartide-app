@@ -1,0 +1,61 @@
+@page "/access/{Slug}/{Audience}"
+@attribute [ExcludeFromInteractiveRouting]
+@inject IConfiguration Configuration
+@inject RestaurantOrderingClient Api
+<PageTitle>@(Staff ? "Staff login" : "Customer login") | @(menu?.Name ?? "BarTide")</PageTitle>
+<div class="bt-unified customer-home" data-enhance-nav="false"><main>
+    <a class="customer-back" href="@MenuPath">← Back to the menu</a>
+    @if (menu is null || Audience is not ("customer" or "staff"))
+    { <h1>Access unavailable</h1><p>Please return to the restaurant menu and try again.</p> }
+    else
+    {
+        <p class="bt-one-kicker">@menu.Name</p><h1>@(Staff ? "Welcome, team." : "Your table. Your perks.")</h1>
+        <p>@(Staff ? "Sign in to see the orders, schedule and tools your manager has given you access to." : "Sign in to keep your orders together, follow cooking progress and use your rewards.")</p>
+        @if (Demo)
+        {
+            <section class="customer-card"><h2>@(Staff ? "Try a staff login" : "Try a customer login")</h2><p>Choose a fictional person. This shared demo needs no password. Use sample details only.</p>
+                @foreach (var person in people)
+                {
+                    <form method="post" action="/auth/session/demo-switch" data-enhance="false"><AntiforgeryToken />
+                        <input type="hidden" name="person_key" value="@person.Key" /><input type="hidden" name="return_to" value="@Destination" />
+                        <button class="customer-person" type="submit"><strong>@person.Name</strong><span>@person.Title →</span></button>
+                    </form>
+                }
+            </section>
+        }
+        else
+        {
+            <section class="customer-card"><a class="bt-one-button" href="@("/signin?return_to=" + Uri.EscapeDataString(Destination))">Sign in</a>
+                @if (!Staff) { <p>First visit? <a href="@("/signup?return_to=" + Uri.EscapeDataString(Destination))">Create your free account</a>.</p> }
+                else { <p>Your manager adds your email and role to the restaurant team. Sign in with that same email. Creating an account alone does not grant staff access.</p> }
+            </section>
+        }
+        <p><a href="@($"/access/{Uri.EscapeDataString(Slug)}/{(Staff ? "customer" : "staff")}")">@(Staff ? "Looking for customer orders & rewards?" : "Work here? Staff login →")</a></p>
+        <p class="customer-note">You can still order from the menu without signing in.</p>
+    }
+</main></div>
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [Parameter] public string Audience { get; set; } = "customer";
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private RestaurantMenu? menu;
+    private bool Staff => Audience == "staff";
+    private bool Demo => PublicDemoWeb.Enabled(Configuration) && Slug == "gulf-lantern";
+    private string MenuPath => "/order/" + Uri.EscapeDataString(Slug);
+    private string Destination => Staff ? "/account" : "/customer/" + Uri.EscapeDataString(Slug);
+    private List<Person> people = [];
+    protected override async Task OnInitializedAsync()
+    {
+        if (Audience is not ("customer" or "staff")) { HttpContext.Response.StatusCode = 404; return; }
+        var result = await Api.GetMenuAsync(Slug, null, HttpContext.RequestAborted);
+        menu = result.Value;
+        if (menu is null) { HttpContext.Response.StatusCode = result.Uncertain ? 503 : 404; return; }
+        if (Demo)
+        {
+            using var fixture = System.Text.Json.JsonDocument.Parse(await System.IO.File.ReadAllTextAsync(Configuration["SampleBar:FixturePath"]!, HttpContext.RequestAborted));
+            people = fixture.RootElement.GetProperty("people").EnumerateArray().Where(p => (p.GetProperty("role").GetString() != "customer") == Staff)
+                .Select(p => new Person(p.GetProperty("key").GetString()!, p.GetProperty("name").GetString()!, p.GetProperty("title").GetString()!)).ToList();
+        }
+    }
+    private sealed record Person(string Key, string Name, string Title);
+}

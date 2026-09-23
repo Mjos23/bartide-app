@@ -1,0 +1,20 @@
+.customer-home { background:#f6f5ed; min-height:80vh; color:#173f38; }
+.customer-home main { max-width:760px; margin:auto; padding:28px 20px 64px; }
+.customer-home h1 { font-size:clamp(1.8rem,6vw,2.6rem); line-height:1.1; margin:22px 0 16px; }
+.customer-home p { line-height:1.6; }
+.customer-home a { color:#205e4e; }
+.customer-back { display:inline-block; padding:10px 0; }
+.customer-card { border:1px solid #cddccf; border-radius:18px; background:#fffdf8; padding:22px; margin:20px 0; }
+.customer-card[hidden] { display:none; }
+.customer-card h2,.customer-card h3 { margin-top:0; }
+.customer-card li { margin:10px 0; }
+.customer-note { color:#51685d; font-size:.88rem; }
+.customer-actions { display:flex; flex-wrap:wrap; gap:10px; margin:24px 0; }
+.customer-actions a { display:block; border:1px solid #becfbe; border-radius:22px; background:white; padding:12px 16px; text-decoration:none; }
+.customer-person { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; width:100%; padding:16px; margin:10px 0; background:#eef4ed; border:1px solid #b9cec1; border-radius:12px; color:#163e32; text-align:left; font:inherit; cursor:pointer; }
+.customer-person span { font-size:.88rem; }
+.customer-section-title { display:flex; align-items:baseline; justify-content:space-between; gap:16px; }
+.customer-order-state { display:block; padding:12px; border-radius:10px; background:#edf3e8; }
+.customer-signout { padding:12px 18px; background:transparent; border:1px solid #9cb29f; border-radius:10px; font:inherit; color:inherit; cursor:pointer; }
+.ordering-account-links { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; padding:10px 0 16px; }
+.ordering-account-links a { display:block; padding:10px 13px; color:#184d40; font-size:.88rem; border:1px solid #b9cec1; background:#fffdf8; border-radius:20px; text-decoration:none; }

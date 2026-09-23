@@ -12,7 +12,7 @@ public partial class RestaurantOrder : IAsyncDisposable
     private DateTimeOffset? deliveryCheckedAt;
     private TideCasa.Contracts.DeliveryLocationView? deliveryLocation;
     private DateTimeOffset locationCheckedAt;
-    private bool ShouldPollDelivery => !disposed && receipt?.Delivery is not null
+    private bool ShouldPollDelivery => !disposed && receipt is not null
         && receipt.Status is not ("completed" or "cancelled" or "delivered") && pending is not null;
 
     private async Task SyncDeliveryPollingAsync()

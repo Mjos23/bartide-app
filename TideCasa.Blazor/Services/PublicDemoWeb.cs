@@ -24,7 +24,13 @@ public static class PublicDemoWeb
         {
             var path = context.Request.Path.Value ?? "/";
             if (path == "/") { context.Response.Redirect("/order/gulf-lantern"); return; }
-            if (path == "/signin") { context.Response.Redirect("/sample-bar"); return; }
+            if (path is "/signin" or "/auth/signin")
+            {
+                var destination = Features.Authentication.AuthFlow.SafeReturnPath(context.Request.Query["return_to"].ToString());
+                context.Response.Redirect(destination.StartsWith("/customer/", StringComparison.Ordinal) || destination.StartsWith("/rewards/", StringComparison.Ordinal)
+                    ? "/access/gulf-lantern/customer" : "/access/gulf-lantern/staff");
+                return;
+            }
             if (path.StartsWith("/owner", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/start", StringComparison.OrdinalIgnoreCase)
                 || path.StartsWith("/account/referrals", StringComparison.OrdinalIgnoreCase)
                 || path.StartsWith("/workspace/", StringComparison.OrdinalIgnoreCase) && (path.Contains("/billing", StringComparison.OrdinalIgnoreCase) || path.Contains("/payments", StringComparison.OrdinalIgnoreCase))

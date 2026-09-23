@@ -37,6 +37,15 @@ public static class RestaurantOrderingEndpoints
             return Results.Content(renderer.GetGraphic(8), "image/svg+xml; charset=utf-8");
         });
 
+        var customer = app.MapGroup("/api/v1/restaurants/{slug}/my-orders").RequireAuthorization()
+            .RequireRateLimiting("delivery-status").WithMetadata(new TideCasa.Api.Infrastructure.ApiBodyLimit(4096))
+            .AddEndpointFilter<OrderingRequestFilter>().AddEndpointFilter(async (context, next) =>
+            { context.HttpContext.Response.Headers.CacheControl = "no-store"; return await next(context); });
+        customer.MapGet("", async (string slug, HttpContext context, RestaurantOrderingStore store, CancellationToken ct) =>
+            Results.Ok(await store.CustomerOrdersAsync(slug, User(context), ct)));
+        customer.MapPost("", async (string slug, RestaurantTrackingRequest request, HttpContext context, RestaurantOrderingStore store, CancellationToken ct) =>
+            Results.Ok(await store.SaveCustomerOrderAsync(slug, request, User(context), ct)));
+
         var owner = app.MapGroup("/api/v1/tenants/{id}/ordering").WithTags("Restaurant management")
             .RequireAuthorization().AddEndpointFilter<AuthRequestFilter>().AddEndpointFilter<OrderingRequestFilter>();
         owner.MapGet("", async (string id, HttpContext context, RestaurantOrderingStore store, CancellationToken ct) =>

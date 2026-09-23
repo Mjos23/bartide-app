@@ -12,6 +12,7 @@ public static partial class RestaurantOrderingFlow
 {
     public static IEndpointRouteBuilder MapRestaurantOrdering(this IEndpointRouteBuilder endpoints)
     {
+        MapCustomerOrders(endpoints);
         endpoints.MapGet("/ordering/qr/{slug}/{table}", QrAsync);
         endpoints.MapPost("/ordering/manage/{tenantId}/tables", CreateAsync).RequireAuthorization();
         endpoints.MapPost("/ordering/manage/{tenantId}/tables/{tableId}", SetAsync).RequireAuthorization();

@@ -29,6 +29,13 @@ public partial class RestaurantOrder
     private string customerName = "", phone = "", address = "", note = "", tableLabel = "";
     private string? error, loadedSlug, loadedTable;
     private bool loading, quoting, busy, uncertain, reviewing, connected;
+    private bool savedToAccount;
+    private async Task SaveToAccountAsync(string orderId)
+    {
+        if (pending is null) return;
+        try { savedToAccount = await JS.InvokeAsync<bool>("tideCustomerOrders.save", Slug, orderId, pending.TrackingKey); }
+        catch (JSException) { savedToAccount = false; }
+    }
     private int quoteRevision, menuRevision;
     private bool Locked => !connected || busy || uncertain;
     private bool CanReview => !Locked && !quoting && quote is { CanSubmit: true } && menu?.Checkout.AcceptingOrders == true;
@@ -118,7 +125,7 @@ public partial class RestaurantOrder
         ++quoteRevision;
         loadedSlug = Slug; loadedTable = TableToken;
         loading = true; error = null; menu = null; quote = null; receipt = null; pending = null;
-        checkout = null; cart.Clear(); customizations.Clear(); detailItem = null; reviewing = false; uncertain = false; busy = false; quoting = false;
+        checkout = null; savedToAccount = false; cart.Clear(); customizations.Clear(); detailItem = null; reviewing = false; uncertain = false; busy = false; quoting = false;
         tipChoice = "0"; customTip = ""; payment = "staff"; deliveryZip = ""; address = ""; tableLabel = "";
         if (Slug.Length > 128 || (TableToken?.Length ?? 0) > 128)
         { loading = false; error = "This restaurant or table link could not be found."; return; }
@@ -254,6 +261,7 @@ public partial class RestaurantOrder
                 ApplyCheckout(phoneValue);
                 if (!await SaveCheckoutAsync(phoneValue.Receipt.OrderId))
                 { error = "Keep this page open. Your order is reserved, but its receipt could not be saved for return from payment."; return; }
+                await SaveToAccountAsync(phoneValue.Receipt.OrderId);
                 ResumePayment(); return;
             }
             if (phoneResult.Uncertain || phoneResult.Code is "request_conflict" or "merchant_busy" or "merchant_review" or "merchant_pending")
@@ -262,12 +270,12 @@ public partial class RestaurantOrder
             try { await JS.InvokeVoidAsync("tideMerchantCheckout.clear", Slug); } catch (JSException) { }
             await RefreshQuoteAsync(); error = FriendlyError(phoneResult.Code, (int)phoneResult.Status); return;
         }
-        if (pending.Order.Fulfillment == "delivery" && !await SaveCheckoutAsync(null))
-        { busy = false; if (!uncertain) pending = null; error = "Allow this tab to save your delivery receipt before placing the order."; return; }
+        if (!await SaveCheckoutAsync(null))
+        { busy = false; if (!uncertain) pending = null; error = "Allow this tab to save your private receipt before placing the order."; return; }
         var result = await Api.OrderAsync(Slug, pending);
         busy = false;
         if (result.Succeeded && result.Value is { } value)
-        { receipt = value; uncertain = false; reviewing = false; if (value.Quote.Fulfillment == "delivery") await SaveCheckoutAsync(value.OrderId); return; }
+        { receipt = value; uncertain = false; reviewing = false; await SaveCheckoutAsync(value.OrderId); await SaveToAccountAsync(value.OrderId); return; }
         if (result.Uncertain || result.Code == "request_conflict")
         { uncertain = true; error = "We couldn’t confirm whether the restaurant received your order. Retry this same order to confirm it safely."; return; }
         pending = null; uncertain = false; reviewing = false;

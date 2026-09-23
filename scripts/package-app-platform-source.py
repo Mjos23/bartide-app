@@ -38,6 +38,7 @@ def main():
     target.mkdir(parents=True, exist_ok=False)
     inputs = [p for folder in FOLDERS for p in (ROOT / folder).rglob('*') if p.is_file() and selected(p)]
     inputs += [ROOT / name for name in ('.dockerignore', 'global.json', 'TideCasa.slnx', 'docs/postgresql-schema.md', 'docs/GULF-LANTERN-HOSTED-DEMO.md', 'docs/ENGINEERING-STUDIO.md', 'docs/DELIVERY-ROADMAP.md', 'docs/DELIVERY-PHASE-ONE.md', 'docs/DELIVERY-PHASE-TWO.md', 'fixtures/gulf-lantern.json')]
+    inputs += [ROOT / 'docs/CUSTOMER-AND-STAFF-ACCESS.md']
     inputs += [p for p in (ROOT / 'scripts').glob('*.py') if not p.name.startswith(('start-local', 'prepare-ordering', 'package-tested'))]
     manifest = {}
     for path in sorted(set(inputs)):

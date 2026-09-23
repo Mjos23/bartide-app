@@ -12,6 +12,7 @@
         <header class="ordering-nav"><a href="/" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="140" height="47" /></a><span>Good food. Your way.</span></header>
     }
     <main class="ordering-main">
+        <nav class="ordering-account-links" aria-label="Customer and staff access" data-enhance-nav="false"><a href="@($"/customer/{Uri.EscapeDataString(Slug)}")">My orders &amp; rewards</a><a href="@($"/access/{Uri.EscapeDataString(Slug)}/staff")">Staff login</a></nav>
         @if (loading)
         {
             <h1>Your menu.</h1><p role="status">Loading the restaurant’s menu…</p>
@@ -63,6 +64,8 @@
                 }
                 @if (receipt.Status == "out_for_delivery") { <DeliveryLocationPanel Location="@deliveryLocation" /> }
                 <p>Keep this private receipt and your order number for help from the restaurant.</p>
+                <p><a href="@($"/customer/{Uri.EscapeDataString(Slug)}")" data-enhance-nav="false">My orders &amp; rewards →</a> <span>@(savedToAccount ? "Saved to your account." : "Sign in to save this receipt and return to it later.")</span></p>
+                @if (receipt.Delivery is null) { <p class="ordering-note" role="status">@CustomerOrderStatus.Label(receipt.Status) @if (!CustomerOrderStatus.Finished(receipt.Status)) { <span>· Status updates automatically while this page is open.</span> } @deliveryRefreshError</p> }
                 <button class="ordering-secondary" type="button" @onclick="RefreshReceiptAsync" disabled="@busy">@(busy ? "Checking…" : "Check order status")</button>
                 @if (checkout?.State == "open")
                 {
