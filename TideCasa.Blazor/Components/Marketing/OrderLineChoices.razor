@@ -1,0 +1,11 @@
+@if (Line.RemovedIngredients is { Count: > 0 })
+{
+    <small class="ordering-note order-line-choice">No @string.Join(", ", Line.RemovedIngredients)</small>
+}
+@if (!string.IsNullOrWhiteSpace(Line.SpecialRequest))
+{
+    <small class="ordering-note order-line-choice">Request: @Line.SpecialRequest</small>
+}
+@code {
+    [Parameter, EditorRequired] public RestaurantOrderLine Line { get; set; } = default!;
+}

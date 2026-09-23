@@ -84,6 +84,7 @@
                                 <label class="desk-field">Item name<input name="name" value="@item.Name" maxlength="160" required /></label>
                                 <label class="desk-field">Category<select name="category_id" required>@foreach (var category in editor.Categories) { <option value="@category.Id" selected="@(item.CategoryId == category.Id)">@category.Name</option> }</select></label>
                                 <label class="desk-field">Description<textarea name="description" rows="3" maxlength="1000">@item.Description</textarea></label>
+                                <label class="desk-field">Ingredients (one per line)<textarea name="ingredients" rows="4" maxlength="1220" placeholder="List up to 20 ingredients; guests can request that these be left off.">@string.Join("\n", item.Ingredients ?? [])</textarea></label>
                                 <label class="desk-field">Menu photo<select name="photo_id"><option value="">No photo</option>@foreach (var photo in editor.Photos ?? []) { <option value="@photo.Id" selected="@(item.PhotoId == photo.Id)">@PhotoLabel(photo)</option> }</select></label>
                                 @if (item.PhotoId is not null) { <img class="ordering-item-photo" src="@($"/private-media/{Uri.EscapeDataString(TenantId)}/photo/{item.PhotoId}")" alt="@item.Name" width="160" height="120" loading="lazy" /> }
                                 <div class="rm-field-grid">
@@ -109,6 +110,7 @@
                                 <label class="desk-field">Item name<input name="name" maxlength="160" required /></label>
                                 <label class="desk-field">Category<select name="category_id" required>@foreach (var category in editor.Categories) { <option value="@category.Id">@category.Name</option> }</select></label>
                                 <label class="desk-field">Description<textarea name="description" rows="3" maxlength="1000"></textarea></label>
+                                <label class="desk-field">Ingredients (one per line)<textarea name="ingredients" rows="4" maxlength="1220" placeholder="List up to 20 ingredients; guests can request that these be left off."></textarea></label>
                                 <label class="desk-field">Menu photo<select name="photo_id"><option value="">No photo</option>@foreach (var photo in editor.Photos ?? []) { <option value="@photo.Id">@PhotoLabel(photo)</option> }</select></label>
                                 <div class="rm-field-grid"><label class="desk-field">Price (USD)<input name="price" type="number" inputmode="decimal" min="0" max="10000" step="0.01" /></label><label class="desk-field">Display-only price label<input name="price_label" maxlength="160" placeholder="For example, Market price" /></label></div>
                                 <label class="rm-check"><input type="checkbox" name="available" value="true" checked /><span>Available to order</span></label>

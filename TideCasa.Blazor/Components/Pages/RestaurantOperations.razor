@@ -18,6 +18,7 @@
             <div class="ordering-section-heading"><p>Review incoming orders, update their progress and record payments collected by your team.</p><a class="ordering-secondary" href="@PagePath">Refresh orders</a></div>
             <p class="ordering-note">Current role: @(workspace.Role == "owner" ? "Owner" : RestaurantStaffRoles.Label(workspace.Role)). Updates apply to the whole order.</p>
             <p class="ordering-note">This page refreshes after each saved change. Use Refresh orders to check for new arrivals.</p>
+            @if (DeliveryView && (workspace.Role is "owner" or "manager" or "driver")) { <DeliveryLocationDesk TenantId="@TenantId" Role="@workspace.Role" Orders="@workspace.Orders" /> }
             @if (DeliveryView)
             {
                 <nav class="delivery-lanes" aria-label="Delivery queues">
@@ -48,7 +49,7 @@
                             <p>Driver: <strong>@DriverName(entry.DriverId)</strong></p>
                             @if (enhanced) { <DeliveryTools Entry="entry" TenantId="@TenantId" Role="@workspace.Role" RestaurantName="@workspace.Name" PickupInstructions="@workspace.PickupInstructions" ReturnPage="@ReturnPage" /> }
                         }
-                        <ul class="ordering-summary-lines">@foreach (var line in quote.Lines) { <li><span>@line.Quantity × @line.Name</span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
+                        <ul class="ordering-summary-lines">@foreach (var line in quote.Lines) { <li><span>@line.Quantity × @line.Name<OrderLineChoices Line="line" /></span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
                         <dl class="ordering-totals">
                             <div><dt>Food and drinks</dt><dd>@Money(quote.SubtotalCents)</dd></div><div><dt>Tax</dt><dd>@Money(quote.TaxCents)</dd></div>
                             @if (quote.DeliveryFeeCents != 0) { <div><dt>Delivery</dt><dd>@Money(quote.DeliveryFeeCents)</dd></div> }

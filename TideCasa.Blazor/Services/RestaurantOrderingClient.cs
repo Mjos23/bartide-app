@@ -11,7 +11,7 @@ public sealed record RestaurantApiResult<T>(HttpStatusCode Status, T? Value, str
     public bool Uncertain => (int)Status >= 500 || Status is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests;
 }
 
-public sealed class RestaurantOrderingClient(HttpClient client, OrderingRequestContext requestContext)
+public sealed partial class RestaurantOrderingClient(HttpClient client, OrderingRequestContext requestContext)
 {
     public Task<RestaurantApiResult<RestaurantMenu>> GetMenuAsync(string slug, string? table, CancellationToken ct = default) =>
         SendAsync<RestaurantMenu>(HttpMethod.Get, RestaurantPath(slug) + "/menu" + (string.IsNullOrWhiteSpace(table) ? "" : "?table=" + Uri.EscapeDataString(table)), null, null, ct);

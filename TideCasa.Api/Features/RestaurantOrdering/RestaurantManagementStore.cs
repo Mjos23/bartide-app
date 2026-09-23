@@ -70,6 +70,7 @@ public sealed partial class RestaurantOrderingStore
             throw new OrderingException("Use a valid item and category identifier.");
         var name = Text(item.Name, "Item name", 160);
         var description = Text(item.Description, "Description", 1000, true, true);
+        var ingredients = IngredientNames(item.Ingredients);
         var label = Text(item.PriceLabel, "Price description", 160, item.PriceCents is not null);
         if (item.PriceCents is < 0 or > 1000000) throw new OrderingException("Price must be between $0 and $10,000.");
         if (request.PhotoId is { Length: > 0 } && !Guid.TryParseExact(request.PhotoId, "D", out _)) throw new OrderingException("Choose a photo from this restaurant.");
@@ -80,6 +81,8 @@ public sealed partial class RestaurantOrderingStore
             var entry = values.OfType<JsonObject>().FirstOrDefault(value => String(value, "id") == item.Id);
             if (entry is null) { if (values.Count >= 100) throw new OrderingException("Use no more than 100 menu items."); entry = new() { ["id"] = item.Id }; values.Add(entry); }
             entry["category"] = item.CategoryId; entry["name"] = name; entry["description"] = description;
+            // Older editors omit this field; preserve their existing ingredient list.
+            if (ingredients is not null) entry["ingredients"] = JsonSerializer.SerializeToNode(ingredients, Json);
             entry["price_cents"] = item.PriceCents; entry["price_label"] = string.IsNullOrEmpty(label) ? null : label; entry["available"] = item.Available;
             if (request.PhotoId is not null) entry["photo_src"] = request.PhotoId.Length == 0 ? null : "/media/" + request.PhotoId;
         }, ct, async (db, tx, token) =>
@@ -171,6 +174,11 @@ public sealed partial class RestaurantOrderingStore
         await using var save = Command(db, tx, "UPDATE bartide_enhanced_configs SET settings_json=@json,version=version+1,updated_at=@now WHERE tenant_id=@id AND version=@version",
             ("@json", c.ToJsonString(Json)), ("@now", Stamp()), ("@id", id), ("@version", request.ExpectedVersion));
         if (await save.ExecuteNonQueryAsync(ct) != 1) throw new OrderingException("Settings changed. Reload before saving.", 409, "stale_settings");
+        if (!request.DeliveryWorkflowEnabled || !request.DeliveryEnabled)
+        {
+            await using var revokeLocations = Command(db, tx, "DELETE FROM tide_delivery_locations WHERE tenant_id=@id", ("@id", id));
+            await revokeLocations.ExecuteNonQueryAsync(ct);
+        }
         await tx.CommitAsync(ct);
         return await SettingsAsync(id, user, ct);
     }
@@ -252,6 +260,8 @@ public sealed partial class RestaurantOrderingStore
         await using var save = Command(db, tx, "UPDATE bartide_enhanced_orders SET payload_json=@json,status=@status,driver_id=@driver,version=version+1,updated_at=@now WHERE tenant_id=@tenant AND id=@id AND version=@version",
             ("@json", payload.ToJsonString(Json)), ("@status", String(payload, "status")), ("@driver", (object?)driver ?? DBNull.Value), ("@now", now), ("@tenant", id), ("@id", orderId), ("@version", version));
         if (await save.ExecuteNonQueryAsync(ct) != 1) throw new OrderingException("This order changed. Reload before updating.", 409, "stale_order");
+        if (request.Action is "assign-driver" or "cancelled" or "confirm-delivery" or "completed")
+            await DeleteLocation(db, tx, id, orderId, ct);
         await tx.CommitAsync(ct);
         return await OperationsAsync(id, user, ct);
     }

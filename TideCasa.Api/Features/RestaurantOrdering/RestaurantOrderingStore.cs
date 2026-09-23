@@ -104,7 +104,8 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
             ["payment_method"] = request.Order.PaymentMethod, ["fulfillment"] = request.Order.Fulfillment,
             ["table_id"] = table?.Id, ["table_label"] = table?.Label,
             ["lines"] = new JsonArray(quote.Lines.Select(line => (JsonNode)new JsonObject
-                { ["item_id"] = line.ItemId, ["name"] = line.Name, ["quantity"] = line.Quantity, ["unit_cents"] = line.UnitCents }).ToArray()),
+                { ["item_id"] = line.ItemId, ["name"] = line.Name, ["quantity"] = line.Quantity, ["unit_cents"] = line.UnitCents,
+                  ["removed_ingredients"] = JsonSerializer.SerializeToNode(line.RemovedIngredients, Json), ["special_request"] = line.SpecialRequest }).ToArray()),
             ["subtotal_cents"] = quote.SubtotalCents, ["tax_cents"] = quote.TaxCents, ["delivery_fee_cents"] = quote.DeliveryFeeCents,
             ["tip_cents"] = quote.TipCents, ["total_cents"] = quote.TotalCents,
             ["customer_name"] = name, ["phone"] = phone, ["address"] = deliveryAddress, ["zip"] = request.Order.DeliveryZip ?? "", ["note"] = note,
@@ -223,7 +224,14 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
                 throw new OrderingException("Choose each item once, with a quantity from 1 to 20.");
             var item = venue.Items.FirstOrDefault(item => item.Id == selection.ItemId);
             if (item is null || !item.Available || item.PriceCents is null) throw new OrderingException("An item is unavailable. Refresh the menu and review your order.", 409, "item_unavailable");
-            lines.Add(new(item.Id, item.Name, selection.Quantity, item.PriceCents.Value));
+            var removed = IngredientNames(selection.RemovedIngredients);
+            if (removed is not null && removed.Any(ingredient => item.Ingredients?.Contains(ingredient, StringComparer.Ordinal) != true))
+                throw new OrderingException("Choose ingredients listed for this item.", 400, "invalid_customization");
+            var special = Text(selection.SpecialRequest, "Item request", 240, true, multiline: true);
+            // Keep the restaurant's ingredient order and price. Removals never create discounts.
+            var canonicalRemoved = removed is { Count: > 0 }
+                ? item.Ingredients!.Where(ingredient => removed.Contains(ingredient, StringComparer.Ordinal)).ToArray() : null;
+            lines.Add(new(item.Id, item.Name, selection.Quantity, item.PriceCents.Value, canonicalRemoved, special.Length == 0 ? null : special));
         }
         if (lines.Sum(line => line.Quantity) > 50) throw new OrderingException("Please keep online orders to 50 items or fewer.");
         lines.Sort((a, b) => StringComparer.Ordinal.Compare(a.ItemId, b.ItemId));
@@ -324,7 +332,8 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
             int? price = item["price_cents"] is null ? null : Integer(item, "price_cents", 0, 1000000, 0);
             itemList.Add(new(String(item, "id"), String(item, "category"), Text(String(item, "name"), "Item", 160),
                 Text(String(item, "description"), "Description", 1000, true, multiline: true), price, item["price_label"] is null ? null : Text(String(item, "price_label"), "Price label", 160, true),
-                Boolean(item, "available", false) && !blocked.Contains(String(item, "id")), PhotoId(String(item, "photo_src"))));
+                Boolean(item, "available", false) && !blocked.Contains(String(item, "id")), PhotoId(String(item, "photo_src")),
+                item["ingredients"] is null ? null : IngredientNames(Strings(item, "ingredients", 20))));
         }
         if (itemList.Select(item => item.Id).Distinct().Count() != itemList.Count) throw Unavailable();
         var tables = new List<RestaurantTable>();
@@ -362,7 +371,9 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
         // Historical orders have no tip/table fields, and stay readable without mutation.
         if (payload["lines"] is not JsonArray storedLines) throw Unavailable();
         var lines = storedLines.OfType<JsonObject>().Select(line => new RestaurantOrderLine(String(line, "item_id"), String(line, "name"),
-            Integer(line, "quantity", 1, 20, 1), Integer(line, "unit_cents", 0, 1000000, 0))).ToList();
+            Integer(line, "quantity", 1, 20, 1), Integer(line, "unit_cents", 0, 1000000, 0),
+            line["removed_ingredients"] is null ? null : IngredientNames(Strings(line, "removed_ingredients", 20)),
+            line["special_request"] is null ? null : Text(String(line, "special_request"), "Item request", 240, true, multiline: true))).ToList();
         var quote = new RestaurantQuote(lines, Integer(payload, "subtotal_cents", 0, int.MaxValue, 0), Integer(payload, "tax_cents", 0, int.MaxValue, 0),
             Integer(payload, "delivery_fee_cents", 0, 5000, 0), Integer(payload, "tip_cents", 0, 50000, 0), Integer(payload, "total_cents", 0, int.MaxValue, 0),
             "USD", String(payload, "fulfillment"), String(payload, "payment_method", "staff"), payload["table_label"]?.GetValue<string>(), "", false, null);
@@ -412,6 +423,15 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
         if (value.Length > max || value.Any(character => char.IsControl(character) && !(multiline && character is '\r' or '\n' or '\t')) || !optional && string.IsNullOrWhiteSpace(value))
             throw new OrderingException($"{name}: enter {(optional ? "up to" : "1 to")} {max} characters.");
         return value.Trim();
+    }
+    private static IReadOnlyList<string>? IngredientNames(IReadOnlyList<string>? values)
+    {
+        if (values is null) return null;
+        if (values.Count > 20) throw new OrderingException("List up to 20 ingredients.", 400, "invalid_customization");
+        var names = values.Select(value => Text(value, "Ingredient", 60)).ToArray();
+        if (names.Distinct(StringComparer.OrdinalIgnoreCase).Count() != names.Length)
+            throw new OrderingException("List each ingredient once.", 400, "invalid_customization");
+        return names;
     }
     private static OrderingException Unavailable() => new("This restaurant's ordering settings need review. Please contact the restaurant.", 503, "invalid_configuration");
     private sealed record Venue(string Id, string Slug, string Name, int MenuVersion, string? OwnerId, JsonObject Config, int ConfigVersion,

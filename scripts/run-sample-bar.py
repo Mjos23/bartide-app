@@ -162,7 +162,7 @@ def seed():
         'area': BAR['location'], 'tagline': BAR['tagline'], 'hours_text': BAR['hours'], 'website_url': '',
         'service_note': 'Fictional local venue. Ask staff about allergens. Sample orders only.', 'currency': 'USD'},
         'categories': BAR['categories'], 'items': [{'id': x['id'], 'category': x['category'], 'name': x['name'],
-            'description': x['description'], 'price_cents': x['priceCents'], 'price_label': None, 'available': True} for x in BAR['menu']]}
+            'description': x['description'], 'price_cents': x['priceCents'], 'price_label': None, 'available': True, 'ingredients': x.get('ingredients', [])} for x in BAR['menu']]}
     config = {'enabled': True, 'accepting_orders': True, 'delivery_enabled': True,
         'tax_basis_points': 700, 'delivery_fee_cents': 500, 'delivery_minimum_cents': 1500,
         'delivery_capacity': 5, 'delivery_zips': ['33706'], 'prep_minutes': 25, 'blocked_item_ids': [],
@@ -207,7 +207,7 @@ def seed():
     for item in BAR['menu']:
         editor = call(BASE + '/menu/items', {'expectedVersion': editor['version'], 'photoId': photos[item['image']],
             'item': {'id': item['id'], 'categoryId': item['category'], 'name': item['name'], 'description': item['description'],
-                'priceCents': item['priceCents'], 'priceLabel': None, 'available': True}}, token)
+                'priceCents': item['priceCents'], 'priceLabel': None, 'available': True, 'ingredients': item.get('ingredients', [])}}, token)
     print('Attached 18 unique photos to 20 menu items.', flush=True)
     video = ROOT / 'TideCasa.Blazor/wwwroot/assets/verticals/course-preview.mp4'
     media = call(BASE + '/media/video', video.read_bytes(), token, {'Content-Type': 'video/mp4',

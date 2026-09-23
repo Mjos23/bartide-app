@@ -48,6 +48,8 @@ builder.Services.AddHttpClient<DemoNotificationSender>(client => client.Timeout 
 builder.Services.AddScoped<DemoInboxStore>();
 builder.Services.AddHostedService<DemoNotificationWorker>();
 builder.Services.AddScoped<RestaurantOrderingStore>();
+builder.Services.AddSingleton<DeliveryLocationSchema>();
+builder.Services.AddHostedService<DeliveryLocationCleanup>();
 builder.Services.AddScoped<StaffTrainingStore>();
 builder.Services.AddTideCasaMedia(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<RewardsStore>();
@@ -67,6 +69,13 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("restaurant-ordering", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
         { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
+    options.AddPolicy("delivery-location", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Items[RegisteredBearerHandler.UserItem] is TideCasa.Contracts.AuthUser u
+            ? "user:" + u.UserId : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 240, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
+    options.AddPolicy("delivery-status", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
+        { PermitLimit = 480, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
     options.AddPolicy("public-form", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
         { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
@@ -108,6 +117,7 @@ app.MapPricing();
 app.MapTideCasaAuthentication();
 app.MapAccounts();
 app.MapRestaurantOrdering();
+app.MapDeliveryLocations();
 app.MapRestaurantManagement();
 app.MapStaffTraining();
 app.MapTideCasaMedia();
@@ -128,6 +138,7 @@ else
     await app.Services.GetRequiredService<FeatureMigrator>().InitializeAsync();
 }
 await app.Services.GetRequiredService<SalesPipelineStore>().InitializeAsync();
+await app.Services.GetRequiredService<DeliveryLocationSchema>().InitializeAsync();
 app.Run();
 
 public partial class Program;

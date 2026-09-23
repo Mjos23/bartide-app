@@ -1,0 +1,28 @@
+@namespace TideCasa.Blazor.Components.Marketing
+<section class="delivery-location-desk" data-location-desk data-tenant="@TenantId" data-role="@Role" aria-label="Delivery location controls">
+    <AntiforgeryToken />
+    <h2>Delivery locations</h2>
+    <p data-location-message role="status">Loading location controls…</p>
+    <p data-location-explanation>Sharing is optional and only works while the driver's app is open. Drivers must be safely stopped when using these controls.</p>
+    @if (Role is "owner" or "manager")
+    {
+        <button class="ordering-secondary" type="button" data-location-enable disabled>Enable location sharing</button>
+    }
+    @if (Role == "driver")
+    {
+        <p>Start sharing only for the customer you are driving to. Stop sharing before selecting a different delivery.</p>
+        @foreach(var entry in Orders.Where(x=>x.Order.Receipt.Status=="out_for_delivery" && x.Order.Receipt.Delivery?.AcknowledgedAt is not null))
+        {
+            <button class="ordering-secondary" type="button" data-location-start="@entry.Order.Receipt.OrderId" disabled>Share location · order @entry.Order.Receipt.Number</button>
+        }
+        <button class="ordering-secondary" type="button" data-location-stop hidden>Stop sharing</button>
+        <p data-location-driver role="status"></p>
+    }
+    <div data-location-results></div>
+    <noscript>JavaScript is needed for location sharing. Delivery status and navigation buttons still work.</noscript>
+</section>
+@code {
+    [Parameter] public string TenantId {get;set;}="";
+    [Parameter] public string Role {get;set;}="";
+    [Parameter] public IReadOnlyList<RestaurantOperationOrder> Orders {get;set;}=[];
+}

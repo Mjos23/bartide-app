@@ -205,6 +205,7 @@ app.UseAntiforgery();
 app.MapTideCasaAuthentication();
 app.MapRestaurantOrdering();
 app.MapRestaurantManagement();
+app.MapDeliveryLocationFlow();
 app.MapStaffTrainingForms();
 app.MapTideCasaMedia();
 app.MapRewardForms();

@@ -66,7 +66,7 @@
                             <p>Status: <strong>@order.Receipt.Status</strong> · Payment: <strong>@order.Receipt.PaymentStatus</strong></p>
                             <p>@order.CustomerName @if (!string.IsNullOrWhiteSpace(order.Phone)) { <span>· <a href="@("tel:" + Uri.EscapeDataString(order.Phone))">@order.Phone</a></span> }</p>
                             @if (order.Receipt.Quote.Fulfillment == "delivery") { <p>@order.Address @order.Zip</p> }
-                            <ul>@foreach (var line in order.Receipt.Quote.Lines) { <li>@line.Quantity × @line.Name</li> }</ul>
+                            <ul>@foreach (var line in order.Receipt.Quote.Lines) { <li>@line.Quantity × @line.Name<OrderLineChoices Line="line" /></li> }</ul>
                             <p>Tip: @Money(order.Receipt.Quote.TipCents, order.Receipt.Quote.Currency)</p>
                             @if (!string.IsNullOrWhiteSpace(order.Note)) { <p>Guest note: @order.Note</p> }
                             <p class="ordering-note">Received @order.Receipt.CreatedAt</p>

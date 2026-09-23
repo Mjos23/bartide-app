@@ -47,7 +47,9 @@ public static partial class RestaurantManagementFlow
                 var priceLabel = Text(form, "price_label", 160);
                 if (price is null && priceLabel.Length == 0) throw new FormFailure("price");
                 var item = new RestaurantMenuItem(EntryId(form, "id"), EntryId(form, "category_id"), Text(form, "name", 160, true),
-                    Text(form, "description", 1000, multiline: true), price, priceLabel.Length == 0 ? null : priceLabel, Checkbox(form, "available"));
+                    Text(form, "description", 1000, multiline: true), price, priceLabel.Length == 0 ? null : priceLabel, Checkbox(form, "available"),
+                    Ingredients: form.ContainsKey("ingredients") ? Text(form, "ingredients", 1220, multiline: true)
+                        .Split(['\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) : null);
                 var photo = form.ContainsKey("photo_id") ? Text(form, "photo_id", 36) : null;
                 if (!string.IsNullOrEmpty(photo) && !Guid.TryParseExact(photo, "D", out _)) throw new FormFailure("invalid");
                 return Response(tenantId, "menu", await api.SaveItemAsync(tenantId, new(version, item, photo), read.Token!, context.RequestAborted));

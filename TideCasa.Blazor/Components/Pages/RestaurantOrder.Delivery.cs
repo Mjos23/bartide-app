@@ -10,6 +10,8 @@ public partial class RestaurantOrder : IAsyncDisposable
     private int deliveryFailures;
     private string? deliveryRefreshError;
     private DateTimeOffset? deliveryCheckedAt;
+    private TideCasa.Contracts.DeliveryLocationView? deliveryLocation;
+    private DateTimeOffset locationCheckedAt;
     private bool ShouldPollDelivery => !disposed && receipt?.Delivery is not null
         && receipt.Status is not ("completed" or "cancelled" or "delivered") && pending is not null;
 
@@ -43,6 +45,14 @@ public partial class RestaurantOrder : IAsyncDisposable
             { receipt = current; deliveryCheckedAt = DateTimeOffset.UtcNow; deliveryFailures = 0; deliveryRefreshError = null; }
             else
             { deliveryFailures++; deliveryRefreshError = "Updates are interrupted. Your last saved status is shown. Use Check order status or contact the restaurant."; }
+            if (receipt?.Status != "out_for_delivery") deliveryLocation = null;
+            else if (DateTimeOffset.UtcNow - locationCheckedAt > TimeSpan.FromSeconds(28))
+            {
+                locationCheckedAt = DateTimeOffset.UtcNow;
+                var locationResult = await Api.LocationAsync(Slug, new(order, saved.TrackingKey));
+                if (disposed || pending != saved || receipt?.OrderId != order) return 0;
+                deliveryLocation = locationResult.Succeeded ? locationResult.Value?.Location : null;
+            }
             await InvokeAsync(StateHasChanged);
             return !ShouldPollDelivery ? 0 : deliveryFailures == 0 ? 15000 : deliveryFailures == 1 ? 30000 : 60000;
         }

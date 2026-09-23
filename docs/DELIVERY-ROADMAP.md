@@ -1,3 +1,5 @@
+Phase two update: foreground location and public simulated tracking implemented; see [phase-two release notes](DELIVERY-PHASE-TWO.md). Phase three and four remain paused.
+
 # Tide Casa delivery roadmap
 
 Prepared September 22, 2026. Phase 1 is implemented for the Gulf Lantern release; see [phase-one behavior and recovery](DELIVERY-PHASE-ONE.md). Phases 2–4 remain planning only and are paused at the user's request.

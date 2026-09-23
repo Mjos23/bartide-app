@@ -5,7 +5,7 @@
 <div class="bt-unified restaurant-ordering @(IsSampleOrdering ? "sample-ordering" : null)">
     @if (IsSampleOrdering)
     {
-        <header class="ordering-nav ordering-venue-nav"><a href="@SectionLink("ordering-menu")">GULF LANTERN<small>BEACH BAR · ST. PETE BEACH</small></a><span>Order direct</span></header>
+        <header class="ordering-nav ordering-venue-nav"><a href="@SectionLink("ordering-menu")">GULF LANTERN<small>BEACH BAR · ST. PETE BEACH</small></a><a class="ordering-builder-link" href="https://bar.tide.casa" target="_blank" rel="noopener">Built by <strong>BarTide</strong></a></header>
     }
     else
     {
@@ -33,7 +33,7 @@
                 @if (checkout?.RefundedCents > 0) { <p>Refunded: @Money(checkout.RefundedCents)</p> }
                 @if (checkout?.PendingRefundCents > 0) { <p>Refund in progress: @Money(checkout.PendingRefundCents)</p> }
                 <p>@FulfillmentLabel(receipt.Quote.Fulfillment)@(!string.IsNullOrWhiteSpace(receipt.Quote.TableLabel) ? " · " + receipt.Quote.TableLabel : "") · @(receipt.Quote.PaymentMethod == "phone" ? "Pay on my phone" : "Pay staff")</p>
-                <ul class="ordering-summary-lines">@foreach (var line in receipt.Quote.Lines) { <li><span>@line.Quantity × @line.Name</span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
+                <ul class="ordering-summary-lines">@foreach (var line in receipt.Quote.Lines) { <li><span>@line.Quantity × @line.Name<OrderLineChoices Line="line" /></span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
                 <dl class="ordering-totals">
                     <div><dt>Food and drinks</dt><dd>@Money(receipt.Quote.SubtotalCents)</dd></div>
                     <div><dt>Tax</dt><dd>@Money(receipt.Quote.TaxCents)</dd></div>
@@ -61,6 +61,7 @@
                         @if (deliveryRefreshError is not null) { <p role="alert" class="ordering-error">@deliveryRefreshError</p> }
                     </section>
                 }
+                @if (receipt.Status == "out_for_delivery") { <DeliveryLocationPanel Location="@deliveryLocation" /> }
                 <p>Keep this private receipt and your order number for help from the restaurant.</p>
                 <button class="ordering-secondary" type="button" @onclick="RefreshReceiptAsync" disabled="@busy">@(busy ? "Checking…" : "Check order status")</button>
                 @if (checkout?.State == "open")
@@ -86,18 +87,26 @@
             @if (!connected) { <p class="ordering-note" role="status">Connecting to the restaurant…</p> }
             @if (menu.Table is not null) { <p class="ordering-table-badge">You scanned @menu.Table.Label.</p> }
             @if (!menu.Checkout.AcceptingOrders) { <p class="ordering-notice" role="status">The restaurant is not accepting new online orders right now. You can still browse the menu.</p> }
+            <nav class="ordering-category-links" aria-label="Jump to menu section">
+                <span>Explore</span>
+                @foreach (var category in MenuGroups)
+                {
+                    <a href="@SectionLink("category-" + category.Key)" @onclick="() => JumpCategoryAsync(category.Key)" @onclick:preventDefault="true">@CategoryJumpLabel(category.Key)</a>
+                }
+                <a href="@($"/events/{Uri.EscapeDataString(Slug)}")">Events</a>
+            </nav>
             <div class="ordering-layout">
                 <section id="ordering-menu" aria-label="Menu" class="ordering-menu" tabindex="-1">
                     @foreach (var category in MenuGroups)
                     {
                         <section class="ordering-category" aria-labelledby="@("category-" + category.Key)">
-                            <h2 id="@("category-" + category.Key)">@CategoryName(category.Key)</h2>
+                            <h2 id="@("category-" + category.Key)" tabindex="-1">@CategoryName(category.Key)</h2>
                             @foreach (var item in category)
                             {
                                 <article class="ordering-menu-item" id="@("item-" + item.Id)">
                                     <div class="ordering-item-content">
                                     <div class="ordering-item-media @(item.PhotoId is not null ? "has-photo" : null)">
-                                    @if (item.PhotoId is not null) { <img class="ordering-item-photo" src="@($"/media/{Uri.EscapeDataString(item.PhotoId)}")" alt="@item.Name" loading="lazy" width="640" height="480" /> }
+                                    @if (item.PhotoId is not null) { <button class="ordering-photo-button" type="button" aria-label="@($"View {item.Name} details and options")" @onclick="() => OpenItem(item)" disabled="@(!connected)"><img class="ordering-item-photo" src="@($"/media/{Uri.EscapeDataString(item.PhotoId)}")" alt="@item.Name" loading="lazy" width="640" height="480" /></button> }
                                     @if (item.Available && item.PriceCents is >= 0)
                                     {
                                         <div class="ordering-quantity" aria-label="@($"Quantity of {item.Name}")">
@@ -108,6 +117,12 @@
                                     }
                                     </div>
                                     <h3>@item.Name</h3><p>@item.Description</p><strong>@(item.PriceCents is { } price ? Money(price) : item.PriceLabel ?? "Ask staff")</strong>
+                                    <button type="button" class="ordering-details-link" @onclick="() => OpenItem(item)" disabled="@(!connected)">Details &amp; options</button>
+                                    @if (customizations.TryGetValue(item.Id, out var itemChoices))
+                                    {
+                                        @if (itemChoices.RemovedIngredients is { Count: > 0 }) { <p class="ordering-note">No @string.Join(", ", itemChoices.RemovedIngredients)</p> }
+                                        @if (itemChoices.SpecialRequest is not null) { <p class="ordering-note">Request: @itemChoices.SpecialRequest</p> }
+                                    }
                                     @if (!item.Available) { <p class="ordering-note">Currently unavailable</p> }
                                     </div>
                                 </article>
@@ -161,7 +176,7 @@
                     @if (quote is not null)
                     {
                         @if (quote.TableLabel is not null) { <p class="ordering-note">Deliver to: <strong>@quote.TableLabel</strong></p> }
-                        <ul class="ordering-summary-lines">@foreach (var line in quote.Lines) { <li><span>@line.Quantity × @line.Name</span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
+                        <ul class="ordering-summary-lines">@foreach (var line in quote.Lines) { <li><span>@line.Quantity × @line.Name<OrderLineChoices Line="line" /></span><strong>@Money(line.UnitCents * line.Quantity)</strong></li> }</ul>
                         <dl class="ordering-totals">
                             <div><dt>Food and drinks</dt><dd>@Money(quote.SubtotalCents)</dd></div><div><dt>Tax</dt><dd>@Money(quote.TaxCents)</dd></div>
                             @if (quote.DeliveryFeeCents > 0) { <div><dt>Delivery</dt><dd>@Money(quote.DeliveryFeeCents)</dd></div> }
@@ -183,7 +198,8 @@
                                 <label class="desk-field">Your name<input type="text" @bind="customerName" @bind:event="oninput" maxlength="80" autocomplete="name" required /></label>
                                 <label class="desk-field">Phone number@(fulfillment == "dine-in" ? " (optional)" : "")<input type="tel" @bind="phone" @bind:event="oninput" maxlength="30" autocomplete="tel" required="@(fulfillment != "dine-in")" /></label>
                                 @if (fulfillment == "delivery") { <label class="desk-field">Delivery address<input type="text" @bind="address" @bind:event="oninput" maxlength="250" autocomplete="street-address" required /></label> }
-                                <label class="desk-field">Order note (optional)<textarea @bind="note" @bind:event="oninput" rows="2" maxlength="500" placeholder="Anything your server should know? Allergies? Please also speak to staff." /></label>
+                                <label class="desk-field">Special requests for your order (optional)<textarea @bind="note" @bind:event="oninput" rows="3" maxlength="500" placeholder="It’s Grandma’s birthday, or please make it extra crispy…" /></label>
+                                <p class="ordering-note">We’ll pass your requests to the restaurant. For allergies, please also speak to staff.</p>
                                 @if (!reviewing) { <button class="bt-one-button" type="submit" disabled="@(!CanReview)">Review order</button> }
                             </fieldset>
                         </form>
@@ -204,6 +220,36 @@
                     <a class="bt-one-button" href="@SectionLink("ordering-checkout")" @onclick="GoToCheckoutAsync" @onclick:preventDefault="true">View cart &amp; checkout</a>
                 </nav>
         }
+            @if (detailItem is { } selectedItem)
+            {
+                <dialog id="ordering-item-dialog" class="ordering-item-dialog" aria-labelledby="ordering-item-title" @onkeydown="ItemKeyAsync">
+                    <div class="ordering-dialog-heading"><span>Make it yours</span><button type="button" class="ordering-secondary" @onclick="CloseItemAsync" autofocus aria-label="Close item details">Close ×</button></div>
+                    @if (selectedItem.PhotoId is not null) { <img class="ordering-detail-photo" src="@($"/media/{Uri.EscapeDataString(selectedItem.PhotoId)}")" alt="@selectedItem.Name" width="640" height="480" /> }
+                    <h2 id="ordering-item-title">@selectedItem.Name</h2>
+                    <p>@selectedItem.Description</p>
+                    <strong>@(selectedItem.PriceCents is { } selectedPrice ? Money(selectedPrice) : selectedItem.PriceLabel ?? "Ask staff")</strong>
+                    @if (selectedItem.Ingredients is { Count: > 0 })
+                    {
+                        <fieldset class="ordering-ingredient-options" disabled="@(Locked || !selectedItem.Available || selectedItem.PriceCents is null)">
+                            <legend>Ingredients</legend><p>Included as listed. Check anything you’d like left off.</p>
+                            @foreach (var ingredient in selectedItem.Ingredients)
+                            {
+                                <label><span>@ingredient</span><span><input type="checkbox" checked="@draftRemoved.Contains(ingredient)" @onchange="args => ToggleIngredient(ingredient, args)" /> Leave off</span></label>
+                            }
+                        </fieldset>
+                    }
+                    else { <p class="ordering-note">Ask the restaurant about ingredients, or add a request below.</p> }
+                    <label class="desk-field">Request for this item (optional)<textarea @bind="draftRequest" @bind:event="oninput" rows="3" maxlength="240" placeholder="For example, extra extra crispy or sauce on the side" disabled="@Locked" /></label>
+                    <p class="ordering-note">These choices apply to every serving of this item in your cart. Requests depend on what the kitchen can do; the price stays the same. For allergies, please speak to staff.</p>
+                    @if (detailError is not null) { <p class="ordering-error" role="alert">@detailError</p> }
+                    <div class="ordering-dialog-actions">
+                        <div class="ordering-quantity" aria-label="Item quantity"><button type="button" class="ordering-secondary" aria-label="Reduce item quantity" disabled="@(Locked || draftQuantity <= 1)" @onclick="() => draftQuantity--">−</button><output aria-live="polite">@draftQuantity</output><button type="button" class="ordering-secondary" aria-label="Increase item quantity" disabled="@(Locked || draftQuantity >= DetailMaximum)" @onclick="() => draftQuantity++">+</button></div>
+                        <button type="button" class="bt-one-button" disabled="@(!CanSaveItem)" @onclick="SaveItemChoiceAsync">@(Quantity(selectedItem.Id) > 0 ? "Update cart" : "Add to cart") @if (selectedItem.PriceCents is { } linePrice) { <span>· @Money(linePrice * draftQuantity)</span> }</button>
+                    </div>
+                    @if (!selectedItem.Available || selectedItem.PriceCents is null) { <p class="ordering-note">This item cannot be ordered online right now.</p> }
+                    else if (!CanSaveItem && !Locked) { <p class="ordering-note">Your cart can hold up to 20 different items and 50 servings. Adjust the cart to add this item.</p> }
+                </dialog>
+            }
     </main>
     <footer class="ordering-footer">
         @if (IsSampleOrdering)

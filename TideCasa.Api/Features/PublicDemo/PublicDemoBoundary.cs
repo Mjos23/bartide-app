@@ -54,10 +54,12 @@ public static class PublicDemoBoundary
             "/events", "/events/{eventId}", "/events/{eventId}/cancel", "/events/{eventId}/check-in", "/rewards/rules", "/rewards/rules/{ruleId}",
             "/rewards/qualifications", "/rewards/qualifications/{qualificationId}/void", "/rewards/points", "/rewards/redemptions/{rewardId}/resolve",
             "/rewards/employee-points", "/posts", "/posts/{postId}/publish", "/posts/{postId}/hide");
+        Add("GET", tenant, "/delivery-location");
+        Add("POST", tenant, "/delivery-location/settings", "/delivery-location/{orderId}/start", "/delivery-location/{orderId}/point", "/delivery-location/{orderId}/stop");
         Add("DELETE", tenant, "/team/shifts/{shiftId}", "/team/lessons/{lessonId}");
         const string restaurant = "/api/v1/restaurants/{slug}";
         Add("GET", restaurant, "/menu", "/tables/{token}/qr", "/events", "/events/mine", "/rewards", "/posts");
-        Add("POST", restaurant, "/quote", "/orders", "/track", "/events/{eventId}/rsvp", "/rewards/join", "/rewards/redemptions/{rewardId}/request", "/rewards/points-redemptions");
+        Add("POST", restaurant, "/delivery-location", "/quote", "/orders", "/track", "/events/{eventId}/rsvp", "/rewards/join", "/rewards/redemptions/{rewardId}/request", "/rewards/points-redemptions");
         Add("GET", "/api/v1/tenants/{tenant}/media", "", "/{kind}/{id}");
         Add("HEAD", "/api/v1/tenants/{tenant}/media", "/{kind}/{id}");
         Add("GET", "/api/v1/media/photos", "/{id}");

@@ -50,6 +50,11 @@ public partial class RestaurantOrder
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (showItemDialog)
+        {
+            showItemDialog = false;
+            await JS.InvokeVoidAsync("tideOrderingDetails.open", "ordering-item-dialog");
+        }
         await SyncDeliveryPollingAsync();
         if (!firstRender) return;
         connected = true;
@@ -113,7 +118,7 @@ public partial class RestaurantOrder
         ++quoteRevision;
         loadedSlug = Slug; loadedTable = TableToken;
         loading = true; error = null; menu = null; quote = null; receipt = null; pending = null;
-        checkout = null; cart.Clear(); reviewing = false; uncertain = false; busy = false; quoting = false;
+        checkout = null; cart.Clear(); customizations.Clear(); detailItem = null; reviewing = false; uncertain = false; busy = false; quoting = false;
         tipChoice = "0"; customTip = ""; payment = "staff"; deliveryZip = ""; address = ""; tableLabel = "";
         if (Slug.Length > 128 || (TableToken?.Length ?? 0) > 128)
         { loading = false; error = "This restaurant or table link could not be found."; return; }
@@ -139,7 +144,7 @@ public partial class RestaurantOrder
         if (Locked || menu?.Items.FirstOrDefault(item => item.Id == id) is not { Available: true, PriceCents: >= 0 }) return;
         if (delta > 0 && ((!cart.ContainsKey(id) && cart.Count >= 20) || cart.Values.Sum() >= 50)) return;
         var quantity = Math.Clamp(Quantity(id) + delta, 0, 20);
-        if (quantity == 0) cart.Remove(id); else cart[id] = quantity;
+        if (quantity == 0) { cart.Remove(id); customizations.Remove(id); } else cart[id] = quantity;
         await RefreshQuoteAsync();
     }
 
@@ -180,7 +185,8 @@ public partial class RestaurantOrder
             customCents = (int)(amount * 100);
         }
         else if (menu.Checkout.TipsEnabled && tipChoice is "15" or "20" or "25") percent = int.Parse(tipChoice, CultureInfo.InvariantCulture);
-        return new(cart.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new OrderItemSelection(pair.Key, pair.Value)).ToArray(), fulfillment, payment,
+        return new(cart.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new OrderItemSelection(pair.Key, pair.Value,
+            customizations.GetValueOrDefault(pair.Key)?.RemovedIngredients, customizations.GetValueOrDefault(pair.Key)?.SpecialRequest)).ToArray(), fulfillment, payment,
             fulfillment == "dine-in" ? menu.Table?.Token : null, fulfillment == "delivery" ? deliveryZip : null, percent, customCents,
             fulfillment == "dine-in" && menu.Table is null ? tableLabel : null);
     }
@@ -304,6 +310,7 @@ public partial class RestaurantOrder
 
     private static string FriendlyError(string? code, int status) => code switch
     {
+        "invalid_customization" => "Review this item's listed ingredients and special request, then try again.",
         "table_required" => "Enter your table number or scan the QR code at your table.",
         "invalid_table" => "Use the table number or name shown at your table.",
         "table_unavailable" => "That table is unavailable. Check its number or ask a staff member.",

@@ -16,7 +16,7 @@
   "categories": [
     {
       "id": "share",
-      "label": "For the table"
+      "label": "Popular items"
     },
     {
       "id": "kitchen",
@@ -38,7 +38,13 @@
       "description": "Smoked Gulf-style fish, house crackers, pickled jalapeno and lemon.",
       "priceCents": 1100,
       "category": "share",
-      "image": "/demo/assets/menu/smoked-fish-dip.webp"
+      "image": "/demo/assets/menu/smoked-fish-dip.webp",
+      "ingredients": [
+        "Smoked fish dip",
+        "House crackers",
+        "Pickled jalapeno",
+        "Lemon"
+      ]
     },
     {
       "id": "beer-cheese-pretzel",
@@ -46,7 +52,12 @@
       "description": "A soft salted pretzel with warm beer cheese and grain mustard.",
       "priceCents": 1050,
       "category": "share",
-      "image": "/demo/assets/menu/beer-cheese-pretzel.webp"
+      "image": "/demo/assets/menu/beer-cheese-pretzel.webp",
+      "ingredients": [
+        "Salted soft pretzel",
+        "Beer cheese",
+        "Grain mustard"
+      ]
     },
     {
       "id": "coconut-shrimp",
@@ -54,7 +65,11 @@
       "description": "Crisp coconut shrimp with orange-chile dipping sauce.",
       "priceCents": 1600,
       "category": "share",
-      "image": "/demo/assets/menu/coconut-shrimp.webp"
+      "image": "/demo/assets/menu/coconut-shrimp.webp",
+      "ingredients": [
+        "Coconut-breaded shrimp",
+        "Orange-chile dipping sauce"
+      ]
     },
     {
       "id": "calamari",
@@ -62,7 +77,13 @@
       "description": "Lightly fried rings, lemon, parsley and house marinara.",
       "priceCents": 1400,
       "category": "share",
-      "image": "/demo/assets/menu/calamari.webp"
+      "image": "/demo/assets/menu/calamari.webp",
+      "ingredients": [
+        "Breaded calamari",
+        "Lemon",
+        "Parsley",
+        "Marinara sauce"
+      ]
     },
     {
       "id": "street-corn",
@@ -70,7 +91,14 @@
       "description": "Lime crema, cotija, cilantro and smoked paprika.",
       "priceCents": 800,
       "category": "share",
-      "image": "/demo/assets/menu/street-corn.webp"
+      "image": "/demo/assets/menu/street-corn.webp",
+      "ingredients": [
+        "Charred corn",
+        "Lime crema",
+        "Cotija cheese",
+        "Cilantro",
+        "Smoked paprika"
+      ]
     },
     {
       "id": "loaded-fries",
@@ -78,7 +106,13 @@
       "description": "Golden fries, beer cheese, scallions and smoky house sauce.",
       "priceCents": 1000,
       "category": "share",
-      "image": "/demo/assets/menu/loaded-fries.webp"
+      "image": "/demo/assets/menu/loaded-fries.webp",
+      "ingredients": [
+        "French fries",
+        "Beer cheese",
+        "Scallions",
+        "Smoky house sauce"
+      ]
     },
     {
       "id": "gulf-tacos",
@@ -86,7 +120,13 @@
       "description": "Blackened fish, citrus slaw, lime crema and warm tortillas.",
       "priceCents": 1700,
       "category": "kitchen",
-      "image": "/demo/assets/menu/gulf-tacos.webp"
+      "image": "/demo/assets/menu/gulf-tacos.webp",
+      "ingredients": [
+        "Blackened fish",
+        "Citrus slaw",
+        "Lime crema",
+        "Tortillas"
+      ]
     },
     {
       "id": "sunset-burger",
@@ -94,7 +134,15 @@
       "description": "Smash-griddled beef, cheddar, lettuce, tomato and fries.",
       "priceCents": 1800,
       "category": "kitchen",
-      "image": "/demo/assets/menu/sunset-burger.webp"
+      "image": "/demo/assets/menu/sunset-burger.webp",
+      "ingredients": [
+        "Beef patty",
+        "Burger bun",
+        "Cheddar",
+        "Lettuce",
+        "Tomato",
+        "French fries"
+      ]
     },
     {
       "id": "citrus-wings",
@@ -102,7 +150,11 @@
       "description": "Twelve wings tossed in orange-lime glaze with a little heat.",
       "priceCents": 1750,
       "category": "kitchen",
-      "image": "/demo/assets/menu/citrus-wings.webp"
+      "image": "/demo/assets/menu/citrus-wings.webp",
+      "ingredients": [
+        "Chicken wings",
+        "Orange-lime glaze"
+      ]
     },
     {
       "id": "margherita-flatbread",
@@ -110,7 +162,13 @@
       "description": "Tomato, mozzarella, fresh basil and a crisp flatbread crust.",
       "priceCents": 1500,
       "category": "kitchen",
-      "image": "/demo/assets/menu/margherita-flatbread.webp"
+      "image": "/demo/assets/menu/margherita-flatbread.webp",
+      "ingredients": [
+        "Flatbread crust",
+        "Tomato",
+        "Mozzarella",
+        "Basil"
+      ]
     },
     {
       "id": "daily-catch",
@@ -118,7 +176,12 @@
       "description": "Seasonal grilled fish, vegetables and lemon-herb butter.",
       "priceCents": 2600,
       "category": "kitchen",
-      "image": "/demo/assets/menu/daily-catch.webp"
+      "image": "/demo/assets/menu/daily-catch.webp",
+      "ingredients": [
+        "Grilled fish",
+        "Seasonal vegetables",
+        "Lemon-herb butter"
+      ]
     },
     {
       "id": "smash-sliders",
@@ -126,7 +189,14 @@
       "description": "Two cheddar sliders with pickles and a side of fries.",
       "priceCents": 1600,
       "category": "kitchen",
-      "image": "/demo/assets/menu/smash-sliders.webp"
+      "image": "/demo/assets/menu/smash-sliders.webp",
+      "ingredients": [
+        "Beef slider patties",
+        "Slider buns",
+        "Cheddar",
+        "Pickles",
+        "French fries"
+      ]
     },
     {
       "id": "shrimp-basket",
@@ -134,7 +204,12 @@
       "description": "A larger serving of our coconut shrimp with fries and citrus slaw.",
       "priceCents": 2100,
       "category": "kitchen",
-      "image": "/demo/assets/menu/coconut-shrimp.webp"
+      "image": "/demo/assets/menu/coconut-shrimp.webp",
+      "ingredients": [
+        "Coconut-breaded shrimp",
+        "French fries",
+        "Citrus slaw"
+      ]
     },
     {
       "id": "wing-platter",
@@ -142,7 +217,13 @@
       "description": "Twenty-four citrus-glazed wings, celery and two dips to share.",
       "priceCents": 3200,
       "category": "share",
-      "image": "/demo/assets/menu/citrus-wings.webp"
+      "image": "/demo/assets/menu/citrus-wings.webp",
+      "ingredients": [
+        "Chicken wings",
+        "Citrus glaze",
+        "Celery",
+        "House dips"
+      ]
     },
     {
       "id": "sunset-spritz",
@@ -150,7 +231,14 @@
       "description": "Aperitif, sparkling wine, orange and soda over ice.",
       "priceCents": 1200,
       "category": "bar",
-      "image": "/demo/assets/menu/sunset-spritz.webp"
+      "image": "/demo/assets/menu/sunset-spritz.webp",
+      "ingredients": [
+        "Aperitif",
+        "Sparkling wine",
+        "Orange",
+        "Soda water",
+        "Ice"
+      ]
     },
     {
       "id": "spicy-margarita",
@@ -158,7 +246,14 @@
       "description": "Tequila, fresh lime, agave and jalapeno with a salted rim.",
       "priceCents": 1300,
       "category": "bar",
-      "image": "/demo/assets/menu/spicy-margarita.webp"
+      "image": "/demo/assets/menu/spicy-margarita.webp",
+      "ingredients": [
+        "Tequila",
+        "Lime juice",
+        "Agave",
+        "Jalapeno",
+        "Salted rim"
+      ]
     },
     {
       "id": "espresso-martini",
@@ -166,7 +261,12 @@
       "description": "Vodka, coffee liqueur and freshly pulled espresso.",
       "priceCents": 1400,
       "category": "bar",
-      "image": "/demo/assets/menu/espresso-martini.webp"
+      "image": "/demo/assets/menu/espresso-martini.webp",
+      "ingredients": [
+        "Vodka",
+        "Coffee liqueur",
+        "Espresso"
+      ]
     },
     {
       "id": "local-draft",
@@ -174,7 +274,10 @@
       "description": "A crisp rotating draft pour. Ask your bartender for the selection.",
       "priceCents": 700,
       "category": "bar",
-      "image": "/demo/assets/menu/local-draft.webp"
+      "image": "/demo/assets/menu/local-draft.webp",
+      "ingredients": [
+        "Rotating draft beer"
+      ]
     },
     {
       "id": "key-lime-fizz",
@@ -182,7 +285,12 @@
       "description": "Alcohol-free key lime, sparkling soda and a fresh lime wheel.",
       "priceCents": 650,
       "category": "soft",
-      "image": "/demo/assets/menu/key-lime-fizz.webp"
+      "image": "/demo/assets/menu/key-lime-fizz.webp",
+      "ingredients": [
+        "Key lime juice",
+        "Sparkling soda",
+        "Lime wheel"
+      ]
     },
     {
       "id": "iced-tea",
@@ -190,7 +298,12 @@
       "description": "Black tea over ice with lemon; sweet or unsweet.",
       "priceCents": 400,
       "category": "soft",
-      "image": "/demo/assets/menu/iced-tea.webp"
+      "image": "/demo/assets/menu/iced-tea.webp",
+      "ingredients": [
+        "Black tea",
+        "Ice",
+        "Lemon"
+      ]
     }
   ],
   "people": [

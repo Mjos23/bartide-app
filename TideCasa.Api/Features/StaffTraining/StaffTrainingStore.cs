@@ -50,6 +50,7 @@ public sealed class StaffTrainingStore(ApplicationDatabase database)
             var changed = await Run(db, tx, "UPDATE bartide_enhanced_members SET active=@active WHERE id=@member AND tenant_id=@tenant AND active=@expected", token,
                 ("@active", request.Active ? 1 : 0), ("@expected", request.ExpectedActive ? 1 : 0), ("@member", memberId), ("@tenant", id));
             if (changed != 1) throw Stale();
+            if (!request.Active) await Run(db, tx, "DELETE FROM tide_delivery_locations WHERE tenant_id=@tenant AND driver_id=@member", token, ("@tenant", id), ("@member", memberId));
         }, ct);
 
     public Task<StaffTrainingWorkspace> AddShiftAsync(string id, AuthUser user, AddTeamShiftRequest request, CancellationToken ct) =>
