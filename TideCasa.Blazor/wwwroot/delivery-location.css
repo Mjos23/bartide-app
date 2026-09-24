@@ -1,0 +1,9 @@
+.delivery-location-desk,.delivery-location-card{padding:1.1rem;border:1px solid #bdcaca;border-radius:16px;background:#f3f8f5;color:#183c37;margin:1rem 0}
+.delivery-location-desk h2,.delivery-location-card h3{margin:0 0 .6rem}.delivery-location-desk button{margin:.35rem .4rem .35rem 0;white-space:normal}
+.delivery-location-desk [hidden]{display:none!important}.delivery-location-card small{display:block;line-height:1.5}.location-age{font-weight:700}
+.delivery-location-map{position:relative;overflow:hidden;height:220px;max-width:640px;background:#dfe9e5;border-radius:10px;margin:.7rem 0;isolation:isolate}
+.delivery-location-map .map-tile{position:absolute;width:256px;height:256px;max-width:none;border:0;border-radius:0}
+.delivery-location-map .map-pin{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#116b5d;border:3px solid white;color:white;border-radius:50%;width:25px;height:25px;box-shadow:0 2px 8px #16372c99;z-index:2}
+.delivery-location-map .map-accuracy{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;background:#00876f22;border:1px solid #00876f77;z-index:1;max-width:200%;max-height:200%}
+.delivery-location-map .map-credit{position:absolute;bottom:0;right:0;background:#fffffff2;padding:2px 5px;font-size:11px;z-index:3;color:#163e36}
+.delivery-location-map .map-open{position:absolute;left:7px;top:7px;padding:6px 9px;background:white;border-radius:6px;z-index:3;color:#174a3f;font-size:12px}

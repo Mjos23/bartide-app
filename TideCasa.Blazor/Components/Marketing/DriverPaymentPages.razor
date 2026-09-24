@@ -1,0 +1,14 @@
+@namespace TideCasa.Blazor.Components.Marketing
+@if (Page > 0 || HasMore)
+{
+    <nav class="driver-work-nav" aria-label="Payment history pages">
+        @if (Page > 0) { <a href="@(Path + "?page=" + (Page - 1))">← Newer deliveries</a> }
+        <span>Page @(Page + 1)</span>
+        @if (HasMore) { <a href="@(Path + "?page=" + (Page + 1))">Older deliveries →</a> }
+    </nav>
+}
+@code {
+    [Parameter] public string Path { get; set; } = "";
+    [Parameter] public int Page { get; set; }
+    [Parameter] public bool HasMore { get; set; }
+}

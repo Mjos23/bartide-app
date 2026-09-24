@@ -12,6 +12,7 @@
     {
         <h2>@account.User.DisplayName</h2>
         <p>@account.User.Email</p>
+        <p><a class="bt-one-link" href="/driver">Driver profile, client offers and delivery work →</a> · <a href="/driver/earnings">Driver earnings and payouts</a></p>
         <p><a class="bt-one-link" href="/account/referrals">Referral workspace →</a></p>
         @if (account.User.IsPlatformOwner)
         {
@@ -33,7 +34,7 @@
                 @foreach (var workspace in account.Workspaces)
                 {
                     <li class="account-workspace"><h4>@workspace.Name</h4><p>@workspace.Status</p>
-                        @if (!string.IsNullOrWhiteSpace(workspace.StaffRole)) { <p>Team role: @workspace.StaffRole</p> }
+                        @if (!string.IsNullOrWhiteSpace(workspace.StaffRole)) { <p>Team role: @RestaurantStaffRoles.Label(workspace.StaffRole)</p> }
                         <div class="account-tool-groups">
                             @if (workspace.CanPrepare || workspace.CanEdit || workspace.IsOwner)
                             {
@@ -45,10 +46,12 @@
                                     @if (workspace.IsOwner) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/billing")">Tide Casa plan and maintenance →</a></p><p class="account-tool-note">Your app’s setup and monthly service plan.</p> }
                                 </section>
                             }
-                            @if (workspace.CanEdit || workspace.StaffMemberId is not null || workspace.StaffRole is "kitchen" or "driver")
+                            @if (workspace.CanEdit || workspace.StaffMemberId is not null || RestaurantStaffRoles.IsStaff(workspace.StaffRole))
                             {
                                 <section><h5>Daily work</h5>
-                                    @if (workspace.CanEdit || workspace.StaffRole is "kitchen" or "driver") { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/operations")">Orders and fulfillment →</a></p> }
+                                    @if (workspace.StaffRole == "driver") { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/deliveries")">My deliveries and availability →</a></p> }
+                                    else if (workspace.CanEdit || RestaurantStaffRoles.IsStaff(workspace.StaffRole)) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/operations")">Orders and fulfillment →</a></p> }
+                                    @if (workspace.CanEdit || workspace.IsOwner || workspace.StaffRole == "manager") { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/deliveries")">Delivery desk and driver accounts →</a></p> }
                                     @if (workspace.CanEdit || workspace.StaffMemberId is not null) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/team")">Team, schedule and training →</a></p> }
                                     @if (workspace.StaffMemberId is not null) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/my-rewards")">Your team rewards →</a></p> }
                                 </section>
@@ -66,6 +69,7 @@
             </ul>
             <p>Choose a workspace tool to get started.</p>
         }
+        <p class="account-tool-note">Driving with BarTide? <a href="/driver">Create your network driver profile</a> to receive client offers, or ask your client to add your verified sign-in email to their own driver team. Accepted workspaces appear here. <a href="/driver/signin">Driver sign-in</a>.</p>
         <form method="post" action="/auth/session/signout" data-enhance="false"><AntiforgeryToken /><button class="bt-one-button" type="submit">Sign out</button></form>
     }
 </AuthFrame>

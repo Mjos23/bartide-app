@@ -1,0 +1,15 @@
+.dispatch-desk { margin: 1.5rem 0; }
+.dispatch-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.dispatch-roster { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 1rem; margin-top: 1rem; }
+.dispatch-driver { border: 1px solid #ccd7dd; border-radius: 1rem; padding: 1rem; min-width: 0; }
+.dispatch-driver h3 { margin: 0; font-size: 1.2rem; }
+.dispatch-driver .ordering-section-heading { align-items: flex-start; gap: .75rem; }
+.dispatch-driver .ordering-section-heading strong { font-size: .8rem; color: #1b6658; }
+.dispatch-form { display: grid; gap: .75rem; margin-top: 1rem; }
+.dispatch-form .ordering-note { margin: 0; }
+.dispatch-form button { justify-self: start; }
+.dispatch-add, .dispatch-shifts { margin-top: 1rem; }
+summary { cursor: pointer; font-weight: 650; }
+.dispatch-shifts ul { padding-left: 1.2rem; }
+.dispatch-shifts li { margin-bottom: 1rem; }
+.dispatch-shifts li p { font-size: .875rem; }

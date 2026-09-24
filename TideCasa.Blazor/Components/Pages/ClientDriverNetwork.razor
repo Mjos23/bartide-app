@@ -1,0 +1,88 @@
+@page "/workspace/{TenantId}/driver-network"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.RestaurantManagement
+@inject RestaurantManagementClient Api
+<PageTitle>Hire network drivers | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/driver-workspaces.css" /><meta name="robots" content="noindex,nofollow" /><script src="/driver-network.js" defer></script></HeadContent>
+<div class="bt-unified restaurant-ordering driver-workspace">
+    <header class="ordering-nav"><a href="@Workspace("deliveries")">← Delivery desk</a><span>BarTide · Driver network</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">MORE DRIVERS, ON YOUR TERMS</p><h1>Hire network drivers</h1>
+        <nav class="driver-work-nav" aria-label="Delivery workspace"><a href="@Workspace("deliveries")">Delivery desk</a><a href="@Workspace("driver-network")" aria-current="page">Hire drivers</a><a href="@Workspace("driver-payments")">Driver payments</a></nav>
+        @if (RestaurantManagementFlow.DriverNetworkNotice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error <a href="@Workspace("driver-network")">Try again</a></p> }
+        @if (workspace is not null)
+        {
+            <section class="ordering-panel">
+                <h2>Your delivery team, with room to grow</h2><p>Offer a fixed amount per completed delivery. The driver must accept before joining your delivery team. Set availability and dispatch from your delivery desk.</p>
+                <p><strong>Network delivery fee: 5% of driver pay.</strong> A $10.00 driver payment costs your business $10.50: $10.00 to the driver and $0.50 to BarTide. Each fee rounds to the nearest cent. Your own drivers have no network fee.</p>
+                <p class="ordering-note">An offer creates no charge. Completing a delivery creates a payment for the owner to review; payment only starts after explicit owner approval.</p>
+                <p><a href="/driver/signin?return_to=%2Fdriver">Driver signup and sign-in link</a> · <a href="@Workspace("team")">Manage your own team</a></p>
+            </section>
+            <section class="ordering-panel">
+                <div class="ordering-section-heading"><h2>Your hiring agreements</h2><a href="@Workspace("driver-network")">Refresh</a></div>
+                @if (workspace.Hires.Count == 0) { <p>No network offers or agreements yet.</p> }
+                <div class="driver-work-grid">
+                    @foreach (var hire in workspace.Hires)
+                    {
+                        var fee = DriverWorkFormat.NetworkFee(hire.PayPerDeliveryCents);
+                        <article class="driver-work-card">
+                            <h3>@hire.DriverName</h3><p class="driver-work-status">@DriverWorkFormat.Status(hire.Status)</p>
+                            <p>@DriverWorkFormat.Money(hire.PayPerDeliveryCents) driver pay + @DriverWorkFormat.Money(fee) network fee = <strong>@DriverWorkFormat.Money(hire.PayPerDeliveryCents + fee) per delivery</strong></p>
+                            @if (!string.IsNullOrWhiteSpace(hire.Notes)) { <p class="driver-work-preserve">@hire.Notes</p> }
+                            @if (hire.Status == "active") { <p><a href="@Workspace("deliveries")">Manage availability and assignments</a></p> }
+                            @if (hire.Status is "active" or "offered")
+                            {
+                                <details><summary>@(hire.Status == "offered" ? "Withdraw offer" : "End agreement")</summary>
+                                    <form method="post" action="@Action("end")" data-enhance="false" class="driver-work-form"><AntiforgeryToken /><input type="hidden" name="hire" value="@hire.Id" /><input type="hidden" name="version" value="@hire.Version" /><label class="rm-check"><input type="checkbox" name="confirm_end" value="true" required /><span>@(hire.Status == "offered" ? "Withdraw this pending offer." : "End this agreement and remove this driver’s workspace access. Complete or reassign their active deliveries first.")</span></label><button class="ordering-secondary" type="submit">Confirm @(hire.Status == "offered" ? "withdrawal" : "end agreement")</button></form>
+                                </details>
+                            }
+                        </article>
+                    }
+                </div>
+            </section>
+            <section class="ordering-panel">
+                <h2>Driver directory</h2><p>Drivers choose to share these profiles with BarTide clients. Review coverage and discuss your delivery needs in the offer notes.</p>
+                @if (workspace.Drivers.Count == 0) { <p>No drivers are listed yet. Share the driver signup link with drivers who would like to join.</p> }
+                <div class="driver-work-grid">
+                    @foreach (var driver in workspace.Drivers)
+                    {
+                        var prior = workspace.Hires.FirstOrDefault(h => h.DriverId == driver.Id);
+                        var pay = prior?.PayPerDeliveryCents ?? 1000;
+                        <article class="driver-work-card">
+                            <h3>@driver.Name</h3><p class="driver-work-preserve">@driver.Bio</p><p>Delivery ZIPs: @string.Join(", ", driver.DeliveryZips)</p><p>Capacity across clients: @driver.Capacity active deliveries</p>
+                            @if (prior?.Status == "active") { <p class="driver-work-status">Already on your network team</p> }
+                            else
+                            {
+                                <form method="post" action="@Action("offer")" data-enhance="false" class="driver-work-form" data-driver-fee-preview>
+                                    <AntiforgeryToken /><input type="hidden" name="driver" value="@driver.Id" /><input type="hidden" name="version" value="@(prior?.Version ?? 0)" />
+                                    <label class="desk-field">Driver pay per completed delivery ($)<input name="pay" type="number" min="0.50" max="1000" step="0.01" value="@((pay / 100m).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))" required /></label>
+                                    <p class="driver-fee-preview" role="status" data-driver-fee-output>@DriverWorkFormat.Money(pay) driver pay + @DriverWorkFormat.Money(DriverWorkFormat.NetworkFee(pay)) network fee = @DriverWorkFormat.Money(pay + DriverWorkFormat.NetworkFee(pay)) client total per delivery.</p>
+                                    <label class="desk-field">Offer notes<textarea name="notes" maxlength="500" rows="3" placeholder="Delivery hours, pickup location and expectations.">@prior?.Notes</textarea></label>
+                                    <button class="bt-one-button" type="submit">@(prior?.Status == "offered" ? "Update offer" : "Send hiring offer")</button>
+                                </form>
+                            }
+                        </article>
+                    }
+                </div>
+            </section>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private ClientDriverNetworkWorkspace? workspace;
+    private string? error;
+    private string Workspace(string page) => "/workspace/" + Uri.EscapeDataString(TenantId) + "/" + page;
+    private string Action(string operation) => "/driver-network/" + Uri.EscapeDataString(TenantId) + "/" + operation;
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open your driver directory."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.GetDriverNetworkAsync(TenantId, token, HttpContext.RequestAborted);
+        if (result.Succeeded) workspace = result.Value;
+        else { error = result.Uncertain ? "The driver directory could not be loaded. Try again shortly." : "This driver directory is unavailable to your account."; HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; }
+    }
+}

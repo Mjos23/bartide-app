@@ -5,7 +5,7 @@ public sealed record RestaurantMenuItem(string Id, string CategoryId, string Nam
 public sealed record RestaurantTable(string Id, string Label, string Token, bool Enabled);
 public sealed record RestaurantCheckoutOptions(bool AcceptingOrders, bool DineInEnabled, bool PickupEnabled, bool DeliveryEnabled,
     bool PayStaffEnabled, bool PhonePaymentAvailable, bool TipsEnabled, int? TaxBasisPoints,
-    int DeliveryFeeCents, int DeliveryMinimumCents, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions);
+    int DeliveryFeeCents, int DeliveryMinimumCents, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions, string ContactPhone = "");
 public sealed record RestaurantMenu(string Slug, string Name, int MenuVersion, string Currency,
     IReadOnlyList<RestaurantCategory> Categories, IReadOnlyList<RestaurantMenuItem> Items, RestaurantCheckoutOptions Checkout, RestaurantTable? Table);
 public sealed record OrderItemSelection(string ItemId, int Quantity);
@@ -19,7 +19,9 @@ public sealed record RestaurantQuote(IReadOnlyList<RestaurantOrderLine> Lines, i
 public sealed record RestaurantOrderRequest(string RequestKey, string TrackingKey, RestaurantQuoteRequest Order,
     string QuoteFingerprint, string CustomerName, string Phone, string? Address = null, string? Note = null);
 public sealed record RestaurantOrderReceipt(string OrderId, string Number, string Status, string PaymentStatus,
-    RestaurantQuote Quote, string CreatedAt);
+    RestaurantQuote Quote, string CreatedAt, RestaurantDeliveryProgress? Delivery = null);
+public sealed record RestaurantDeliveryProgress(string? DriverName, string? AssignedAt, string? AcknowledgedAt,
+    string? CollectedAt, string? DeliveredAt, string? ProblemCode, string UpdatedAt);
 public sealed record RestaurantTrackingRequest(string OrderId, string TrackingKey);
 public sealed record RestaurantManagedOrder(RestaurantOrderReceipt Receipt, string CustomerName, string Phone, string Address,
     string Zip, string Note, int Version);

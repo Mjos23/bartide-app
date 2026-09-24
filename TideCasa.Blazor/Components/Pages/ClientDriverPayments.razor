@@ -1,0 +1,96 @@
+@page "/workspace/{TenantId}/driver-payments"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.RestaurantManagement
+@inject RestaurantManagementClient Api
+<PageTitle>Review driver payments | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/driver-workspaces.css" /><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<div class="bt-unified restaurant-ordering driver-workspace">
+    <header class="ordering-nav"><a href="@Workspace("deliveries")">← Delivery desk</a><span>BarTide · Driver payments</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">YOU APPROVE EVERY PAYMENT</p><h1>Review driver payments</h1>
+        <nav class="driver-work-nav" aria-label="Delivery workspace"><a href="@Workspace("deliveries")">Delivery desk</a><a href="@Workspace("driver-network")">Hire drivers</a><a href="@Workspace("driver-payments")" aria-current="page">Driver payments</a></nav>
+        @if (RestaurantManagementFlow.DriverNetworkNotice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error <a href="@CurrentPath">Try again</a></p> }
+        @if (workspace is not null)
+        {
+            @if (workspace.Sandbox) { <p class="ordering-notice driver-sandbox" role="status"><strong>Test mode</strong> — Stripe test payments only. No real driver payments are made.</p> }
+            <section class="ordering-panel">
+                <div class="ordering-section-heading"><h2>@workspace.Name</h2><a href="@CurrentPath">Refresh payments</a></div>
+                <p>Completed deliveries appear here for owner approval. Completion alone does not start a payment.</p>
+                <p>Network driver pay comes from the accepted hiring agreement. BarTide adds a 5% network fee: $10.00 driver pay + $0.50 fee = $10.50 client total. Your own drivers have no network fee.</p>
+                <p class="ordering-note">Paid status means credited to the driver’s Stripe account, not arrival in their bank. Charges, refunds and disputes remain visible in payment history.</p>
+                @if (!workspace.PaymentsEnabled) { <p class="ordering-notice"><strong>Payments are not enabled yet.</strong> You can review completed work; no checkout can start until driver payments are configured.</p> }
+                @if (!workspace.CanApprove) { <p class="ordering-note">You can review this delivery history. Only the business owner can approve and pay drivers.</p> }
+            </section>
+            <DriverPaymentPages Path="@Workspace("driver-payments")" Page="workspace.Page" HasMore="workspace.HasMore" />
+            @if (workspace.Payments.Count == 0) { <section class="ordering-panel"><h2>@(workspace.Page == 0 ? "No completed deliveries to review yet." : "No completed deliveries on this page.")</h2><p>@(workspace.Page == 0 ? "Driver payments will appear after delivery is confirmed." : "Use Newer deliveries to return to your history.")</p></section> }
+            <div class="driver-work-grid">
+                @foreach (var payment in workspace.Payments)
+                {
+                    var reviewingOwn = payment.Source != "network" && payment.DriverPayCents == 0 && ReviewPayment == payment.Id && ReviewCents is >= 50 and <= 100000;
+                    var pay = reviewingOwn ? ReviewCents!.Value : payment.DriverPayCents;
+                    var fee = reviewingOwn ? 0 : payment.PlatformFeeCents;
+                    var total = reviewingOwn ? pay : payment.TotalCents;
+                    <article class="ordering-panel driver-work-card">
+                        <h2>Order @payment.OrderNumber</h2><h3>@payment.DriverName</h3><p class="driver-work-status">@DriverWorkFormat.Status(payment.Status)</p>
+                        <p>@(payment.Source == "network" ? "Network driver · agreed pay" : "Your own driver · no network fee")</p>
+                        <p class="ordering-note">Completed @DriverWorkFormat.Time(payment.CompletedAt)</p>
+                        @if (pay > 0)
+                        {
+                            <dl class="ordering-totals"><div><dt>Driver pay</dt><dd>@DriverWorkFormat.Money(pay)</dd></div><div><dt>BarTide network fee@(payment.Source == "network" ? " (5%)" : "")</dt><dd>@DriverWorkFormat.Money(fee)</dd></div><div class="ordering-total"><dt>Client total</dt><dd>@DriverWorkFormat.Money(total)</dd></div></dl>
+                        }
+                        else { <p>The owner chooses the amount for this direct driver payment.</p> }
+                        @if (workspace.CanApprove && workspace.PaymentsEnabled)
+                        {
+                            @if (payment.Status is "pending_approval" or "expired")
+                            {
+                                @if (payment.Source != "network" && payment.DriverPayCents == 0 && !reviewingOwn)
+                                {
+                                    <form method="post" action="@Action(payment.Id, "review")" data-enhance="false" class="driver-work-form"><AntiforgeryToken /><input type="hidden" name="page" value="@workspace.Page" /><label class="desk-field">Driver pay ($)<input name="pay" type="number" min="0.50" max="1000" step="0.01" required /></label><p class="ordering-note">No network fee. Review the exact total before approval.</p><button type="submit" class="ordering-secondary">Review payment amount</button></form>
+                                }
+                                else if (pay > 0)
+                                {
+                                    <form method="post" action="@Action(payment.Id, "approve")" data-enhance="false" class="driver-work-form">
+                                        <AntiforgeryToken /><input type="hidden" name="page" value="@workspace.Page" /><input type="hidden" name="version" value="@payment.Version" /><input type="hidden" name="pay_cents" value="@pay" />
+                                        <label class="rm-check"><input type="checkbox" name="confirm_payment" value="true" required /><span>I approve @DriverWorkFormat.Money(total) for this completed delivery: @DriverWorkFormat.Money(pay) to @payment.DriverName and @DriverWorkFormat.Money(fee) to BarTide.</span></label>
+                                        <button type="submit" class="bt-one-button">Approve @DriverWorkFormat.Money(total) · continue to Stripe</button>
+                                    </form>
+                                    @if (reviewingOwn) { <p><a href="@CurrentPath">Change the amount</a></p> }
+                                }
+                            }
+                            @if (payment.Status == "open" && DriverWorkFormat.HostedUrl(payment.CheckoutUrl, "checkout.stripe.com") is { } checkout)
+                            { <p><a class="bt-one-button" href="@checkout" rel="noopener noreferrer">Continue approved payment with Stripe</a></p> }
+                            @if (payment.Status is "creating" or "open" or "review" or "paid")
+                            {
+                                <form method="post" action="@Action(payment.Id, "refresh")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="page" value="@workspace.Page" /><button type="submit" class="ordering-secondary">Check payment status</button></form>
+                            }
+                        }
+                    </article>
+                }
+            </div>
+            <DriverPaymentPages Path="@Workspace("driver-payments")" Page="workspace.Page" HasMore="workspace.HasMore" />
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int Page { get; set; }
+    [SupplyParameterFromQuery(Name = "payment")] public string? ReviewPayment { get; set; }
+    [SupplyParameterFromQuery(Name = "pay")] public int? ReviewCents { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private ClientDriverPaymentsWorkspace? workspace;
+    private string? error;
+    private string CurrentPath => Workspace("driver-payments") + "?page=" + (workspace?.Page ?? Page);
+    private string Workspace(string page) => "/workspace/" + Uri.EscapeDataString(TenantId) + "/" + page;
+    private string Action(string payment, string operation) => "/driver-payments/" + Uri.EscapeDataString(TenantId) + "/" + Uri.EscapeDataString(payment) + "/" + operation;
+    protected override async Task OnInitializedAsync()
+    {
+        if (Page is < 0 or > 100000) { error = "Choose a valid payment history page."; HttpContext.Response.StatusCode = 400; return; }
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to review driver payments."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.GetDriverPaymentsAsync(TenantId, token, HttpContext.RequestAborted, Page);
+        if (result.Succeeded) workspace = result.Value;
+        else { error = result.Uncertain ? "Driver payments could not be loaded. Try again shortly." : "Driver payments are unavailable to your account."; HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; }
+    }
+}

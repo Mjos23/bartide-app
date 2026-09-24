@@ -1,0 +1,74 @@
+@page "/driver"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.RestaurantManagement
+@inject RestaurantManagementClient Api
+<PageTitle>Driver workspace | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/driver-workspaces.css" /><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<div class="bt-unified restaurant-ordering driver-workspace">
+    <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Driver network</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">YOUR NEXT DELIVERY STARTS HERE</p><h1>Your driver workspace</h1>
+        <nav class="driver-work-nav" aria-label="Driver workspace"><a href="/driver" aria-current="page">Profile and offers</a><a href="/driver/earnings">Earnings and payouts</a><a href="/account">Your delivery workspaces</a></nav>
+        @if (RestaurantManagementFlow.DriverNetworkNotice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error <a href="/driver">Try again</a></p> }
+        @if (account is not null)
+        {
+            <section class="ordering-panel">
+                <h2>@(account.Profile is null ? "Create your driver profile" : "Your network profile")</h2>
+                <p>Choose whether BarTide businesses can find your profile and offer delivery work. You decide which offers to accept. Creating a profile or joining the directory does not give access to a business’s orders.</p>
+                <form method="post" action="/driver/manage/profile" data-enhance="false" class="driver-work-form">
+                    <AntiforgeryToken /><input type="hidden" name="version" value="@(account.Profile?.Version ?? 0)" />
+                    <label class="desk-field">Driver name<input name="name" maxlength="80" value="@(account.Profile?.Name ?? DisplayName)" required autocomplete="name" /></label>
+                    <label class="desk-field">About you<textarea name="bio" rows="3" maxlength="1000" placeholder="Tell clients about your delivery experience and availability.">@account.Profile?.Bio</textarea></label>
+                    <label class="desk-field">Delivery ZIP codes<input name="zips" maxlength="500" value="@string.Join(", ", account.Profile?.DeliveryZips ?? [])" placeholder="33101, 33102" required /></label>
+                    <p class="ordering-note">Enter 1–50 five-digit ZIP codes, separated by commas.</p>
+                    <label class="desk-field">Maximum active deliveries across BarTide clients<input name="capacity" type="number" min="1" max="10" value="@(account.Profile?.Capacity ?? 1)" required /></label>
+                    <label class="rm-check"><input type="checkbox" name="listed" value="true" checked="@(account.Profile?.Listed == true)" /><span>List my name, introduction, ZIP coverage and capacity in the BarTide client driver directory.</span></label>
+                    <p class="ordering-note">Unlisting hides your profile from the directory. Existing agreements stay active. Set your availability separately in each client delivery workspace.</p>
+                    <button class="bt-one-button" type="submit">Save driver profile</button>
+                </form>
+            </section>
+            <section class="ordering-panel">
+                <div class="ordering-section-heading"><h2>Client offers and agreements</h2><a href="/driver">Refresh offers</a></div>
+                <p>Your agreed delivery pay is shown below. Clients pay the 5% BarTide network fee separately; it is not deducted from your agreed pay. Completed deliveries still need the client owner’s payment approval.</p>
+                @if (account.Hires.Count == 0) { <p>No offers yet. List your profile so clients can find you.</p> }
+                <div class="driver-work-grid">
+                    @foreach (var hire in account.Hires)
+                    {
+                        <article class="driver-work-card">
+                            <h3>@hire.TenantName</h3><p class="driver-work-status">@DriverWorkFormat.Status(hire.Status)</p>
+                            <p class="driver-work-pay">@DriverWorkFormat.Money(hire.PayPerDeliveryCents) <span>to you per completed delivery</span></p>
+                            @if (!string.IsNullOrWhiteSpace(hire.Notes)) { <p class="driver-work-preserve">@hire.Notes</p> }
+                            @if (hire.Status == "offered")
+                            {
+                                <p class="ordering-note">Accepting connects you to this client’s driver team. Open their delivery workspace afterward to set availability.</p>
+                                <div class="driver-work-actions">
+                                    @foreach (var response in new[] { "accept", "decline" })
+                                    {
+                                        <form method="post" action="@("/driver/manage/hires/" + Uri.EscapeDataString(hire.Id))" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="version" value="@hire.Version" /><input type="hidden" name="response" value="@response" /><button type="submit" class="ordering-secondary">@(response == "accept" ? "Accept offer" : "Decline offer")</button></form>
+                                    }
+                                </div>
+                            }
+                            @if (hire.Status == "active") { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(hire.TenantId)}/deliveries")">My deliveries and availability →</a></p> }
+                        </article>
+                    }
+                </div>
+            </section>
+        }
+    </main>
+</div>
+@code {
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private DriverNetworkAccount? account;
+    private string? error;
+    private string DisplayName => (HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.User.DisplayName ?? "";
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open your driver workspace."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.GetDriverAccountAsync(token, HttpContext.RequestAborted);
+        if (result.Succeeded) account = result.Value;
+        else { error = result.Uncertain ? "Your driver workspace could not be loaded. Try again shortly." : "Your driver workspace is unavailable to this account."; HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; }
+    }
+}

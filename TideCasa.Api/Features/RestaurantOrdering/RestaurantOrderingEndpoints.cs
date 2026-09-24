@@ -22,7 +22,7 @@ public static class RestaurantOrderingEndpoints
             return Results.Json(result.Receipt, statusCode: result.Created ? 201 : 200);
         });
         guest.MapPost("/track", async (string slug, RestaurantTrackingRequest request, RestaurantOrderingStore store, CancellationToken ct) =>
-            Results.Ok(await store.TrackAsync(slug, request, ct)));
+            Results.Ok(await store.TrackAsync(slug, request, ct))).RequireRateLimiting("delivery-status");
         guest.MapGet("/tables/{token}/qr", async (string slug, string token, RestaurantOrderingStore store, IConfiguration configuration, IHostEnvironment environment, CancellationToken ct) =>
         {
             var menu = await store.MenuAsync(slug, token, ct);

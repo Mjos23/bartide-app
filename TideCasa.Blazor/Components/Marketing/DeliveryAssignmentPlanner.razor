@@ -1,0 +1,34 @@
+@namespace TideCasa.Blazor.Components.Marketing
+@using System.Globalization
+<section class="dispatch-plan" aria-label="Order assignment plan">
+    <p><strong>Assignment plan:</strong> @PlanLabel</p>
+    @if (Entry.AssignmentPlan?.DispatchAt is { } dispatchAt) { <p>Dispatch at @Time(dispatchAt). @(Entry.AssignmentPlan.PreferredDriverId is { } preferred ? "Preferred driver: " + (Drivers.FirstOrDefault(d => d.Id == preferred)?.Name ?? "Driver unavailable") + "." : "Match an available driver.")</p> }
+    <details><summary>Choose automatic or scheduled assignment</summary>
+        <p class="ordering-note">Assignment begins after the order is accepted. Scheduled dispatch keeps this order unassigned until the selected time. If no eligible driver is available, it waits for a later check.</p>
+        <form method="post" action="@ActionPath" data-enhance="false">
+            <AntiforgeryToken /><input type="hidden" name="version" value="@Entry.Order.Version" /><input type="hidden" name="mode" value="automatic" />
+            <button class="ordering-secondary" type="submit">Assign automatically when eligible</button>
+        </form>
+        <form method="post" action="@ActionPath" data-enhance="false" class="dispatch-plan-form">
+            <AntiforgeryToken /><input type="hidden" name="version" value="@Entry.Order.Version" /><input type="hidden" name="mode" value="scheduled" />
+            <label class="desk-field">Dispatch date and time<input type="datetime-local" name="dispatch_at" value="@ScheduledValue" required /></label>
+            <DeliveryTimeZone />
+            <label class="desk-field">Preferred driver<select name="driver"><option value="">Any available driver</option>@foreach (var driver in Drivers.Where(d => d.AccountLinked)) { <option value="@driver.Id" selected="@(driver.Id == Entry.AssignmentPlan?.PreferredDriverId)">@driver.Name</option> }</select></label>
+            <p class="ordering-note">Choose a time within the next 90 days. A preferred driver must be available, cover this ZIP and have capacity at dispatch time; otherwise the order waits. Existing times are shown in UTC.</p>
+            <button class="ordering-secondary" type="submit">Save scheduled dispatch</button>
+        </form>
+        <form method="post" action="@ActionPath" data-enhance="false">
+            <AntiforgeryToken /><input type="hidden" name="version" value="@Entry.Order.Version" /><input type="hidden" name="mode" value="manual" />
+            <button class="ordering-secondary" type="submit">Keep for manual assignment</button>
+        </form>
+    </details>
+</section>
+@code {
+    [Parameter, EditorRequired] public RestaurantOperationOrder Entry { get; set; } = default!;
+    [Parameter] public string TenantId { get; set; } = "";
+    [Parameter] public IReadOnlyList<RestaurantDriver> Drivers { get; set; } = [];
+    private string ActionPath => "/restaurant-management/" + Uri.EscapeDataString(TenantId) + "/dispatch/orders/" + Uri.EscapeDataString(Entry.Order.Receipt.OrderId);
+    private string PlanLabel => Entry.AssignmentPlan?.Mode switch { "automatic" => "Automatic", "scheduled" => "Scheduled", "manual" => "Manual", _ => "Follows workspace dispatch setting" };
+    private string ScheduledValue => DateTimeOffset.TryParse(Entry.AssignmentPlan?.DispatchAt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var when) ? when.UtcDateTime.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) : "";
+    private static string Time(string value) => DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var when) ? when.ToUniversalTime().ToString("MMM d, yyyy HH:mm 'UTC'", CultureInfo.InvariantCulture) : value;
+}

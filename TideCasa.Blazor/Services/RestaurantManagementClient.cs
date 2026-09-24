@@ -5,7 +5,7 @@ using TideCasa.Contracts;
 
 namespace TideCasa.Blazor.Services;
 
-public sealed class RestaurantManagementClient(HttpClient client, OrderingRequestContext requestContext)
+public sealed partial class RestaurantManagementClient(HttpClient client, OrderingRequestContext requestContext)
 {
     public Task<RestaurantApiResult<RestaurantMenuEditor>> GetMenuAsync(string tenant, string token, CancellationToken ct) =>
         SendAsync<RestaurantMenuEditor>(HttpMethod.Get, Path(tenant, "menu"), null, token, ct);

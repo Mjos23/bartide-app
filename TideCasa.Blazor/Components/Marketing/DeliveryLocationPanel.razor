@@ -1,0 +1,26 @@
+@namespace TideCasa.Blazor.Components.Marketing
+@inject IJSRuntime JS
+<section class="delivery-location-card" aria-label="Delivery location">
+    <h3>Driver location</h3>
+    @if (Location is { } location)
+    {
+        <p>@location.DriverName · @(location.Simulated ? "Simulated trip" : "Location shared for your delivery")</p>
+        <p class="location-age" data-location-age="@location.Point?.CapturedAt" data-location-server="@location.ServerTime">@(location.State == "recent" ? "Recent update" : location.State == "stale" ? "Location is out of date" : "Waiting for a location")</p>
+        @if (location.Point is { } point)
+        {
+            <p>Accuracy: approximately @Math.Round(point.AccuracyMeters) metres. Updated @DateTimeOffset.Parse(point.CapturedAt).ToString("HH:mm:ss 'UTC'").</p>
+            <div @ref="map" class="delivery-location-map" aria-label="Driver's last reported location"></div>
+        }
+    }
+    else { <p>The driver is not sharing a location right now. Order status updates will continue.</p> }
+    <small>Location may pause when the driver locks the phone or opens navigation. No arrival time is estimated.</small>
+</section>
+@code {
+    [Parameter] public DeliveryLocationView? Location {get;set;}
+    private ElementReference map;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if(Location?.Point is {} point)try {await JS.InvokeVoidAsync("tideDeliveryLocation.draw",map,point,Location.Simulated);}
+        catch(Exception e) when(e is JSDisconnectedException or TaskCanceledException){}
+    }
+}

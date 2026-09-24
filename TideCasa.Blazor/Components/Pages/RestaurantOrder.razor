@@ -34,6 +34,26 @@
                     <div><dt>Tip</dt><dd>@Money(receipt.Quote.TipCents)</dd></div>
                     <div class="ordering-total"><dt>Total to pay</dt><dd>@Money(receipt.Quote.TotalCents)</dd></div>
                 </dl>
+                @if (receipt.Delivery is { } delivery)
+                {
+                    <section aria-label="Delivery updates" class="delivery-progress">
+                        <h3>Your delivery</h3>
+                        @if (!string.IsNullOrWhiteSpace(menu.Checkout.ContactPhone)) { <p><a href="@("tel:" + Uri.EscapeDataString(menu.Checkout.ContactPhone))">Contact @menu.Name · @menu.Checkout.ContactPhone</a></p> }
+                        <ul class="delivery-timeline">
+                            <li class="@(receipt.Status is "accepted" or "preparing" or "ready" or "out_for_delivery" or "delivered" or "completed" ? "done" : null)">Restaurant acceptance</li>
+                            <li class="@(delivery.AssignedAt is not null ? "done" : null)">Driver assigned</li>
+                            <li class="@(delivery.AcknowledgedAt is not null ? "done" : null)">Driver acknowledged</li>
+                            <li class="@(delivery.CollectedAt is not null ? "done" : null)">On the way</li>
+                            <li class="@(delivery.DeliveredAt is not null ? "done" : null)">Delivered</li>
+                        </ul>
+                        @if (delivery.DriverName is not null) { <p>Your driver: <strong>@delivery.DriverName</strong></p> }
+                        @if (delivery.ProblemCode is not null) { <p role="status">The restaurant is resolving a delivery issue. Please contact the restaurant with your order number.</p> }
+                        <p class="ordering-note">Last change: @DateTimeOffset.Parse(delivery.UpdatedAt).ToString("MMM d, h:mm tt 'UTC'"). @(ShouldPollDelivery ? "Updates automatically while this page is open." : "Delivery updates finished.")</p>
+                        @if (deliveryCheckedAt is { } checkedAt) { <small>Last checked @checkedAt.ToString("h:mm:ss tt 'UTC'")</small> }
+                        @if (deliveryRefreshError is not null) { <p role="alert" class="ordering-error">@deliveryRefreshError</p> }
+                    </section>
+                }
+                @if (receipt.Status == "out_for_delivery") { <DeliveryLocationPanel Location="@deliveryLocation" /> }
                 <p>Save your order number and keep this page open to check its status.</p>
                 <button class="ordering-secondary" type="button" @onclick="RefreshReceiptAsync" disabled="@busy">@(busy ? "Checking…" : "Check order status")</button>
                 @if (checkout?.State == "open")

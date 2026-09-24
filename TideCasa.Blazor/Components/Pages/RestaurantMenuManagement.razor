@@ -142,9 +142,10 @@
                             <label class="desk-field">Delivery minimum (USD)<input name="delivery_minimum" type="number" inputmode="decimal" value="@Amount(settings.DeliveryMinimumCents)" min="0" max="1000" step="0.01" required /></label>
                             <label class="desk-field">Delivery capacity<input name="delivery_capacity" type="number" inputmode="numeric" value="@settings.DeliveryCapacity" min="1" max="30" step="1" required /></label>
                         </div>
+                        <label class="rm-check"><input type="checkbox" name="delivery_workflow_enabled" value="true" checked="@settings.DeliveryWorkflowEnabled" /><span>Enhanced delivery desk: driver acknowledgement, delivery confirmation and customer updates. Existing enhanced deliveries stay manageable if switched off.</span></label>
                         <label class="desk-field">Delivery ZIP codes<textarea name="delivery_zips" rows="2" maxlength="500" placeholder="For example, 33101, 33102">@string.Join(", ", settings.DeliveryZips)</textarea></label>
                         <p class="ordering-note">List up to 50 five-digit ZIP codes. Delivery capacity limits how many delivery orders can be open at once.</p>
-                        <label class="desk-field">Restaurant contact phone (optional, shown on your public app)<input type="tel" name="contact_phone" maxlength="30" value="@settings.ContactPhone" /></label>
+                        <label class="desk-field">Restaurant contact phone (optional, shown on delivery receipts)<input type="tel" name="contact_phone" maxlength="30" value="@settings.ContactPhone" /></label>
                         <div class="rm-field-grid"><label class="desk-field">Pickup instructions<textarea name="pickup_instructions" rows="3" maxlength="500">@settings.PickupInstructions</textarea></label><label class="desk-field">Payment instructions<textarea name="payment_instructions" rows="3" maxlength="500">@settings.PaymentInstructions</textarea></label></div>
                         <button class="bt-one-button" type="submit">Save ordering settings</button>
                     </form>

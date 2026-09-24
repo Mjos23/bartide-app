@@ -143,7 +143,7 @@ public sealed partial class RestaurantOrderingStore
         await tx.CommitAsync(ct);
         return new(venue.ConfigVersion, venue.Status == "active" && Boolean(c, "accepting_orders", false), options.PickupEnabled, Boolean(c, "delivery_enabled", false),
             options.PayStaffEnabled, options.TipsEnabled, options.TaxBasisPoints, options.DeliveryFeeCents, options.DeliveryMinimumCents,
-            Integer(c, "delivery_capacity", 1, 30, 5), options.DeliveryZips, options.PickupInstructions, options.PaymentInstructions, String(c, "contact_phone"));
+            Integer(c, "delivery_capacity", 1, 30, 5), options.DeliveryZips, options.PickupInstructions, options.PaymentInstructions, Boolean(c, "delivery_workflow_enabled", false), options.ContactPhone);
     }
 
     public async Task<RestaurantOrderingSettings> SaveSettingsAsync(string id, AuthUser user, SaveRestaurantOrderingSettingsRequest request, CancellationToken ct)
@@ -164,7 +164,7 @@ public sealed partial class RestaurantOrderingStore
         if (venue.Status != "active" && request.AcceptingOrders)
             throw new OrderingException("Orders can open after your approved app launches. Save service settings with orders closed.", 409, "launch_required");
         if (venue.ConfigVersion != request.ExpectedVersion) throw new OrderingException("Settings changed. Reload before saving.", 409, "stale_settings");
-        var c = venue.Config; var checkout = c["checkout"] as JsonObject;
+        var c = venue.Config; c["delivery_workflow_enabled"] = request.DeliveryWorkflowEnabled; var checkout = c["checkout"] as JsonObject;
         if (checkout is null) { checkout = new(); c["checkout"] = checkout; }
         checkout["pickup_enabled"] = request.PickupEnabled; checkout["pay_staff_enabled"] = request.PayStaffEnabled; checkout["tips_enabled"] = request.TipsEnabled;
         c["accepting_orders"] = venue.Status == "active" && request.AcceptingOrders; c["delivery_enabled"] = request.DeliveryEnabled; c["tax_basis_points"] = request.TaxBasisPoints;
@@ -173,6 +173,11 @@ public sealed partial class RestaurantOrderingStore
         await using var save = Command(db, tx, "UPDATE bartide_enhanced_configs SET settings_json=@json,version=version+1,updated_at=@now WHERE tenant_id=@id AND version=@version",
             ("@json", c.ToJsonString(Json)), ("@now", Stamp()), ("@id", id), ("@version", request.ExpectedVersion));
         if (await save.ExecuteNonQueryAsync(ct) != 1) throw new OrderingException("Settings changed. Reload before saving.", 409, "stale_settings");
+        if (!request.DeliveryWorkflowEnabled || !request.DeliveryEnabled)
+        {
+            await using var revokeLocations = Command(db, tx, "DELETE FROM tide_delivery_locations WHERE tenant_id=@id", ("@id", id));
+            await revokeLocations.ExecuteNonQueryAsync(ct);
+        }
         await tx.CommitAsync(ct);
         return await SettingsAsync(id, user, ct);
     }
@@ -185,9 +190,9 @@ public sealed partial class RestaurantOrderingStore
         var drivers = new List<RestaurantDriver>();
         if (access.Role is "owner" or "manager")
         {
-            await using var command = Command(db, tx, "SELECT id,name FROM bartide_enhanced_members WHERE tenant_id=@id AND role='driver' AND active=1 ORDER BY name", ("@id", id));
+            await using var command = Command(db, tx, "SELECT id,name,user_id FROM bartide_enhanced_members WHERE tenant_id=@id AND role='driver' AND active=1 ORDER BY name", ("@id", id));
             await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct)) drivers.Add(new(reader.GetString(0), reader.GetString(1)));
+            while (await reader.ReadAsync(ct)) drivers.Add(new(reader.GetString(0), reader.GetString(1), !reader.IsDBNull(2) && reader.GetString(2).Length > 0));
         }
         var orders = new List<RestaurantOperationOrder>();
         await using (var command = Command(db, tx,
@@ -199,11 +204,11 @@ public sealed partial class RestaurantOrderingStore
             {
                 var p = Parse(reader.GetString(0)); var driver = reader.IsDBNull(1) ? null : reader.GetString(1);
                 var order = new RestaurantManagedOrder(Receipt(p), String(p, "customer_name"), String(p, "phone"), String(p, "address"), String(p, "zip"), String(p, "note"), reader.ReadInt32(2));
-                orders.Add(new(order, driver, AllowedActions(order.Receipt, access.Role, driver)));
+                orders.Add(new(order, driver, AllowedActions(order.Receipt, access.Role, driver, DeliveryWorkflow(venue, p)), DeliveryWorkflow(venue, p), AssignmentPlan(p)));
             }
         }
         await tx.CommitAsync(ct);
-        return new(id, venue.Name, access.Role, drivers, orders);
+        return new(id, venue.Name, access.Role, drivers, orders, Boolean(venue.Config, "delivery_workflow_enabled", false) || orders.Any(o => o.Order.Receipt.Delivery is not null), String(venue.Config, "pickup_instructions"));
     }
 
     public async Task<RestaurantOperationsWorkspace> ChangeOrderAsync(string id, string orderId, AuthUser user, ChangeRestaurantOrderRequest request, CancellationToken ct)
@@ -221,9 +226,15 @@ public sealed partial class RestaurantOrderingStore
         if (access.Role == "driver" && driver != access.MemberId) throw new OrderingException("This delivery is not assigned to you.", 403, "forbidden");
         if (request.ExpectedVersion != version) throw new OrderingException("This order changed. Reload before updating.", 409, "stale_order");
         var receipt = Receipt(payload);
-        if (!AllowedActions(receipt, access.Role, driver).Contains(request.Action)) throw new OrderingException("That order action is not available.", 409, "invalid_transition");
-        if (request.Action == "assign-driver")
+        if (!AllowedActions(receipt, access.Role, driver, DeliveryWorkflow(venue, payload)).Contains(request.Action)) throw new OrderingException("That order action is not available.", 409, "invalid_transition");
+        if (DeliveryWorkflow(venue, payload))
         {
+            driver = await ChangeDeliveryAsync(db, tx, id, payload, driver, access.Role, user.UserId, request, ct);
+        }
+        else if (request.Action == "assign-driver")
+        {
+            await ValidateDriverAssignment(db, tx, id, request.DriverId, payload, ct);
+            await CaptureDriverSource(db, tx, id, request.DriverId!, payload, ct);
             await using var assigned = Command(db, tx, "SELECT COUNT(*) FROM bartide_enhanced_members WHERE id=@member AND tenant_id=@tenant AND active=1 AND role='driver'",
                 ("@member", (object?)request.DriverId ?? DBNull.Value), ("@tenant", id));
             if (Convert.ToInt64(await assigned.ExecuteScalarAsync(ct)) != 1) throw new OrderingException("Choose an active driver for this business.");
@@ -243,19 +254,23 @@ public sealed partial class RestaurantOrderingStore
             }
             payload["status"] = request.Action;
         }
+        await TideCasa.Api.Features.DriverPayments.DriverPaymentsStore.RecordCompletionAsync(db, tx, id, orderId, payload, driver, ct);
         var now = Stamp(); payload["version"] = version + 1; payload["updated_at"] = now;
         var history = payload["history"] as JsonArray;
         if (history is null) { history = new(); payload["history"] = history; }
-        history.Add(new JsonObject { ["status"] = String(payload, "status"), ["action"] = request.Action, ["at"] = now, ["actor_id"] = user.UserId });
+        history.Add(new JsonObject { ["status"] = String(payload, "status"), ["action"] = request.Action, ["at"] = now, ["actor_id"] = user.UserId, ["delivery_note"] = Text(request.DeliveryNote, "Delivery note", 300, true, true), ["driver_id"] = driver });
         await using var save = Command(db, tx, "UPDATE bartide_enhanced_orders SET payload_json=@json,status=@status,driver_id=@driver,version=version+1,updated_at=@now WHERE tenant_id=@tenant AND id=@id AND version=@version",
             ("@json", payload.ToJsonString(Json)), ("@status", String(payload, "status")), ("@driver", (object?)driver ?? DBNull.Value), ("@now", now), ("@tenant", id), ("@id", orderId), ("@version", version));
         if (await save.ExecuteNonQueryAsync(ct) != 1) throw new OrderingException("This order changed. Reload before updating.", 409, "stale_order");
+        if (request.Action is "assign-driver" or "cancelled" or "confirm-delivery" or "completed")
+            await DeleteLocation(db, tx, id, orderId, ct);
         await tx.CommitAsync(ct);
         return await OperationsAsync(id, user, ct);
     }
 
-    private static IReadOnlyList<string> AllowedActions(RestaurantOrderReceipt receipt, string role, string? driver)
+    private static IReadOnlyList<string> AllowedActions(RestaurantOrderReceipt receipt, string role, string? driver, bool enhanced = false)
     {
+        if (enhanced) return DeliveryActions(receipt, role, driver);
         var actions = new List<string>(); var status = receipt.Status; var delivery = receipt.Quote.Fulfillment == "delivery";
         if (status is "completed" or "cancelled") return actions;
         // A verified full refund permits an owner to close the remaining work.
@@ -288,6 +303,7 @@ public sealed partial class RestaurantOrderingStore
         if (user.IsPlatformOwner || user.UserId == venue.OwnerId) return ("owner", null);
         var member = await TenantStaffAccess.FindAsync(db, tx, venue.Id, user, ct);
         if (member is null) throw new OrderingException("Active team access is required.", 403, "forbidden");
+        if (member.Role == "driver") await TideCasa.Api.Features.DriverNetwork.DriverNetworkPolicy.RequireActiveHireAsync(db, tx, venue.Id, member.Id, ct);
         return (member.Role, member.Id);
     }
 }

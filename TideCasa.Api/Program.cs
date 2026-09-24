@@ -20,8 +20,11 @@ using TideCasa.Api.Features.Referrals;
 using TideCasa.Api.Features.LaunchReview;
 using TideCasa.Api.Features.BusinessPosts;
 using TideCasa.Api.Features.SalesPipeline;
+using TideCasa.Api.Features.PublicDemo;
 using TideCasa.Api.Features.EmailTracking;
 using TideCasa.Api.Features.ClientOnboarding;
+using TideCasa.Api.Features.DriverNetwork;
+using TideCasa.Api.Features.DriverPayments;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16 * 1024);
@@ -41,6 +44,7 @@ builder.Services.AddSingleton<PostgresSchemaMigrator>();
 builder.Services.AddScoped<WorkspaceAccessStore>();
 builder.Services.AddScoped<WorkspaceRegistrationStore>();
 builder.Services.AddScoped<ClientOnboardingStore>();
+builder.Services.AddSingleton<PublicDemoOptions>();
 builder.Services.AddTideCasaAuthentication();
 builder.Services.AddSingleton<DemoRequestStore>();
 builder.Services.AddScoped<DemoRequestService>();
@@ -49,6 +53,17 @@ builder.Services.AddHttpClient<DemoNotificationSender>(client => client.Timeout 
 builder.Services.AddScoped<DemoInboxStore>();
 builder.Services.AddHostedService<DemoNotificationWorker>();
 builder.Services.AddScoped<RestaurantOrderingStore>();
+builder.Services.AddSingleton<DeliveryLocationSchema>();
+builder.Services.AddHostedService<DeliveryLocationCleanup>();
+builder.Services.AddSingleton<DeliveryDispatchSchema>();
+builder.Services.AddHostedService<DeliveryDispatchWorker>();
+builder.Services.AddScoped<DriverNetworkStore>();
+builder.Services.AddSingleton<DriverNetworkSchema>();
+builder.Services.AddSingleton<DriverPaymentsSchema>();
+builder.Services.AddSingleton<DriverPaymentOptions>();
+builder.Services.AddSingleton<DriverStripeProvider>();
+builder.Services.AddScoped<DriverPaymentsStore>();
+builder.Services.AddHostedService<DriverPaymentRecovery>();
 builder.Services.AddScoped<StaffTrainingStore>();
 builder.Services.AddTideCasaMedia(builder.Configuration, builder.Environment);
 builder.Services.AddScoped<RewardsStore>();
@@ -67,6 +82,13 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("restaurant-ordering", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
         { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
+    options.AddPolicy("delivery-location", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Items[RegisteredBearerHandler.UserItem] is TideCasa.Contracts.AuthUser u
+            ? "user:" + u.UserId : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 240, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
+    options.AddPolicy("delivery-status", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
+        { PermitLimit = 480, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
     options.AddPolicy("public-form", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
         { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
@@ -108,6 +130,10 @@ app.MapTideCasaAuthentication();
 app.MapAccounts();
 app.MapClientOnboarding();
 app.MapRestaurantOrdering();
+app.MapDeliveryLocations();
+app.MapDeliveryDispatch();
+app.MapDriverNetwork();
+app.MapDriverPayments();
 app.MapRestaurantManagement();
 app.MapStaffTraining();
 app.MapTideCasaMedia();
@@ -129,7 +155,11 @@ else
     await app.Services.GetRequiredService<FeatureMigrator>().InitializeAsync();
 }
 await app.Services.GetRequiredService<SalesPipelineStore>().InitializeAsync();
-if (!builder.Configuration.GetValue<bool>("PublicDemo:Enabled"))
+await app.Services.GetRequiredService<DeliveryLocationSchema>().InitializeAsync();
+await app.Services.GetRequiredService<DeliveryDispatchSchema>().InitializeAsync();
+await app.Services.GetRequiredService<DriverNetworkSchema>().InitializeAsync();
+await app.Services.GetRequiredService<DriverPaymentsSchema>().InitializeAsync();
+if (!app.Services.GetRequiredService<PublicDemoOptions>().Enabled)
 {
     await app.Services.GetRequiredService<EmailTrackingSchema>().InitializeAsync();
     await app.Services.GetRequiredService<EmailTrackingStore>().InitializeAsync();

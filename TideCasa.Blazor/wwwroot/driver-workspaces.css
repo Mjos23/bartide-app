@@ -1,0 +1,18 @@
+.driver-work-nav { display: flex; flex-wrap: wrap; gap: .65rem 1.5rem; margin: 1.5rem 0; }
+.driver-work-nav a { color: #155f61; font-weight: 650; }
+.driver-work-nav a[aria-current] { text-decoration-thickness: 3px; text-underline-offset: .35em; }
+.driver-workspace .ordering-panel { margin-bottom: 1.25rem; }
+.driver-work-form { display: grid; gap: .9rem; margin-top: 1rem; }
+.driver-work-form .ordering-note { margin: 0; }
+.driver-work-form button { justify-self: start; }
+.driver-work-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 1.25rem; }
+.driver-work-card { border: 1px solid #ccd7dd; border-radius: 1rem; padding: 1.25rem; min-width: 0; overflow-wrap: anywhere; }
+.driver-work-card h3 { margin: 0 0 .65rem; }
+.driver-work-card summary { cursor: pointer; font-weight: 650; }
+.driver-work-status { display: inline-block; padding: .35rem .65rem; background: #edf4f3; color: #155750; border-radius: .5rem; font-weight: 650; font-size: .85rem; }
+.driver-work-pay { font-size: 1.7rem; font-weight: 750; }
+.driver-work-pay span { display: block; font-size: .9rem; font-weight: 400; }
+.driver-work-preserve { white-space: pre-wrap; }
+.driver-work-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.driver-fee-preview { padding: .85rem; background: #edf4f3; border-radius: .5rem; line-height: 1.5; }
+.driver-sandbox { border: 2px solid #9b710f; background: #fff6dd; color: #664700; }

@@ -173,6 +173,7 @@ app.Use(async (context, next) =>
         || context.Request.Path.StartsWithSegments("/event-management") || context.Request.Path.StartsWithSegments("/event-reservations")
         || context.Request.Path.StartsWithSegments("/private-media")
         || context.Request.Path.StartsWithSegments("/owner")
+        || context.Request.Path.StartsWithSegments("/driver")
         || context.Request.Path.StartsWithSegments("/start")
         || context.Request.Path.StartsWithSegments("/onboarding")
         || context.Request.Path.StartsWithSegments("/service-billing")
@@ -181,7 +182,7 @@ app.Use(async (context, next) =>
         || context.Request.Path.StartsWithSegments("/updates")
         || context.Request.Path.StartsWithSegments("/post-management")
         || context.Request.Path.StartsWithSegments("/post-subscriptions")
-        || new[] { "/signin", "/signup", "/verify-email", "/forgot-password", "/reset-password", "/signout" }.Contains(context.Request.Path.Value, StringComparer.OrdinalIgnoreCase))
+        || new[] { "/signin", "/driver/signin", "/signup", "/verify-email", "/forgot-password", "/reset-password", "/signout" }.Contains(context.Request.Path.Value, StringComparer.OrdinalIgnoreCase))
     {
         context.Response.Headers.CacheControl = "no-store";
         context.Response.Headers.Pragma = "no-cache";
@@ -199,6 +200,9 @@ app.MapTideCasaAuthentication();
 app.MapRestaurantOrdering();
 app.MapRestaurantManagement();
 app.MapClientOnboarding();
+app.MapDeliveryLocationFlow();
+app.MapDeliveryDispatchFlow();
+app.MapDriverNetworkForms();
 app.MapStaffTrainingForms();
 app.MapTideCasaMedia();
 app.MapRewardForms();

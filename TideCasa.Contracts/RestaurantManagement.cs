@@ -8,14 +8,16 @@ public sealed record SaveRestaurantProfileRequest(int ExpectedVersion, Restauran
 public sealed record SaveRestaurantCategoryRequest(int ExpectedVersion, RestaurantCategory Category);
 public sealed record SaveRestaurantItemRequest(int ExpectedVersion, RestaurantMenuItem Item, string? PhotoId = null);
 public sealed record RemoveRestaurantEntryRequest(int ExpectedVersion);
-public sealed record RestaurantDriver(string Id, string Name);
-public sealed record RestaurantOperationOrder(RestaurantManagedOrder Order, string? DriverId, IReadOnlyList<string> AllowedActions);
+public sealed record RestaurantDriver(string Id, string Name, bool AccountLinked = true);
+public sealed record RestaurantOperationOrder(RestaurantManagedOrder Order, string? DriverId, IReadOnlyList<string> AllowedActions, bool DeliveryWorkflowEnabled = false, DeliveryAssignmentPlan? AssignmentPlan = null);
 public sealed record RestaurantOperationsWorkspace(string TenantId, string Name, string Role,
-    IReadOnlyList<RestaurantDriver> Drivers, IReadOnlyList<RestaurantOperationOrder> Orders);
-public sealed record ChangeRestaurantOrderRequest(int ExpectedVersion, string Action, string? DriverId = null, bool PaymentCollected = false);
+    IReadOnlyList<RestaurantDriver> Drivers, IReadOnlyList<RestaurantOperationOrder> Orders,
+    bool DeliveryWorkflowEnabled = false, string PickupInstructions = "");
+public sealed record ChangeRestaurantOrderRequest(int ExpectedVersion, string Action, string? DriverId = null, bool PaymentCollected = false,
+    string? DeliveryNote = null, string? ProblemCode = null);
 public sealed record RestaurantOrderingSettings(int Version, bool AcceptingOrders, bool PickupEnabled, bool DeliveryEnabled,
     bool PayStaffEnabled, bool TipsEnabled, int? TaxBasisPoints, int DeliveryFeeCents, int DeliveryMinimumCents,
-    int DeliveryCapacity, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions, string ContactPhone = "");
+    int DeliveryCapacity, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions, bool DeliveryWorkflowEnabled = false, string ContactPhone = "");
 public sealed record SaveRestaurantOrderingSettingsRequest(int ExpectedVersion, bool AcceptingOrders, bool PickupEnabled,
     bool DeliveryEnabled, bool PayStaffEnabled, bool TipsEnabled, int? TaxBasisPoints, int DeliveryFeeCents,
-    int DeliveryMinimumCents, int DeliveryCapacity, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions, string ContactPhone = "");
+    int DeliveryMinimumCents, int DeliveryCapacity, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions, bool DeliveryWorkflowEnabled = false, string ContactPhone = "");

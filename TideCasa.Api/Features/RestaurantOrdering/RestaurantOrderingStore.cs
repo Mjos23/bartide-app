@@ -84,7 +84,7 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
         await EnforceRateAsync(db, transaction, venue.Id, address, ct);
         if (merchant is not null) await EnforcePhoneReservationAsync(db, transaction, merchant, address, ct);
         await using (var count = Command(db, transaction,
-            "SELECT COUNT(*),COALESCE(SUM(CASE WHEN fulfillment='delivery' THEN 1 ELSE 0 END),0) FROM bartide_enhanced_orders WHERE tenant_id=@tenant AND status NOT IN ('completed','cancelled')", ("@tenant", venue.Id)))
+            "SELECT COUNT(*),COALESCE(SUM(CASE WHEN fulfillment='delivery' THEN 1 ELSE 0 END),0) FROM bartide_enhanced_orders WHERE tenant_id=@tenant AND status NOT IN ('completed','cancelled','delivered')", ("@tenant", venue.Id)))
         {
             await using var reader = await count.ExecuteReaderAsync(ct);
             await reader.ReadAsync(ct);
@@ -112,6 +112,7 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
             ["history"] = new JsonArray(new JsonObject { ["status"] = initialStatus, ["at"] = now }),
             ["dotnet_receipt"] = JsonSerializer.SerializeToNode(receipt, Json)
         };
+        if (request.Order.Fulfillment == "delivery" && Boolean(venue.Config, "delivery_workflow_enabled", false)) payload["delivery"] = new JsonObject();
         await using var insert = Command(db, transaction, """
             INSERT INTO bartide_enhanced_orders(id,tenant_id,request_key,request_hash,tracking_hash,payload_json,status,fulfillment,version,created_at,updated_at)
             VALUES (@id,@tenant,@key,@hash,@tracking,@payload,@status,@fulfillment,0,@now,@now)
@@ -120,7 +121,7 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
         await insert.ExecuteNonQueryAsync(ct);
         if (merchant is not null) await InsertPhoneAttemptAsync(db, transaction, merchant, receipt, requestHash, address, ct);
         await transaction.CommitAsync(ct);
-        return (receipt, true);
+        return (Receipt(payload), true);
     }
 
     public async Task<RestaurantOrderReceipt> TrackAsync(string slug, RestaurantTrackingRequest request, CancellationToken ct)
@@ -262,7 +263,7 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
             Boolean(checkout, "dine_in_enabled", false), Boolean(checkout, "pickup_enabled", true), Boolean(config, "delivery_enabled", false) && zips.Count > 0,
             Boolean(checkout, "pay_staff_enabled", true), phoneReady, Boolean(checkout, "tips_enabled", true), tax,
             Integer(config, "delivery_fee_cents", 0, 5000, 500), Integer(config, "delivery_minimum_cents", 0, 100000, 1500), zips,
-            String(config, "pickup_instructions"), String(config, "payment_instructions"));
+            String(config, "pickup_instructions"), String(config, "payment_instructions"), String(config, "contact_phone"));
     }
 
     private static RestaurantTable? ResolveTable(Venue venue, string? token, bool required, string? label = null)
@@ -361,7 +362,7 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
     {
         // Reconstruct only approved fields; never serialize contact data into public responses.
         var receipt = payload["dotnet_receipt"]?.Deserialize<RestaurantOrderReceipt>(Json);
-        if (receipt is not null) return receipt with { Status = String(payload, "status"), PaymentStatus = String(payload, "payment_status") };
+        if (receipt is not null) return receipt with { Status = String(payload, "status"), PaymentStatus = String(payload, "payment_status"), Delivery = DeliveryProgress(payload) };
         // Historical orders have no tip/table fields, and stay readable without mutation.
         if (payload["lines"] is not JsonArray storedLines) throw Unavailable();
         var lines = storedLines.OfType<JsonObject>().Select(line => new RestaurantOrderLine(String(line, "item_id"), String(line, "name"),
@@ -369,7 +370,7 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
         var quote = new RestaurantQuote(lines, Integer(payload, "subtotal_cents", 0, int.MaxValue, 0), Integer(payload, "tax_cents", 0, int.MaxValue, 0),
             Integer(payload, "delivery_fee_cents", 0, 5000, 0), Integer(payload, "tip_cents", 0, 50000, 0), Integer(payload, "total_cents", 0, int.MaxValue, 0),
             "USD", String(payload, "fulfillment"), String(payload, "payment_method", "staff"), payload["table_label"]?.GetValue<string>(), "", false, null);
-        return new(String(payload, "id"), String(payload, "number"), String(payload, "status"), String(payload, "payment_status", "unpaid"), quote, String(payload, "created_at"));
+        return new(String(payload, "id"), String(payload, "number"), String(payload, "status"), String(payload, "payment_status", "unpaid"), quote, String(payload, "created_at"), DeliveryProgress(payload));
     }
 
     private static async Task EnforceRateAsync(DbConnection db, DbTransaction tx, string tenant, string address, CancellationToken ct)

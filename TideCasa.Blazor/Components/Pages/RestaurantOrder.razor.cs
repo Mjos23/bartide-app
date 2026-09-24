@@ -30,7 +30,7 @@ public partial class RestaurantOrder
     private bool CanReview => !Locked && !quoting && quote is { CanSubmit: true } && menu?.Checkout.AcceptingOrders == true;
     private static readonly (string Value, string Label)[] TipChoices = [("0", "No tip"), ("15", "15%"), ("20", "20%"), ("25", "25%"), ("custom", "Custom")];
     private IEnumerable<IGrouping<string, RestaurantMenuItem>> MenuGroups => menu?.Items.GroupBy(item => item.CategoryId) ?? Enumerable.Empty<IGrouping<string, RestaurantMenuItem>>();
-    private string ReceiptStatus => receipt?.Status switch { "awaiting_payment" => "Complete payment before the restaurant can accept this order.", "paid_needs_review" or "payment_review" => "The restaurant is reviewing this payment. Please contact staff before ordering again.", "new" => "Awaiting the restaurant’s acceptance.", "accepted" => "The restaurant has accepted your order.", "preparing" => "Your order is being prepared.", "ready" => "Your order is ready.", "out_for_delivery" => "Your order is out for delivery.", "completed" => "Your order is complete.", "cancelled" or "canceled" => "Your order was cancelled.", _ => "Current order status: " + receipt?.Status };
+    private string ReceiptStatus => receipt?.Status switch { "awaiting_payment" => "Complete payment before the restaurant can accept this order.", "paid_needs_review" or "payment_review" => "The restaurant is reviewing this payment. Please contact staff before ordering again.", "new" => "Awaiting the restaurant’s acceptance.", "accepted" => "The restaurant has accepted your order.", "preparing" => "Your order is being prepared.", "ready" => "Your order is ready.", "out_for_delivery" => "Your order is out for delivery.", "delivered" => "Delivered · payment outstanding.", "completed" => "Your order is complete.", "cancelled" or "canceled" => "Your order was cancelled.", _ => "Current order status: " + receipt?.Status };
     private string ReceiptPayment => receipt?.PaymentStatus switch { "paid_in_person" => "Paid to staff", "paid" => "Paid", "refunded" => "Refunded", "pending" => "Awaiting card payment", "partially_refunded" => "Partially refunded", "refund_pending" => "Refund in progress", _ => "Unpaid" };
 
     protected override Task OnParametersSetAsync()
@@ -41,6 +41,7 @@ public partial class RestaurantOrder
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await SyncDeliveryPollingAsync();
         if (!firstRender) return;
         connected = true;
         try

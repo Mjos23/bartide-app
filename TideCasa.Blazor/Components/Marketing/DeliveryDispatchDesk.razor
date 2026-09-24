@@ -1,0 +1,100 @@
+@namespace TideCasa.Blazor.Components.Marketing
+@using System.Globalization
+<section class="ordering-panel dispatch-desk" aria-label="Drivers and dispatch">
+    <div class="ordering-section-heading"><h2>@(Manager ? "Drivers and dispatch" : "Your driver availability")</h2><span>@(Board.AutomaticAssignment ? "Automatic dispatch on" : "Manual dispatch")</span></div>
+    @if (Manager) { <p><a href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/driver-network")">Find and hire network drivers</a> · <a href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/driver-payments")">Review driver payments</a></p> }
+    else { <p><a href="/driver">Driver profile and client offers</a> · <a href="/driver/earnings">Earnings and payouts</a></p> }
+    @if (!Board.WorkflowEnabled)
+    {
+        @if (Manager) { <p class="ordering-note">Enable the delivery workflow in <a href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/menu")">delivery settings</a> to use automatic and scheduled assignment.</p> }
+        else { <p class="ordering-note">Your manager can enable automatic and scheduled assignment in delivery settings.</p> }
+    }
+    @if (Manager)
+    {
+        <p>Automatically match accepted orders to drivers with connected accounts who are available, cover the delivery ZIP and have room for another order. Scheduled plans wait until their dispatch time.</p>
+        <div class="dispatch-actions">
+            <form method="post" action="@Action("settings")" data-enhance="false">
+                <AntiforgeryToken /><input type="hidden" name="version" value="@Board.Version" /><input type="hidden" name="automatic" value="@(!Board.AutomaticAssignment ? "true" : "")" />
+                <button class="ordering-secondary" type="submit" disabled="@(!Board.WorkflowEnabled && !Board.AutomaticAssignment)">@(Board.AutomaticAssignment ? "Turn off automatic dispatch" : "Turn on automatic dispatch")</button>
+            </form>
+            <form method="post" action="@Action("run")" data-enhance="false">
+                <AntiforgeryToken /><button class="ordering-secondary" type="submit" disabled="@(!Board.WorkflowEnabled)">Check for assignments now</button>
+            </form>
+        </div>
+        <p class="ordering-note">New orders must be accepted first. If no driver qualifies, the order remains in Needs assignment. Turning automatic dispatch off does not cancel individual automatic or scheduled plans.</p>
+        <p><a href="@DriverSignIn">Driver sign-in link</a> · <a href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/team")">Team and schedule</a></p>
+        <details class="dispatch-add"><summary>Add a driver account</summary>
+            <p>Add the driver’s own email. They create an account, verify that email and sign in through the driver link. Share the link yourself; adding a driver does not send an invitation.</p>
+            <form method="post" action="@Action("driver")" data-enhance="false" class="dispatch-form">
+                <AntiforgeryToken />
+                <label class="desk-field">Driver name<input name="name" maxlength="80" required autocomplete="off" /></label>
+                <label class="desk-field">Driver sign-in email<input name="email" type="email" maxlength="254" required autocomplete="off" /></label>
+                <button class="bt-one-button" type="submit">Add driver</button>
+            </form>
+        </details>
+    }
+    @if (!VisibleDrivers.Any()) { <p>No active driver accounts are connected yet.</p> }
+    <div class="dispatch-roster">
+        @foreach (var driver in VisibleDrivers)
+        {
+            <article class="dispatch-driver">
+                <div class="ordering-section-heading"><h3>@driver.Name</h3><strong>@(driver.AvailableNow ? "Available now" : "Unavailable now")</strong></div>
+                <p>@(driver.AccountLinked ? "Sign-in account connected" : "Waiting for verified sign-in") · @driver.ActiveOrders / @driver.Capacity active deliveries</p>
+                <form method="post" action="@Action("profile")" data-enhance="false" class="dispatch-form">
+                    <AntiforgeryToken /><input type="hidden" name="version" value="@driver.Version" /><input type="hidden" name="driver" value="@driver.Id" />
+                    <label class="desk-field">Availability<select name="availability"><option value="offline" selected="@(driver.Availability == "offline")">Offline</option><option value="available" selected="@(driver.Availability == "available")">Available now</option><option value="scheduled" selected="@(driver.Availability == "scheduled")">Available during scheduled shifts</option></select></label>
+                    @if (Manager)
+                    {
+                        <label class="desk-field">Maximum active deliveries<input name="capacity" type="number" min="1" max="10" value="@driver.Capacity" required /></label>
+                        <label class="desk-field">Delivery ZIP codes<input name="zips" maxlength="500" value="@string.Join(", ", driver.DeliveryZips)" placeholder="All business delivery ZIPs" /></label>
+                        <p class="ordering-note">Separate ZIP codes with commas. Leave empty to cover all business delivery ZIPs.</p>
+                    }
+                    else
+                    {
+                        <input type="hidden" name="capacity" value="@driver.Capacity" /><input type="hidden" name="zips" value="@string.Join(",", driver.DeliveryZips)" />
+                        <p class="ordering-note">Your manager sets capacity and coverage. Coverage: @(driver.DeliveryZips.Count == 0 ? "All business delivery ZIPs" : string.Join(", ", driver.DeliveryZips)).</p>
+                    }
+                    <button class="ordering-secondary" type="submit">@(Manager ? "Save driver settings" : "Save my availability")</button>
+                </form>
+                <p class="ordering-note">Going offline stops new assignments; it keeps deliveries already assigned to you.</p>
+                <details class="dispatch-shifts"><summary>@(Manager ? "Driver shifts" : "Your shifts") (@DriverShifts(driver.Id).Count())</summary>
+                    <p class="ordering-note">Saved times below are UTC. Scheduled availability follows these shifts.</p>
+                    @if (!DriverShifts(driver.Id).Any()) { <p>No current or upcoming shifts.</p> }
+                    <ul>
+                        @foreach (var shift in DriverShifts(driver.Id))
+                        {
+                            <li><strong>@shift.Label</strong><p>@Time(shift.StartsAt) – @Time(shift.EndsAt)</p>
+                                @if (Manager)
+                                {
+                                    <form method="post" action="@Action("remove-shift")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="shift" value="@shift.Id" /><button type="submit" class="ordering-secondary">Remove shift</button></form>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    @if (Manager)
+                    {
+                        <form method="post" action="@Action("shift")" data-enhance="false" class="dispatch-form">
+                            <AntiforgeryToken /><input type="hidden" name="driver" value="@driver.Id" />
+                            <label class="desk-field">Shift name<input name="label" required maxlength="80" placeholder="Dinner deliveries" /></label>
+                            <label class="desk-field">Starts<input name="starts" type="datetime-local" required /></label>
+                            <label class="desk-field">Ends<input name="ends" type="datetime-local" required /></label>
+                            <DeliveryTimeZone />
+                            <p class="ordering-note">Shifts can last 15 minutes to 16 hours. Select the time zone for the times you enter.</p>
+                            <button class="ordering-secondary" type="submit">Add driver shift</button>
+                        </form>
+                    }
+                </details>
+            </article>
+        }
+    </div>
+</section>
+@code {
+    [Parameter, EditorRequired] public DeliveryDispatchWorkspace Board { get; set; } = default!;
+    [Parameter] public string TenantId { get; set; } = "";
+    private bool Manager => Board.Role is "owner" or "manager";
+    private IEnumerable<DeliveryDriverProfile> VisibleDrivers => Board.Drivers.Where(driver => Manager || driver.Id == Board.MemberId);
+    private string Action(string operation) => "/restaurant-management/" + Uri.EscapeDataString(TenantId) + "/dispatch/" + operation;
+    private string DriverSignIn => "/driver/signin?return_to=" + Uri.EscapeDataString("/workspace/" + Uri.EscapeDataString(TenantId) + "/deliveries");
+    private IEnumerable<TeamShift> DriverShifts(string driver) => Board.Shifts.Where(s => s.MemberId == driver).OrderBy(s => s.StartsAt, StringComparer.Ordinal);
+    private static string Time(string value) => DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time) ? time.ToUniversalTime().ToString("MMM d, yyyy HH:mm 'UTC'", CultureInfo.InvariantCulture) : value;
+}

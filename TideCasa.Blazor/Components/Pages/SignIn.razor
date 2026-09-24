@@ -1,17 +1,25 @@
 @page "/signin"
 @page "/auth/signin"
+@page "/driver/signin"
 @attribute [ExcludeFromInteractiveRouting]
 @inherits AuthPageBase
 
-<PageTitle>Welcome back. | Tide Casa</PageTitle>
-<AuthFrame Title="Welcome back." Description="Sign in to your business workspace.">
+<PageTitle>@(DriverEntry ? "Driver sign-in" : "Welcome back.") | Tide Casa</PageTitle>
+<AuthFrame Title="@(DriverEntry ? "Driver sign-in." : "Welcome back.")" Description="@(DriverEntry ? "Your deliveries, shifts and availability in one place." : "Sign in to your business workspace.")">
     @if (NoticeText is not null) { <p role="status">@NoticeText</p> }
+    @if (DriverEntry) { <p>Join the BarTide driver network or sign in to your client’s delivery team. New drivers can create an account below and verify their email before setting up a driver profile. If a client already added you, verify that same email to connect to their team.</p> }
     <form method="post" action="/auth/session/signin" data-enhance="false">
         <AntiforgeryToken />
-        <input type="hidden" name="return_to" value="@ReturnPath" />
+        <input type="hidden" name="return_to" value="@DriverReturnPath" />
         <label class="desk-field" for="email">Email address<input id="email" name="email" type="email" autocomplete="username" maxlength="254" required /></label>
 <label class="desk-field" for="password">Password<input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" required /></label>
         <button class="bt-one-button" type="submit">Sign in</button>
     </form>
-    <p><a href="@AuthLink("/forgot-password")">Forgot your password?</a></p><p>New here? <a href="@AuthLink("/signup")">Create an account</a>.</p><p><a href="@AuthLink("/verify-email")">Verify your email</a></p>
+    <p><a href="@DriverAuthLink("/forgot-password")">Forgot your password?</a></p><p>New here? <a href="@DriverAuthLink("/signup")">@(DriverEntry ? "Create your driver account" : "Create an account")</a>.</p><p><a href="@DriverAuthLink("/verify-email")">Verify your email</a></p>
 </AuthFrame>
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private bool DriverEntry => HttpContext.Request.Path == "/driver/signin";
+    private string DriverReturnPath => DriverEntry && string.IsNullOrWhiteSpace(ReturnTo) ? "/driver" : ReturnPath;
+    private string DriverAuthLink(string page) => page + "?return_to=" + Uri.EscapeDataString(DriverReturnPath);
+}

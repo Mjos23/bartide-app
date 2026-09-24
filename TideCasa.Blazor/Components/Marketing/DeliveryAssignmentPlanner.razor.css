@@ -1,0 +1,5 @@
+.dispatch-plan { border-top: 1px solid #ccd7dd; margin-top: 1rem; padding-top: .75rem; }
+.dispatch-plan summary { cursor: pointer; font-weight: 650; }
+.dispatch-plan form { margin-top: 1rem; }
+.dispatch-plan-form { display: grid; gap: .75rem; border: 1px solid #ccd7dd; border-radius: .75rem; padding: 1rem; }
+.dispatch-plan-form button { justify-self: start; }

@@ -151,7 +151,7 @@ def sql(statement, values=()):
         return connection.execute(statement, values).fetchall()
 
 
-def launch():
+def launch(storage_env=None):
     env = os.environ.copy()
     for key in list(env):
         if any(word in key.upper() for word in ('STRIPE', 'RESEND', 'SUPABASE', 'CLOUDFLARE',
@@ -164,6 +164,8 @@ def launch():
         'Stripe__CheckoutEnabled': 'false', 'Stripe__InvoicesEnabled': 'false',
         'Ordering__PublicBaseUrl': 'https://ordering.example.invalid',
         'ReverseProxy__KnownClientProxy': '127.0.0.1'})
+    env.update({'ConnectionStrings__Application': '', 'DOTNET_PROCESSOR_COUNT': '1', 'PublicDemo__Enabled': 'false', 'MerchantPayments__CheckoutEnabled': 'false', 'Notifications__Mode': 'disabled'})
+    env.update(storage_env or {})
     log = (RUN / 'TideCasa.Api.log').open('w', encoding='utf-8')
     LOGS.append(log)
     proc = subprocess.Popen([str(SDK), str(Path(os.environ.get('TIDE_TEST_BUILD_ROOT', str(ROOT))) / 'TideCasa.Api/bin/Debug/net10.0/TideCasa.Api.dll')],

@@ -1,0 +1,69 @@
+@page "/driver/earnings"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Features.RestaurantManagement
+@inject RestaurantManagementClient Api
+<PageTitle>Driver earnings and payouts | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/driver-workspaces.css" /><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<div class="bt-unified restaurant-ordering driver-workspace">
+    <header class="ordering-nav"><a href="/driver">← Driver workspace</a><span>BarTide · Earnings and payouts</span></header>
+    <main class="ordering-main">
+        <p class="bt-one-kicker">EVERY DELIVERY, ACCOUNTED FOR</p><h1>Your earnings and payouts</h1>
+        <nav class="driver-work-nav" aria-label="Driver workspace"><a href="/driver">Profile and offers</a><a href="/driver/earnings" aria-current="page">Earnings and payouts</a><a href="/account">Your delivery workspaces</a></nav>
+        @if (RestaurantManagementFlow.DriverNetworkNotice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error <a href="@CurrentPath">Try again</a></p> }
+        @if (workspace is not null)
+        {
+            @if (workspace.Payout.Sandbox) { <p class="ordering-notice driver-sandbox" role="status"><strong>Test mode</strong> — this workspace uses Stripe test payments. No real money is paid.</p> }
+            <section class="ordering-panel">
+                <div class="ordering-section-heading"><h2>Your payout account</h2><a href="@CurrentPath">Refresh status</a></div>
+                <p>@workspace.Payout.Message</p>
+                @if (!workspace.Payout.PaymentsEnabled) { <p class="ordering-note">Driver payments are not enabled yet. Completed deliveries can be reviewed here while payment setup is being prepared.</p> }
+                @if (workspace.Payout.SetupAvailable)
+                {
+                    <form method="post" action="/driver/manage/payout" data-enhance="false" class="driver-work-form">
+                        <AntiforgeryToken /><input type="hidden" name="request_key" value="@Guid.NewGuid().ToString("D")" />
+                        <p>Stripe securely collects your identity and bank details. BarTide does not collect those details in this form.</p>
+                        <label class="rm-check"><input type="checkbox" name="confirm_us" value="true" required /><span>I am setting up this driver payout account as a US individual.</span></label>
+                        <button class="bt-one-button" type="submit">@(workspace.Payout.State == "ready" ? "Review Stripe payout details" : "Set up payouts with Stripe")</button>
+                    </form>
+                }
+                else { <p class="ordering-note">Payout setup is currently unavailable. Refresh this page when BarTide enables it.</p> }
+            </section>
+            <section class="ordering-panel">
+                <h2>Completed delivery earnings</h2>
+                <p>Completing a delivery does not charge the client. The client owner reviews and approves payment. “Credited to driver Stripe account” means the payment reached your Stripe balance; it does not confirm arrival in your bank account.</p>
+                <DriverPaymentPages Path="/driver/earnings" Page="workspace.Page" HasMore="workspace.HasMore" />
+                @if (workspace.Payments.Count == 0) { <p>@(workspace.Page == 0 ? "No completed deliveries are recorded yet." : "No completed deliveries on this page. Use Newer deliveries to return to your history.")</p> }
+                <div class="driver-work-grid">
+                    @foreach (var payment in workspace.Payments)
+                    {
+                        <article class="driver-work-card">
+                            <h3>@payment.RestaurantName · Order @payment.OrderNumber</h3><p class="driver-work-status">@DriverWorkFormat.Status(payment.Status)</p>
+                            <p class="driver-work-pay">@(payment.DriverPayCents > 0 ? DriverWorkFormat.Money(payment.DriverPayCents) : "Awaiting owner’s pay amount") <span>@(payment.DriverPayCents > 0 ? "driver pay" : "")</span></p>
+                            <p>@(payment.Source == "network" ? "Network agreement · your agreed pay is preserved; the client pays the 5% fee separately." : "Direct client driver · no network fee.")</p>
+                            <p class="ordering-note">Completed @DriverWorkFormat.Time(payment.CompletedAt)</p>
+                        </article>
+                    }
+                </div>
+                <DriverPaymentPages Path="/driver/earnings" Page="workspace.Page" HasMore="workspace.HasMore" />
+            </section>
+        }
+    </main>
+</div>
+@code {
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int Page { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private DriverEarningsWorkspace? workspace;
+    private string? error;
+    private string CurrentPath => "/driver/earnings?page=" + Page;
+    protected override async Task OnInitializedAsync()
+    {
+        if (Page is < 0 or > 100000) { error = "Choose a valid earnings history page."; HttpContext.Response.StatusCode = 400; return; }
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to view your earnings."; HttpContext.Response.StatusCode = 401; return; }
+        var result = await Api.GetDriverEarningsAsync(token, HttpContext.RequestAborted, Page);
+        if (result.Succeeded) workspace = result.Value;
+        else { error = result.Uncertain ? "Your earnings could not be loaded. Try again shortly." : "Driver earnings are unavailable to this account."; HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; }
+    }
+}

@@ -1,0 +1,51 @@
+@namespace TideCasa.Blazor.Components.Marketing
+<section class="delivery-progress" aria-label="Delivery progress">
+    @if (Entry.Order.Receipt.Delivery is { } progress)
+    {
+        <p><strong>@(progress.DriverName is null ? "Waiting for assignment" : "Driver: " + progress.DriverName)</strong></p>
+        <p>@(progress.AcknowledgedAt is null ? "Driver acknowledgement pending" : "Driver acknowledged · " + Time(progress.AcknowledgedAt))</p>
+        @if (progress.CollectedAt is not null) { <p>Collected · @Time(progress.CollectedAt)</p> }
+        @if (progress.DeliveredAt is not null) { <p>Delivered · @Time(progress.DeliveredAt)</p> }
+        @if (progress.ProblemCode is not null) { <p class="ordering-error">Needs attention: @Problem(progress.ProblemCode)</p> }
+        <small>Last change: @Time(progress.UpdatedAt)</small>
+    }
+    <p>Collect from @RestaurantName. @PickupInstructions</p>
+    <a class="ordering-secondary" href="@Directions" target="_blank" rel="noopener noreferrer">Open directions ↗</a>
+    <p class="ordering-note">Open navigation and update delivery steps while safely stopped.</p>
+    @foreach (var action in Entry.AllowedActions.Where(a => a is "acknowledge-delivery" or "out_for_delivery" or "confirm-delivery" or "resolve-delivery-problem"))
+    {
+        <form method="post" action="@ActionPath" data-enhance="false" class="delivery-action">
+            <AntiforgeryToken /><input type="hidden" name="version" value="@Entry.Order.Version" /><input type="hidden" name="action" value="@action" /><input type="hidden" name="return_page" value="@ReturnPage" />
+            @if (action is "confirm-delivery" or "resolve-delivery-problem" || action == "out_for_delivery" && Role != "driver")
+            {
+                <label class="desk-field">@(Role == "driver" ? "Delivery note (optional)" : "Reason / handoff note")<textarea name="delivery_note" maxlength="300" rows="2" required="@(Role != "driver")"></textarea></label>
+            }
+            @if (action == "confirm-delivery") { <p class="ordering-note">Confirm the handoff only. This does not record or collect a payment.</p> }
+            <button class="bt-one-button" type="submit">@Label(action)</button>
+        </form>
+    }
+    @if (Entry.AllowedActions.Contains("report-delivery-problem"))
+    {
+        <details class="rm-entry"><summary>Report a delivery problem</summary>
+            <form method="post" action="@ActionPath" data-enhance="false">
+                <AntiforgeryToken /><input type="hidden" name="version" value="@Entry.Order.Version" /><input type="hidden" name="action" value="report-delivery-problem" /><input type="hidden" name="return_page" value="@ReturnPage" />
+                <label class="desk-field">Problem<select name="problem_code" required><option value="customer-unavailable">Customer unavailable</option><option value="address-issue">Address issue</option><option value="unable-to-deliver">Unable to deliver</option></select></label>
+                <label class="desk-field">Details (optional)<textarea name="delivery_note" maxlength="300" rows="2"></textarea></label>
+                <button class="ordering-secondary" type="submit">Flag for manager</button>
+            </form>
+        </details>
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public RestaurantOperationOrder Entry { get; set; } = default!;
+    [Parameter] public string TenantId { get; set; } = "";
+    [Parameter] public string RestaurantName { get; set; } = "";
+    [Parameter] public string PickupInstructions { get; set; } = "";
+    [Parameter] public string Role { get; set; } = "";
+    [Parameter] public string ReturnPage { get; set; } = "operations";
+    private string ActionPath => "/restaurant-management/" + Uri.EscapeDataString(TenantId) + "/orders/" + Entry.Order.Receipt.OrderId;
+    private string Directions => "https://www.google.com/maps/dir/?api=1&destination=" + Uri.EscapeDataString(Entry.Order.Address + " " + Entry.Order.Zip);
+    private static string Time(string value) => DateTimeOffset.TryParse(value, out var time) ? time.ToString("MMM d, h:mm tt 'UTC'") : value;
+    private static string Label(string action) => action switch { "acknowledge-delivery" => "Acknowledge delivery", "out_for_delivery" => "Collected · start delivery", "confirm-delivery" => "Confirm delivered", _ => "Resolve delivery problem" };
+    private static string Problem(string value) => value switch { "customer-unavailable" => "Customer unavailable", "address-issue" => "Address issue", _ => "Unable to deliver" };
+}
