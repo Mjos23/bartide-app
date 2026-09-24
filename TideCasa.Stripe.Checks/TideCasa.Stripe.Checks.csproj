@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup><Compile Include="../TideCasa.Api/Infrastructure/Payments/*.cs" Link="Payments/%(Filename)%(Extension)" /></ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="../TideCasa.Api/Features/MerchantPayments/MerchantPaymentOptions.cs" Link="Payments/MerchantPaymentOptions.cs" />
+    <Using Include="Microsoft.Extensions.Configuration" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+</Project>

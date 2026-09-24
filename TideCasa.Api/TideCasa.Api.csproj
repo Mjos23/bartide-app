@@ -16,7 +16,6 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="Lib.Net.Http.WebPush" Version="3.3.1" />
-    <PackageReference Include="Stripe.net" Version="52.4.2" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
     <PackageReference Include="SkiaSharp" Version="4.152.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.1" />

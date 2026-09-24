@@ -1,0 +1,63 @@
+@page "/workspace/{TenantId}/preview"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.Globalization
+@using TideCasa.Blazor.Components.Onboarding
+@using TideCasa.Blazor.Features.ClientOnboarding
+@inject ClientOnboardingClient Api
+<PageTitle>Private preview | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/client-onboarding.css" /><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<div class="client-onboarding onboarding-preview-page">
+    <header class="onboarding-nav"><a href="@ClientOnboardingFlow.Page(TenantId)">← Back to your setup</a><strong>Private preview · not published</strong></header>
+    <section class="onboarding-shell onboarding-preview-controls"><p class="onboarding-eyebrow">YOUR APP, TAKING SHAPE</p><h1>Review every detail.</h1><p>This saved preview is visible only to authorized workspace users. Open it on your phone or resize your browser to review the same responsive page guests will see.</p>
+        @if (error is not null) { <p class="onboarding-notice" role="alert">@error</p> }
+        @if (release is not null)
+        {
+            <p class="onboarding-help">Preview saved @CreatedAt. Template @release.TemplateVersion.</p>
+            @if (!release.Current) { <p class="onboarding-notice" role="alert">Your details changed after this preview was saved. Return to setup and refresh the preview before approving it.</p> }
+            @if (release.Approved && release.Current) { <p class="onboarding-success">You approved this preview for BarTide review.</p> }
+            <details class="onboarding-details"><summary>Readiness checks</summary><ul class="onboarding-checks">@foreach (var check in release.Checks) { <li class="@check.State"><span>@StateLabel(check.State)</span>@check.Message</li> }</ul></details>
+            @if (release.Service.Ordering && release.Items.Any(item => item.Available && item.PriceCents is not null))
+            {
+                <details class="onboarding-details"><summary>Try a private practice order</summary><p>Check an item, the tax and any delivery fee against the saved preview. This creates a practice quote only; it does not send an order to staff or charge a card.</p>
+                    <form method="post" action="@FormPath("practice")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="releaseId" value="@release.Id" /><input type="hidden" name="fingerprint" value="@release.Fingerprint" />
+                        <div class="onboarding-fields"><label>Menu item<select name="itemId">@foreach (var item in release.Items.Where(item => item.Available && item.PriceCents is not null)) { <option value="@item.Id">@item.Name · @Money(item.PriceCents!.Value)</option> }</select></label><label>Order type<select name="fulfillment">@if (release.Service.Pickup) { <option value="pickup">Pickup</option> }@if (release.Service.DineIn) { <option value="dine-in">At the table</option> }@if (release.Service.Delivery) { <option value="delivery">Delivery</option> }</select></label></div>
+                        @if (release.Service.DineIn) { <label>Table (used only for table orders)<select name="tableLabel">@foreach (var table in release.Service.TableLabels) { <option value="@table">@table</option> }</select></label> }
+                        @if (release.Service.Delivery) { <label>ZIP code (used only for delivery)<select name="deliveryZip">@foreach (var zip in release.Service.DeliveryZips) { <option value="@zip">@zip</option> }</select></label> }
+                        <button class="onboarding-button secondary" type="submit" disabled="@(!release.Current)">Check practice total</button>
+                    </form>
+                </details>
+            }
+            @if (isOwner)
+            {
+                <form class="onboarding-approval" method="post" action="@FormPath("approve")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="releaseId" value="@release.Id" /><input type="hidden" name="fingerprint" value="@release.Fingerprint" />
+                    <label class="onboarding-check"><input type="checkbox" name="confirmed" value="true" required disabled="@(!release.Current || !release.CanApprove)" /><span>I reviewed this exact preview, including public contact details, hours, menu prices and service choices, and approve this content for launch review.</span></label>
+                    <button class="onboarding-button" type="submit" disabled="@(!release.Current || !release.CanApprove)">Approve content and request review</button>
+                    <p class="onboarding-help">BarTide reviews publication with you after the scheduled build period. Outstanding plan or live-payment requirements still need to be resolved. This approval does not make the page public.</p>
+                </form>
+            }
+            else { <p class="onboarding-help">The business owner approves the final content and requests launch review.</p> }
+        }
+    </section>
+    @if (release is not null) { <div class="onboarding-preview-frame"><VenuePresentation Business="@release.Business" Brand="@release.Brand" Categories="@release.Categories" Items="@release.Items" TenantId="@release.TenantId" Slug="@release.Slug" Private="true" OrderingAvailable="false" /></div> }
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private OnboardingRelease? release;
+    private bool isOwner;
+    private string? error;
+    private string FormPath(string operation) => "/onboarding/" + Uri.EscapeDataString(TenantId) + "/" + operation;
+    private string CreatedAt => DateTimeOffset.TryParse(release?.CreatedAt, out var date) ? date.ToString("MMM d, yyyy, h:mm tt 'UTC'", CultureInfo.GetCultureInfo("en-US")) : "recently";
+    private static string Money(int cents) => (cents / 100m).ToString("C2", CultureInfo.GetCultureInfo("en-US"));
+    private static string StateLabel(string state) => state switch { "ready" => "Ready", "needs_attention" => "Needs attention", "waiting" => "Waiting", _ => "Optional" };
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open your private preview."; HttpContext.Response.StatusCode = 401; return; }
+        var account = HttpContext.Items[AuthFlow.AccountItem] as AccountOverview;
+        isOwner = account?.User.IsPlatformOwner == true || account?.Workspaces.Any(workspace => workspace.TenantId == TenantId && workspace.IsOwner) == true;
+        var result = await Api.PreviewAsync(TenantId, token, HttpContext.RequestAborted);
+        if (result.Succeeded && result.Value is not null) release = result.Value;
+        else { error = result.Uncertain ? "Your preview could not be loaded. Please try again shortly." : "No preview is available to this account yet. Return to setup and build your private preview."; HttpContext.Response.StatusCode = result.Uncertain ? 503 : (int)result.Status; }
+    }
+}

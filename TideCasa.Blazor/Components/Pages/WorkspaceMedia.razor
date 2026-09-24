@@ -8,6 +8,7 @@
     <header class="media-nav"><a href="/account">← Your account</a><span>BarTide · Photos and files</span></header>
     <main class="media-main">
         <p class="bt-one-kicker">YOUR RESTAURANT</p><h1>@(workspace?.Name ?? "Photos and files")</h1>
+        <TideCasa.Blazor.Components.Onboarding.SetupReturnLink TenantId="@TenantId" />
         @if (error is not null)
         {
             <p class="media-notice" role="alert">@error <a href="@CurrentPath">Try again</a></p>

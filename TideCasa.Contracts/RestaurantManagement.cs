@@ -15,7 +15,7 @@ public sealed record RestaurantOperationsWorkspace(string TenantId, string Name,
 public sealed record ChangeRestaurantOrderRequest(int ExpectedVersion, string Action, string? DriverId = null, bool PaymentCollected = false);
 public sealed record RestaurantOrderingSettings(int Version, bool AcceptingOrders, bool PickupEnabled, bool DeliveryEnabled,
     bool PayStaffEnabled, bool TipsEnabled, int? TaxBasisPoints, int DeliveryFeeCents, int DeliveryMinimumCents,
-    int DeliveryCapacity, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions);
+    int DeliveryCapacity, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions, string ContactPhone = "");
 public sealed record SaveRestaurantOrderingSettingsRequest(int ExpectedVersion, bool AcceptingOrders, bool PickupEnabled,
     bool DeliveryEnabled, bool PayStaffEnabled, bool TipsEnabled, int? TaxBasisPoints, int DeliveryFeeCents,
-    int DeliveryMinimumCents, int DeliveryCapacity, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions);
+    int DeliveryMinimumCents, int DeliveryCapacity, IReadOnlyList<string> DeliveryZips, string PickupInstructions, string PaymentInstructions, string ContactPhone = "");

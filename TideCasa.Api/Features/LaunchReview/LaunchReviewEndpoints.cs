@@ -1,4 +1,6 @@
 using System.Data.Common;
+using System.Text.Json;
+using TideCasa.Api.Features.ClientOnboarding;
 using TideCasa.Api.Features.Authentication;
 using TideCasa.Api.Infrastructure;
 using TideCasa.Contracts;
@@ -24,7 +26,8 @@ public sealed class LaunchReviewFilter : IEndpointFilter
         context.HttpContext.Response.Headers.CacheControl = "no-store";
         try { return await next(context); }
         catch (LaunchReviewException error) { return Results.Problem(statusCode: error.Status, title: error.Message, extensions: new Dictionary<string, object?> { ["code"] = error.Code }); }
-        catch (Exception error) when (error is DbException or InvalidOperationException or FormatException or OverflowException)
+        catch (OnboardingException error) { return Results.Problem(statusCode: error.Status, title: error.Message, extensions: new Dictionary<string, object?> { ["code"] = error.Code }); }
+        catch (Exception error) when (error is DbException or JsonException or InvalidOperationException or FormatException or OverflowException)
         { return Results.Problem(statusCode: 503, title: "Launch review is temporarily unavailable.", extensions: new Dictionary<string, object?> { ["code"] = "launch_unavailable" }); }
     }
 }

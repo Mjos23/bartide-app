@@ -2,8 +2,8 @@ using TideCasa.Api.Infrastructure;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Data.Common;
-using Stripe;
-using Stripe.Events;
+using TideCasa.Api.Infrastructure.Payments;
+using static TideCasa.Api.Infrastructure.Payments.StripeJson;
 
 namespace TideCasa.Api.Features.MerchantPayments;
 
@@ -13,18 +13,29 @@ public sealed partial class MerchantPaymentsStore
     private sealed record NotificationReference(string ObjectId, string? IntentId = null, string? ChargeId = null, string? AttemptId = null);
     private static readonly HashSet<string> SnapshotTypes = ["checkout.session.completed", "checkout.session.expired", "checkout.session.async_payment_succeeded", "checkout.session.async_payment_failed", "payment_intent.succeeded", "payment_intent.payment_failed", "payment_intent.canceled", "charge.refunded", "refund.created", "refund.updated", "refund.failed"];
 
-    public async Task AcceptNotificationAsync(string context, string body, string signature, CancellationToken ct)
+    private static readonly HashSet<string> ThinTypes = ["v2.core.account.created", "v2.core.account.closed", "v2.core.account.updated",
+        "v2.core.account[configuration.merchant].capability_status_updated", "v2.core.account[configuration.merchant].updated",
+        "v2.core.account[defaults].updated", "v2.core.account[requirements].updated"];
+
+    public async Task AcceptNotificationAsync(string context, ReadOnlyMemory<byte> body, string signature, CancellationToken ct)
     {
         if (!options.Configured) throw new MerchantFailure("Payment notifications are not configured.", 503, "merchant_disabled");
+        var secret = context == "snapshot" ? options.SnapshotSecret : context == "thin" ? options.ThinSecret : "";
+        if (!MerchantPaymentOptions.ValidSecret(secret)) throw new MerchantFailure("Payment notifications are not configured.", 503, "merchant_disabled");
+        StripeWebhookSignature.Verify(body.Span, signature, secret);
+        using var json = JsonDocument.Parse(body, new JsonDocumentOptions { MaxDepth = 48 }); var root = json.RootElement;
+        RejectDuplicateProperties(root);
         string eventId, eventType, account; NotificationReference reference;
+        eventId = S(root, "id") ?? ""; eventType = S(root, "type") ?? "";
         if (context == "snapshot")
         {
-            if (!MerchantPaymentOptions.ValidSecret(options.SnapshotSecret)) throw new MerchantFailure("Payment notifications are not configured.", 503, "merchant_disabled");
-            var parsed = EventUtility.ConstructEvent(body, signature, options.SnapshotSecret, tolerance: 300, throwOnApiVersionMismatch: true);
-            if (parsed.Livemode || !MerchantPaymentOptions.AccountId(parsed.Account)) throw new MerchantFailure("Wrong payment event context.", 400, "event_context");
-            eventId = parsed.Id; eventType = parsed.Type; account = parsed.Account;
+            if (S(root, "object") != "event" || S(root, "api_version") != StripeHttpTransport.ApiVersion || B(root, "livemode") != false
+                || !MerchantPaymentOptions.AccountId(S(root, "account"))) throw new MerchantFailure("Wrong payment event context.", 400, "event_context");
+            account = S(root, "account")!;
             if (!SnapshotTypes.Contains(eventType)) return;
-            using var json = JsonDocument.Parse(body); var obj = json.RootElement.GetProperty("data").GetProperty("object");
+            var obj = P(P(root, "data"), "object");
+            var expectedKind = eventType.StartsWith("checkout.", StringComparison.Ordinal) ? "checkout.session" : eventType.StartsWith("payment_intent.", StringComparison.Ordinal) ? "payment_intent" : eventType.StartsWith("refund.", StringComparison.Ordinal) ? "refund" : "charge";
+            if (S(obj, "object") != expectedKind) throw new MerchantFailure("Invalid event reference.");
             var objectId = Field(obj, "id") ?? throw new MerchantFailure("Invalid event reference.");
             reference = new(objectId,
                 eventType.StartsWith("payment_intent.", StringComparison.Ordinal) ? objectId : Field(obj, "payment_intent"),
@@ -33,26 +44,14 @@ public sealed partial class MerchantPaymentsStore
         }
         else
         {
-            if (context != "thin" || !MerchantPaymentOptions.ValidSecret(options.ThinSecret)) throw new MerchantFailure("Account notifications are not configured.", 503, "merchant_disabled");
-            var notification = provider.Client.ParseEventNotification(body, signature, options.ThinSecret, tolerance: 300);
             // Accounts v2 merchant objects belong to the platform. This endpoint
             // never follows an arbitrary organization or connected-account context.
-            var scope = notification.Context?.ToString();
-            if (notification.Livemode || !string.IsNullOrEmpty(scope) && scope != options.PlatformAccount) throw new MerchantFailure("Wrong account event context.", 400, "event_context");
-            string? related = notification switch
-            {
-                V2CoreAccountCreatedEventNotification n => n.RelatedObject?.Id,
-                V2CoreAccountClosedEventNotification n => n.RelatedObject?.Id,
-                V2CoreAccountUpdatedEventNotification n => n.RelatedObject?.Id,
-                V2CoreAccountIncludingConfigurationMerchantCapabilityStatusUpdatedEventNotification n => n.RelatedObject?.Id,
-                V2CoreAccountIncludingConfigurationMerchantUpdatedEventNotification n => n.RelatedObject?.Id,
-                V2CoreAccountIncludingDefaultsUpdatedEventNotification n => n.RelatedObject?.Id,
-                V2CoreAccountIncludingRequirementsUpdatedEventNotification n => n.RelatedObject?.Id,
-                _ => null
-            };
-            if (related is null) return;
-            if (!MerchantPaymentOptions.AccountId(related)) throw new MerchantFailure("Invalid account event reference.");
-            account = related; eventId = notification.Id; eventType = notification.Type; reference = new(account);
+            if (S(root, "object") != "v2.core.event" || B(root, "livemode") != false
+                || !Empty(root, "context") && S(root, "context") != options.PlatformAccount) throw new MerchantFailure("Wrong account event context.", 400, "event_context");
+            if (!ThinTypes.Contains(eventType)) return;
+            var related = P(root, "related_object");
+            if (S(related, "type") != "v2.core.account" || !MerchantPaymentOptions.AccountId(S(related, "id"))) throw new MerchantFailure("Invalid account event reference.");
+            account = S(related, "id")!; reference = new(account);
         }
         if (eventId is null || !Regex.IsMatch(eventId, "^[A-Za-z0-9_]{6,160}$")) throw new MerchantFailure("Invalid notification ID.");
         var key = new InboxKey(context, account, eventId); var savedReference = JsonSerializer.Serialize(reference, Json);
@@ -70,7 +69,7 @@ public sealed partial class MerchantPaymentsStore
         // Durably queued notifications are acknowledged even when a concurrent
         // payment operation owns the lease. Recovery retries that inbox entry.
         try { await ProcessNotificationAsync(key, ct); }
-        catch (Exception error) when (error is StripeException or HttpRequestException or TaskCanceledException or MerchantFailure) { await InboxFailed(key, CancellationToken.None); }
+        catch (Exception error) when (error is StripeTransportException or HttpRequestException or OperationCanceledException or MerchantFailure) { await InboxFailed(key, CancellationToken.None); }
     }
     private static string? Field(JsonElement root, string name)
     {
@@ -131,12 +130,12 @@ public sealed partial class MerchantPaymentsStore
         foreach (var key in events)
         {
             try { await ProcessNotificationAsync(key, ct); }
-            catch (Exception error) when (error is StripeException or HttpRequestException or TaskCanceledException or MerchantFailure) { if (ct.IsCancellationRequested) return; await InboxFailed(key, ct); }
+            catch (Exception error) when (error is StripeTransportException or HttpRequestException or OperationCanceledException or MerchantFailure) { if (ct.IsCancellationRequested) return; await InboxFailed(key, ct); }
         }
         foreach (var id in attempts)
         {
             try { await ReconcileAsync(id, false, null, ct); }
-            catch (Exception error) when (error is StripeException or HttpRequestException or TaskCanceledException or MerchantFailure) { if (ct.IsCancellationRequested) return; }
+            catch (Exception error) when (error is StripeTransportException or HttpRequestException or OperationCanceledException or MerchantFailure) { if (ct.IsCancellationRequested) return; }
         }
     }
 }

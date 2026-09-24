@@ -12,7 +12,7 @@ public sealed record StaffTrainingWorkspace(string TenantId, string Name, bool C
     IReadOnlyList<TeamMember> Members, IReadOnlyList<TeamShift> Shifts, IReadOnlyList<TeamMessage> Messages,
     IReadOnlyList<TrainingCourse> Courses, IReadOnlyList<TrainingLesson> Lessons,
     IReadOnlyList<StaffCourseAssignment> Assignments, IReadOnlyList<StaffLessonProgress> Progress,
-    IReadOnlyList<TrainingVideoOption>? UploadedVideos = null);
+    IReadOnlyList<TrainingVideoOption>? UploadedVideos = null, bool CanManageManagers = false);
 public sealed record AddTeamMemberRequest(string Name, string Email, string Role);
 public sealed record SetTeamMemberStateRequest(bool ExpectedActive, bool Active);
 public sealed record AddTeamShiftRequest(string MemberId, string StartsAt, string EndsAt, string Label);

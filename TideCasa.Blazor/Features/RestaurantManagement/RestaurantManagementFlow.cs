@@ -60,7 +60,7 @@ public static partial class RestaurantManagementFlow
                 Checkbox(form, "delivery_enabled"), Checkbox(form, "pay_staff_enabled"), Checkbox(form, "tips_enabled"),
                 Amount(form, "tax_percent", 2500, true), Amount(form, "delivery_fee", 5000)!.Value,
                 Amount(form, "delivery_minimum", 100000)!.Value, capacity, zips,
-                Text(form, "pickup_instructions", 500, multiline: true), Text(form, "payment_instructions", 500, multiline: true));
+                Text(form, "pickup_instructions", 500, multiline: true), Text(form, "payment_instructions", 500, multiline: true), Text(form, "contact_phone", 30));
             return Response(tenantId, "menu", await api.SaveSettingsAsync(tenantId, settings, read.Token!, context.RequestAborted));
         }
         catch (FormFailure failure) { return Redirect(tenantId, "menu", failure.Notice); }

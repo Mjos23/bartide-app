@@ -23,7 +23,8 @@
         @if (account.Workspaces.Count == 0)
         {
             <p>No business workspace is connected to this account yet.</p>
-            <p><a class="bt-one-link" href="/purchase/restaurant">Get started with BarTide →</a></p>
+            <p><a class="bt-one-link" href="/start/restaurant">Start your free BarTide workspace →</a></p>
+            <p>Save your business details and prepare your app before reviewing your plan.</p>
             <p><a class="bt-one-link" href="/book-a-demo">Book a demo</a></p>
         }
         else
@@ -37,9 +38,10 @@
                             @if (workspace.CanPrepare || workspace.CanEdit || workspace.IsOwner)
                             {
                                 <section><h5>Setup &amp; care</h5>
+                                    @if (workspace.CanPrepare && workspace.Vertical == "bartide") { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/onboarding")">Your setup checklist and private preview →</a></p> }
                                     @if (workspace.CanPrepare) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/menu")">Menu and business details →</a></p><p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/media")">Files, photos and videos →</a></p> }
                                     @if (workspace.CanEdit) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/ordering")">Table QR codes and order settings →</a></p> }
-                                    @if (workspace.CanEdit && workspace.IsOwner) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/payments")">Customer card payments →</a></p><p class="account-tool-note">Money your customers pay your business.</p> }
+                                    @if (workspace.CanPrepare && workspace.IsOwner && workspace.Vertical == "bartide") { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/payments")">Customer card payments →</a></p><p class="account-tool-note">Money your customers pay your business.</p> }
                                     @if (workspace.IsOwner) { <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(workspace.TenantId)}/billing")">Tide Casa plan and maintenance →</a></p><p class="account-tool-note">Your app’s setup and monthly service plan.</p> }
                                 </section>
                             }

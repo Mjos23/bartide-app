@@ -1,7 +1,8 @@
-"""Exercise the real service-billing API/SQLite/Stripe SDK/Blazor against synthetic
+"""Exercise the real service-billing API/SQLite/standard .NET transport/Blazor against synthetic
 identity and Stripe HTTP fixtures. No real Stripe account or payment is touched.
 Build first; TIDE_TEST_BUILD_ROOT can select a compiled integration snapshot.
 """
+import base64
 import concurrent.futures
 import copy
 from datetime import datetime, timezone
@@ -65,7 +66,7 @@ class StripeFixture(BaseHTTPRequestHandler):
         with LOCK:
             REQUESTS.append({'path': path, 'method': method, 'body': body, 'version': self.headers.get('Stripe-Version'),
                 'agent': self.headers.get('User-Agent'), 'account': self.headers.get('Stripe-Account'), 'key': self.headers.get('Idempotency-Key')})
-            if self.headers.get('Authorization') != 'Bearer rk_test_tide_local_fixture' or self.headers.get('Stripe-Version') != VERSION or self.headers.get('Stripe-Account'):
+            if self.headers.get('Authorization') != 'Basic ' + base64.b64encode(b'rk_test_tide_local_fixture:').decode() or self.headers.get('Stripe-Version') != VERSION or self.headers.get('Stripe-Account'):
                 return self.respond(403, {'error': {'message': 'Synthetic fixture credentials/context invalid', 'type': 'invalid_request_error'}})
             if path == '/v1/account':
                 if OVERSIZE:
@@ -417,7 +418,7 @@ def run():
     refund(rec_charge, 60000, 'succeeded')
     s.sql('UPDATE tide_service_orders SET session_id=NULL WHERE id=?', (rec_id,))
     s.check('Refund-before-paid event recovers missing session via subscription', event(rec_charge, 'charge.refunded')[0] == 200 and session_for(rec_id) == rec_session and s.sql('SELECT refunded_cents FROM tide_service_invoices WHERE id=?', (rec_invoice,))[0][0] == 60000)
-    s.check('SDK uses pinned stable version without Connect header', all(r['version'] == VERSION and not r['account'] for r in REQUESTS) and any('Stripe' in (r['agent'] or '') for r in REQUESTS))
+    s.check('Custom transport uses pinned stable version without Connect header', all(r['version'] == VERSION and not r['account'] for r in REQUESTS) and all(r['agent'] == 'TideCasa-StripeHttp/1.0' for r in REQUESTS))
     # SSR forms share the real API session and CSRF protections.
     launch('TideCasa.Blazor', WEB, {'Api__BaseUrl': s.API, 'Auth__AllowLocalHttp': 'true', 'DataProtection__KeyPath': str(RUN / 'keys')})
     owner_browser = w.login('alice')

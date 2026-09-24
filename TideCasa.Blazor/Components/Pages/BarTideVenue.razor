@@ -1,0 +1,27 @@
+@page "/bar/{Slug}"
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Components.Onboarding
+@inject ClientOnboardingClient Api
+<PageTitle>@(site?.Business.Name ?? "Restaurant") | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/client-onboarding.css" /></HeadContent>
+@if (site is not null)
+{
+    <VenuePresentation Business="@site.Business" Brand="@site.Brand" Categories="@site.Categories" Items="@site.Items" TenantId="@site.TenantId" Slug="@site.Slug" OrderingAvailable="@site.OrderingAvailable" PublishedHours="@site.HoursText" />
+}
+else
+{
+    <main class="onboarding-shell"><p class="onboarding-eyebrow">BARTIDE</p><h1>This page is unavailable.</h1><p>@message</p><a href="/restaurant">Visit BarTide →</a></main>
+}
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private OnboardingPublicSite? site;
+    private string message = "Please check the address or contact the restaurant.";
+    protected override async Task OnInitializedAsync()
+    {
+        HttpContext.Response.Headers.CacheControl = "no-store";
+        var result = await Api.PublicAsync(Slug, HttpContext.RequestAborted);
+        if (result.Succeeded && result.Value is not null) site = result.Value;
+        else { HttpContext.Response.StatusCode = result.Uncertain ? 503 : 404; if (result.Uncertain) message = "This restaurant’s page could not be loaded right now. Please try again shortly."; }
+    }
+}

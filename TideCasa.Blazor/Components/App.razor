@@ -46,6 +46,8 @@
     {
         get
         {
+            var restaurant = System.Text.RegularExpressions.Regex.Match(HttpContext.Request.Path.Value ?? "", "^/bar/([a-z0-9-]{1,200})/?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            if (restaurant.Success) return "/bar/" + Uri.EscapeDataString(restaurant.Groups[1].Value) + "/manifest.webmanifest";
             var updates = System.Text.RegularExpressions.Regex.Match(HttpContext.Request.Path.Value ?? "", "^/updates/([A-Za-z0-9_-]{1,128})/?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             return updates.Success ? TideCasa.Blazor.Features.BusinessPosts.BusinessPostsFlow.Manifest(updates.Groups[1].Value)
                 : IsBarHost ? "/bartide.webmanifest" : "/tide-casa.webmanifest";

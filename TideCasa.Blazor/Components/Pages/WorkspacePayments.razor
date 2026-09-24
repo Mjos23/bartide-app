@@ -8,24 +8,47 @@
 <div class="bt-unified restaurant-ordering merchant-payments">
     <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Card payments</span></header>
     <main class="ordering-main"><p class="bt-one-kicker">YOUR ORDERS. YOUR PAYMENTS.</p><h1>Get paid at your restaurant</h1>
+        <TideCasa.Blazor.Components.Onboarding.SetupReturnLink TenantId="@TenantId" />
         @if (MerchantPaymentsFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
         @if (error is not null) { <p class="ordering-notice" role="alert">@error</p> }
         @if (status is not null)
         {
             <section class="ordering-panel"><p class="merchant-test-label">Test setup · No real charges</p><h2>@status.Name</h2><p>@status.Message</p>
-                <dl class="merchant-status"><div><dt>Connection</dt><dd>@State(status.State)</dd></div><div><dt>Pay on phone</dt><dd>@(status.PhoneCheckoutAvailable ? "Available for testing" : "Not available yet")</dd></div></dl>
+                <p>Saved contact: <strong>@status.BusinessEmail</strong>. Confirm this business name and email before continuing. Update incorrect details in your business workspace.</p>
+                <dl class="merchant-status">
+                    <div><dt>Business verification</dt><dd>@State(status.ConnectionState)</dd></div>
+                    <div><dt>Card acceptance</dt><dd>@Capability(status.CardPaymentsState)</dd></div>
+                    <div><dt>Payout readiness</dt><dd>@Capability(status.PayoutsState)</dd></div>
+                    <div><dt>BarTide phone checkout</dt><dd>@(status.PhoneCheckoutAvailable ? "Available for test orders" : "Not available yet")</dd></div>
+                </dl>
+                <p class="ordering-note">Last checked: @(Checked(status.CheckedAt)). @(status.Stale ? "This information is stale. Refresh before relying on it." : "Returning from Stripe does not prove verification is complete.")</p>
+                @if (status.RequirementCategories.Count > 0)
+                { <ul>@foreach (var category in status.RequirementCategories) { <li>@Requirement(category)</li> }</ul> }
+                <h3>Your next step</h3><p>@NextStep(status.NextAction)</p>
+                <ol class="merchant-checklist"><li>Confirm your saved business details.</li><li>Start or resume the same Stripe connection.</li><li>Complete Stripe verification and review card acceptance and payouts.</li><li>When phone checkout is available, place a sandbox test order.</li></ol>
                 <p>Guest card payments go directly to your restaurant’s connected Stripe account. You keep access to your Stripe Dashboard for payment records and refunds.</p>
                 <p class="ordering-note">Tide Casa setup and monthly maintenance are billed separately. This connection is for your restaurant’s orders.</p>
-                @if (status.OnboardingAvailable && status.State != "review")
+                @if (status.EmbeddedOnboardingAvailable)
+                {
+                    <form id="merchant-embedded-confirm" action="@($"/merchant-payments/{Uri.EscapeDataString(TenantId)}/session")" method="post" data-enhance="false"><AntiforgeryToken />
+                        <input type="hidden" name="request_key" value="@Guid.NewGuid().ToString("D")" />
+                        <label class="merchant-confirm"><input type="checkbox" name="confirm_us" value="true" required /><span>The saved details are correct for this US business, and I am authorized to manage its payment setup.</span></label>
+                    </form>
+                    <TideCasa.Blazor.Components.MerchantPayments.MerchantEmbeddedOnboarding FormId="merchant-embedded-confirm" @rendermode="InteractiveServer" />
+                }
+                @if (status.OnboardingAvailable && status.State is not ("review" or "restricted"))
                 {
                     <form action="@($"/merchant-payments/{Uri.EscapeDataString(TenantId)}/onboarding")" method="post" data-enhance="false"><AntiforgeryToken />
                         <input type="hidden" name="request_key" value="@Guid.NewGuid().ToString("D")" />
-                        <label class="merchant-confirm"><input type="checkbox" name="confirm_us" value="true" required /><span>This restaurant is a US business, and I am authorized to manage its payment setup.</span></label>
-                        <button class="bt-one-button" type="submit">@(status.State == "unconnected" ? "Set up with Stripe" : "Continue Stripe setup")</button>
+                        <label class="merchant-confirm"><input type="checkbox" name="confirm_us" value="true" required /><span>The saved details are correct for this US business, and I am authorized to manage its payment setup.</span></label>
+                        <button class="bt-one-button" type="submit">@(status.State == "unconnected" ? "Set up with Stripe" : "Continue on Stripe’s website")</button>
                     </form>
                     <p class="ordering-note">Stripe collects bank and business details securely. Never paste an API key or card details into this page.</p>
                 }
                 <a class="bt-one-link" href="@MerchantPaymentsFlow.Page(TenantId)">Refresh connection status →</a>
+                @if (status.DashboardUrl is not null) { <p><a href="@status.DashboardUrl" target="_blank" rel="noopener noreferrer">Open Stripe Dashboard →</a></p> }
+                @if (status.TestOrderUrl is not null) { <p><a class="bt-one-button" href="@status.TestOrderUrl">Test an order →</a></p> }
+                <p class="ordering-note">Already use Stripe? Stripe may offer to reuse your business information during setup. This does not move payment history or attach an existing account. Connecting an existing account is not available here yet.</p>
             </section>
         }
     </main>
@@ -36,7 +59,18 @@
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
     private MerchantPaymentStatus? status;
     private string? error;
-    private static string State(string value) => value switch { "ready" => "Setup complete", "onboarding" => "Setup in progress", "restricted" or "review" => "Needs attention", "creating" => "Connecting", "unconnected" => "Not connected", _ => "Being prepared" };
+    private static string State(string value) => value switch { "connected" => "Requirements checked", "needs_input" => "Information needed", "pending_review" => "Under Stripe review", "restricted" or "review" => "Needs attention", "creating" => "Connecting", "unconnected" => "Not connected", "disabled" => "Not enabled", _ => "Could not confirm" };
+    private static string Capability(string value) => value switch { "active" => "Ready", "pending" => "Under review", "restricted" or "inactive" => "Not ready", "unsupported" => "Unavailable", _ => "Not confirmed" };
+    private static string Checked(string? value) => DateTimeOffset.TryParse(value, out var date) ? date.ToUniversalTime().ToString("MMM d, yyyy HH:mm 'UTC'") : "Not checked yet";
+    private static string Requirement(string value) => value switch { "past_due" => "Some Stripe requirements are overdue.", "information_needed" => "Stripe needs more information; continue secure setup.", "stripe_review" => "Stripe is reviewing submitted information.", "future_information" => "Additional information will be required later.", _ => "Check the remaining requirements in Stripe." };
+    private static string NextStep(string value) => value switch
+    {
+        "start_setup" => "Confirm the details below and start Stripe setup.", "continue_setup" => "Continue setup for your saved connection.",
+        "wait_for_review" => "Wait for Stripe’s review, then refresh this page.", "test_order" => "Place a test order and check its payment status.",
+        "prepare_launch" => "Continue your private business setup. Public checkout stays closed until the app is approved and published.",
+        "verify_checkout" => "Contact Tide Casa to finish the phone checkout verification checks.", "review_connection" => "Review the saved connection with Stripe or Tide Casa support.",
+        "unavailable" => "Phone payment setup has not been enabled. Pay staff remains available where offered.", _ => "Refresh this page to check the saved connection again."
+    };
     protected override async Task OnInitializedAsync()
     {
         if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { HttpContext.Response.StatusCode = 401; error = "Sign in again to manage payments."; return; }

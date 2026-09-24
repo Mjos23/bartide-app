@@ -16,7 +16,7 @@ public sealed class TeamException(string message, int status = 400, string code 
 /// <summary>Uses the legacy team and course records; explicit staff assignments/progress are additive.</summary>
 public sealed class StaffTrainingStore(ApplicationDatabase database)
 {
-    private sealed record Access(string TenantId, string Name, bool Manager, string? MemberId, string DisplayName);
+    private sealed record Access(string TenantId, string Name, bool Manager, string? MemberId, string DisplayName, bool Owner = false);
     private static string Now() => DateTimeOffset.UtcNow.ToString("O");
     private static string Id() => Guid.NewGuid().ToString("D");
     private delegate Task Change(DbConnection db, DbTransaction tx, Access access, CancellationToken ct);
@@ -29,8 +29,9 @@ public sealed class StaffTrainingStore(ApplicationDatabase database)
             Manager(a); Required(request);
             var name = Text(request.Name, "Name", 80);
             var email = Text(request.Email, "Sign-in email", 254).ToLowerInvariant();
-            if (!Regex.IsMatch(email, "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$") || request.Role is not ("kitchen" or "driver"))
-                throw new TeamException("Enter an email and choose kitchen or driver access.");
+            if (!Regex.IsMatch(email, "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$") || !RestaurantStaffRoles.IsStaff(request.Role))
+                throw new TeamException("Enter an email and choose a supported team role.");
+            if (request.Role == "manager" && !a.Owner) throw new TeamException("Only the business owner can grant manager access.", 403, "owner_required");
             if (await Count(db, tx, "SELECT COUNT(*) FROM bartide_enhanced_members WHERE tenant_id=@tenant", token, ("@tenant", id)) >= 30)
                 throw new TeamException("This team supports up to 30 staff records.", 409, "team_full");
             if (await Count(db, tx, db.Sql("SELECT COUNT(*) FROM bartide_enhanced_members WHERE tenant_id=@tenant AND email=@email COLLATE NOCASE",
@@ -44,6 +45,8 @@ public sealed class StaffTrainingStore(ApplicationDatabase database)
         ExecuteAsync(id, user, async (db, tx, a, token) =>
         {
             Manager(a); Required(request);
+            if (!a.Owner && await Count(db, tx, "SELECT COUNT(*) FROM bartide_enhanced_members WHERE id=@member AND tenant_id=@tenant AND role='manager'", token, ("@member", memberId), ("@tenant", id)) != 0)
+                throw new TeamException("Only the business owner can change manager access.", 403, "owner_required");
             var changed = await Run(db, tx, "UPDATE bartide_enhanced_members SET active=@active WHERE id=@member AND tenant_id=@tenant AND active=@expected", token,
                 ("@active", request.Active ? 1 : 0), ("@expected", request.ExpectedActive ? 1 : 0), ("@member", memberId), ("@tenant", id));
             if (changed != 1) throw Stale();
@@ -176,7 +179,7 @@ public sealed class StaffTrainingStore(ApplicationDatabase database)
         ExecuteAsync(id, user, async (db, tx, a, token) =>
         {
             Required(request);
-            if (a.Manager || a.MemberId is null) throw new TeamException("Progress belongs to the assigned employee. Use their own account to save it.", 403, "staff_required");
+            if (a.MemberId is null) throw new TeamException("Progress belongs to the assigned employee. Use their own account to save it.", 403, "staff_required");
             if (await Count(db, tx, "SELECT COUNT(*) FROM fit_lessons l JOIN fit_courses c ON c.id=l.course_id AND c.tenant_id=l.tenant_id JOIN tide_staff_course_assignments x ON x.course_id=c.id AND x.tenant_id=c.tenant_id WHERE l.id=@lesson AND l.tenant_id=@tenant AND c.published=1 AND x.member_id=@member AND x.active=1", token,
                 ("@lesson", lessonId), ("@tenant", id), ("@member", a.MemberId)) != 1) throw Missing();
             await Run(db, tx, "INSERT INTO tide_staff_lesson_progress(tenant_id,member_id,lesson_id,completed,updated_at) VALUES(@tenant,@member,@lesson,@completed,@now) ON CONFLICT(member_id,lesson_id) DO UPDATE SET completed=excluded.completed,updated_at=excluded.updated_at WHERE tide_staff_lesson_progress.tenant_id=excluded.tenant_id", token,
@@ -202,8 +205,10 @@ public sealed class StaffTrainingStore(ApplicationDatabase database)
         if (tenants.Count != 1) throw Missing();
         var tenant = tenants[0];
         using var config = JsonDocument.Parse(tenant[4]);
-        if (tenant[2] != "active" || tenant[3] != "bartide" || !config.RootElement.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.True)
-            throw new TeamException("This restaurant workspace is not active.", 403, "team_unavailable");
+        var preparation = tenant[2] is "draft" or "building";
+        if (tenant[3] != "bartide" || (!preparation && (tenant[2] != "active"
+            || !config.RootElement.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.True)))
+            throw new TeamException("This restaurant workspace is unavailable.", 403, "team_unavailable");
         var email = user.Email.Trim().ToLowerInvariant();
         if (tenant[1].Length == 0 && !user.IsPlatformOwner)
         {
@@ -212,14 +217,10 @@ public sealed class StaffTrainingStore(ApplicationDatabase database)
                 ("@user", user.UserId), ("@tenant", id), ("@email", email));
             tenant[1] = (await Rows(db, tx, "SELECT user_id FROM bartide_customers WHERE id=@tenant", r => r.IsDBNull(0) ? "" : r.GetString(0), ct, ("@tenant", id)))[0];
         }
-        if (user.IsPlatformOwner || tenant[1] == user.UserId) return new(id, tenant[0], true, null, tenant[0] + " manager");
-        await Run(db, tx, db.Sql("UPDATE bartide_enhanced_members SET user_id=@user WHERE tenant_id=@tenant AND active=1 AND user_id IS NULL AND email=@email COLLATE NOCASE AND role IN('kitchen','driver')",
-            "UPDATE bartide_enhanced_members SET user_id=@user WHERE tenant_id=@tenant AND active=1 AND user_id IS NULL AND translate(email,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')=translate(@email,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz') COLLATE \"C\" AND role IN('kitchen','driver')"), ct,
-            ("@user", user.UserId), ("@tenant", id), ("@email", email));
-        var members = await Rows(db, tx, "SELECT id,name FROM bartide_enhanced_members WHERE tenant_id=@tenant AND user_id=@user AND active=1 AND role IN('kitchen','driver') LIMIT 2", r => (Id: r.GetString(0), Name: r.GetString(1)), ct,
-            ("@tenant", id), ("@user", user.UserId));
-        if (members.Count != 1) throw new TeamException("You do not have active access to this team.", 403, "team_forbidden");
-        return new(id, tenant[0], false, members[0].Id, members[0].Name);
+        if (user.IsPlatformOwner || tenant[1] == user.UserId) return new(id, tenant[0], true, null, tenant[0] + " owner", true);
+        var member = await TenantStaffAccess.FindAsync(db, tx, id, user, ct, allowPreparation: true);
+        if (member is null) throw new TeamException("You do not have active access to this team.", 403, "team_forbidden");
+        return new(id, tenant[0], member.Role == "manager", member.Id, member.Name);
     }
 
     private static async Task<StaffTrainingWorkspace> Workspace(DbConnection db, DbTransaction tx, Access a, CancellationToken ct)
@@ -236,7 +237,7 @@ public sealed class StaffTrainingStore(ApplicationDatabase database)
         var assignments = await Rows(db, tx, "SELECT x.member_id,x.course_id,x.active,x.version FROM tide_staff_course_assignments x JOIN fit_courses c ON c.id=x.course_id AND c.tenant_id=x.tenant_id JOIN bartide_enhanced_members m ON m.id=x.member_id AND m.tenant_id=x.tenant_id WHERE x.tenant_id=@tenant AND (@manager=1 OR (x.member_id=@member AND x.active=1 AND c.published=1)) ORDER BY x.member_id,x.course_id", r => new StaffCourseAssignment(r.GetString(0), r.GetString(1), r.ReadInt64(2) == 1, r.ReadInt32(3)), ct, args);
         var progress = await Rows(db, tx, "SELECT p.member_id,p.lesson_id,p.completed,p.updated_at FROM tide_staff_lesson_progress p JOIN fit_lessons l ON l.id=p.lesson_id AND l.tenant_id=p.tenant_id JOIN fit_courses c ON c.id=l.course_id AND c.tenant_id=l.tenant_id JOIN bartide_enhanced_members m ON m.id=p.member_id AND m.tenant_id=p.tenant_id WHERE p.tenant_id=@tenant AND (@manager=1 OR (p.member_id=@member AND " + visibleCourse + ")) ORDER BY p.member_id,p.lesson_id", r => new StaffLessonProgress(r.GetString(0), r.GetString(1), r.ReadInt64(2) == 1, r.GetString(3)), ct, args);
         var videos = a.Manager ? await Rows(db, tx, "SELECT id,name FROM fit_videos WHERE tenant_id=@tenant AND status='ready' ORDER BY created_at DESC LIMIT 100", r => new TrainingVideoOption(r.GetString(0), r.GetString(1)), ct, args) : [];
-        return new(a.TenantId, a.Name, a.Manager, a.MemberId, members, shifts, messages, courses, lessons, assignments, progress, videos);
+        return new(a.TenantId, a.Name, a.Manager, a.MemberId, members, shifts, messages, courses, lessons, assignments, progress, videos, a.Owner);
     }
 
     private static string SafeVideo(string kind, string source)
@@ -273,10 +274,10 @@ public sealed class StaffTrainingStore(ApplicationDatabase database)
 
     private static async Task ActiveMember(DbConnection db, DbTransaction tx, string tenant, string member, CancellationToken ct)
     {
-        if (await Count(db, tx, "SELECT COUNT(*) FROM bartide_enhanced_members WHERE tenant_id=@tenant AND id=@member AND active=1 AND role IN('kitchen','driver')", ct, ("@tenant", tenant), ("@member", member)) != 1)
+        if (await Count(db, tx, "SELECT COUNT(*) FROM bartide_enhanced_members WHERE tenant_id=@tenant AND id=@member AND active=1 AND role IN('manager','bartender','server','kitchen','driver')", ct, ("@tenant", tenant), ("@member", member)) != 1)
             throw new TeamException("Choose an active employee on this team.", 400, "invalid_member");
     }
-    private static void Manager(Access a) { if (!a.Manager) throw new TeamException("Business owner access is required.", 403, "manager_required"); }
+    private static void Manager(Access a) { if (!a.Manager) throw new TeamException("Business owner or manager access is required.", 403, "manager_required"); }
     private static void Required(object? request) { if (request is null) throw new TeamException("Enter the requested details."); }
     private static TeamException Missing() => new("This team item is unavailable.", 404, "not_found");
     private static TeamException Stale() => new("This item changed. Refresh before saving again.", 409, "team_changed");

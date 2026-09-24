@@ -7,4 +7,5 @@
   <Project Path="TideCasa.MigrationTool/TideCasa.MigrationTool.csproj" />
   <Project Path="TideCasa.Persistence.Checks/TideCasa.Persistence.Checks.csproj" />
   <Project Path="TideCasa.EmailTracking.Checks/TideCasa.EmailTracking.Checks.csproj" />
+  <Project Path="TideCasa.Stripe.Checks/TideCasa.Stripe.Checks.csproj" />
 </Solution>

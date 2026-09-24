@@ -9,6 +9,7 @@
     <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Menu and settings</span></header>
     <main class="ordering-main">
         <p class="bt-one-kicker">MAKE IT YOURS</p><h1>@(editor?.Profile.Name ?? "Menu and settings")</h1>
+        <TideCasa.Blazor.Components.Onboarding.SetupReturnLink TenantId="@TenantId" />
         <nav class="rm-workspace-nav" aria-label="Workspace"><a aria-current="page" href="@PagePath">Menu and settings</a><a href="@WorkspacePath("operations")">Orders</a><a href="@WorkspacePath("ordering")">Table QR codes</a></nav>
         @if (RestaurantManagementFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
         @if (error is not null) { <div class="ordering-notice" role="alert"><p>@error</p><a href="@PagePath">Try loading again</a></div> }
@@ -143,6 +144,7 @@
                         </div>
                         <label class="desk-field">Delivery ZIP codes<textarea name="delivery_zips" rows="2" maxlength="500" placeholder="For example, 33101, 33102">@string.Join(", ", settings.DeliveryZips)</textarea></label>
                         <p class="ordering-note">List up to 50 five-digit ZIP codes. Delivery capacity limits how many delivery orders can be open at once.</p>
+                        <label class="desk-field">Restaurant contact phone (optional, shown on your public app)<input type="tel" name="contact_phone" maxlength="30" value="@settings.ContactPhone" /></label>
                         <div class="rm-field-grid"><label class="desk-field">Pickup instructions<textarea name="pickup_instructions" rows="3" maxlength="500">@settings.PickupInstructions</textarea></label><label class="desk-field">Payment instructions<textarea name="payment_instructions" rows="3" maxlength="500">@settings.PaymentInstructions</textarea></label></div>
                         <button class="bt-one-button" type="submit">Save ordering settings</button>
                     </form>

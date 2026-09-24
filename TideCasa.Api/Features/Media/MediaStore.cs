@@ -48,7 +48,12 @@ public sealed class MediaStore(ApplicationDatabase database, IPrivateObjectStore
         if ((kind == "photo" && type != "image/jpeg") || (kind == "menu" && type is not ("image/jpeg" or "application/pdf")) || (kind == "video" && type != "video/mp4"))
             throw new MediaException("Choose a JPG photo, a PDF or JPG menu, or an MP4 video.", 415);
         var name = Filename(filename, type);
-        await using (var check = await database.OpenAsync(ct)) { using var tx = check.BeginTransaction(deferred: true); await Owner(check, tx, tenant, user, ct); }
+        await using (var check = await database.OpenAsync(ct))
+        {
+            using var tx = check.BeginTransaction(deferred: false);
+            await Owner(check, tx, tenant, user, ct);
+            await tx.CommitAsync(ct);
+        }
         if (!objects.Ready) throw new MediaException("Private uploads are not connected yet.", 503, "storage_unavailable");
         var spool = SpoolDirectory();
         if (!await UploadSlots.WaitAsync(0, ct)) throw new MediaException("Other uploads are finishing. Try again shortly.", 429, "uploads_busy");
@@ -152,7 +157,7 @@ public sealed class MediaStore(ApplicationDatabase database, IPrivateObjectStore
         var tenant = await TextScalar(db, tx, "SELECT p.tenant_id FROM bartide_photos p JOIN bartide_customers t ON t.id=p.tenant_id WHERE p.id=@id AND p.status='ready' AND t.status='active'", ct, ("@id", id));
         if (tenant is null) throw Missing();
         var file = (await Records(db, tx, tenant, "photo", id, ct)).SingleOrDefault();
-        if (file is null || !await Referenced(db, tx, file, ct)) throw Missing();
+        if (file is null || !await Referenced(db, tx, file, ct, publicAccess: true)) throw Missing();
         await tx.CommitAsync(ct); return file;
     }
 
@@ -198,7 +203,7 @@ public sealed class MediaStore(ApplicationDatabase database, IPrivateObjectStore
         await using var db = await database.OpenAsync(ct); using var tx = db.BeginTransaction(deferred: false);
         var record = (await Records(db, tx, tenant, kind, id, ct)).SingleOrDefault();
         if (record is null || record.Status != "ready") throw Missing();
-        if (!await IsOwner(db, tx, tenant, user, ct))
+        if (!await CanManage(db, tx, tenant, user, ct))
         {
             if (kind != "video") throw Missing();
             var sql = db.Sql("""
@@ -208,7 +213,7 @@ public sealed class MediaStore(ApplicationDatabase database, IPrivateObjectStore
                 JOIN bartide_enhanced_members m ON m.id=a.member_id AND m.tenant_id=t.id
                 WHERE t.id=@tenant AND t.status='active' AND t.vertical='bartide' AND json_extract(e.settings_json,'$.enabled')=1
                 AND c.published=1 AND l.video_kind='upload' AND l.video_source=@video
-                AND a.active=1 AND m.active=1 AND m.user_id=@user AND m.role IN('kitchen','driver')
+                AND a.active=1 AND m.active=1 AND m.user_id=@user AND m.role IN('manager','bartender','server','kitchen','driver')
                 """, """
                 SELECT COUNT(*) FROM fit_lessons l JOIN fit_courses c ON c.id=l.course_id AND c.tenant_id=l.tenant_id
                 JOIN bartide_customers t ON t.id=l.tenant_id JOIN bartide_enhanced_configs e ON e.tenant_id=t.id
@@ -216,7 +221,7 @@ public sealed class MediaStore(ApplicationDatabase database, IPrivateObjectStore
                 JOIN bartide_enhanced_members m ON m.id=a.member_id AND m.tenant_id=t.id
                 WHERE t.id=@tenant AND t.status='active' AND t.vertical='bartide' AND (tide_json(e.settings_json)->'enabled') IN('true'::jsonb,'1'::jsonb)
                 AND c.published=1 AND l.video_kind='upload' AND l.video_source=@video
-                AND a.active=1 AND m.active=1 AND m.user_id=@user AND m.role IN('kitchen','driver')
+                AND a.active=1 AND m.active=1 AND m.user_id=@user AND m.role IN('manager','bartender','server','kitchen','driver')
                 """);
             if (await Scalar(db, tx, sql, ct, ("@tenant", tenant), ("@video", id), ("@user", user.UserId)) == 0) throw Missing();
         }
@@ -295,15 +300,16 @@ public sealed class MediaStore(ApplicationDatabase database, IPrivateObjectStore
     private static void CheckId(string id) { if (!Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,128}$")) throw Missing(); }
     private static async Task<string> Owner(DbConnection db, DbTransaction tx, string tenant, AuthUser user, CancellationToken ct)
     {
-        if (!await IsOwner(db, tx, tenant, user, ct)) throw new MediaException("This file workspace is not available to this account.", 403, "media_forbidden");
+        if (!await CanManage(db, tx, tenant, user, ct)) throw new MediaException("This file workspace is not available to this account.", 403, "media_forbidden");
         return (await TextScalar(db, tx, "SELECT name FROM bartide_customers WHERE id=@tenant", ct, ("@tenant", tenant)))!;
     }
-    private static async Task<bool> IsOwner(DbConnection db, DbTransaction tx, string tenant, AuthUser user, CancellationToken ct)
+    private static async Task<bool> CanManage(DbConnection db, DbTransaction tx, string tenant, AuthUser user, CancellationToken ct)
     {
         CheckId(tenant);
         return !string.IsNullOrEmpty(user.UserId) && await Scalar(db, tx,
             "SELECT COUNT(*) FROM bartide_customers WHERE id=@tenant AND (@platform=1 OR (user_id=@user AND status IN('draft','building','active')))", ct,
-            ("@tenant", tenant), ("@platform", user.IsPlatformOwner ? 1 : 0), ("@user", user.UserId)) == 1;
+            ("@tenant", tenant), ("@platform", user.IsPlatformOwner ? 1 : 0), ("@user", user.UserId)) == 1
+            || await TenantStaffAccess.IsManagerAsync(db, tx, tenant, user, ct, allowPreparation: true);
     }
     private static async Task<List<MediaRecord>> Records(DbConnection db, DbTransaction tx, string tenant, string kind, string? id, CancellationToken ct)
     {
@@ -320,13 +326,21 @@ public sealed class MediaStore(ApplicationDatabase database, IPrivateObjectStore
         }
         return records;
     }
-    private static async Task<bool> Referenced(DbConnection db, DbTransaction tx, MediaRecord file, CancellationToken ct)
+    private static async Task<bool> Referenced(DbConnection db, DbTransaction tx, MediaRecord file, CancellationToken ct, bool publicAccess = false)
     {
         if (file.Kind == "video") return await Scalar(db, tx, "SELECT COUNT(*) FROM fit_lessons WHERE tenant_id=@tenant AND video_kind='upload' AND video_source=@id", ct, ("@tenant", file.TenantId), ("@id", file.Id)) > 0;
         if (file.Kind != "photo") return false;
         var json = await TextScalar(db, tx, "SELECT menu_json FROM bartide_customers WHERE id=@tenant", ct, ("@tenant", file.TenantId));
         using var menu = JsonDocument.Parse(json ?? "{}");
-        return menu.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array && items.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("photo_src", out var source) && source.ValueKind == JsonValueKind.String && source.GetString() == "/media/" + file.Id);
+        if (menu.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array && items.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("photo_src", out var source) && source.ValueKind == JsonValueKind.String && source.GetString() == "/media/" + file.Id)) return true;
+        if (menu.RootElement.TryGetProperty("venue", out var venue) && venue.ValueKind == JsonValueKind.Object)
+            foreach (var key in new[] { "logo_src", "cover_src" })
+                if (venue.TryGetProperty(key, out var source) && source.ValueKind == JsonValueKind.String && source.GetString() == "/media/" + file.Id) return true;
+        if (publicAccess) return false;
+        // Retain assets used by the current/previous private release; public delivery uses only current public references.
+        var settings = await TextScalar(db, tx, "SELECT settings_json FROM bartide_enhanced_configs WHERE tenant_id=@tenant", ct, ("@tenant", file.TenantId));
+        using var config = JsonDocument.Parse(settings ?? "{}");
+        return config.RootElement.TryGetProperty("onboarding", out var onboarding) && onboarding.GetRawText().Contains("\"" + file.Id + "\"", StringComparison.Ordinal);
     }
     private static DbCommand Command(DbConnection db, DbTransaction? tx, string sql, params (string Name, object? Value)[] parameters)
     { var command = db.CreateCommand(); command.Transaction = tx; command.CommandText = sql; foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value); return command; }

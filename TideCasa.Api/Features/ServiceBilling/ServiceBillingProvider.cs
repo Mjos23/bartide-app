@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Stripe;
+using TideCasa.Api.Infrastructure.Payments;
 
 namespace TideCasa.Api.Features.ServiceBilling;
 
@@ -13,19 +13,18 @@ public sealed class BillingException(string message, int status = 409, string co
 
 public sealed class ServiceBillingProvider : IDisposable
 {
-    public const string ApiVersion = "2026-08-26.dahlia";
+    public const string ApiVersion = StripeHttpTransport.ApiVersion;
     public const string TermsVersion = "2026-09-maintenance-v2";
     public const int MonthlyCents = 14900;
     public const int MaintenanceDelayDays = 30;
     public const string Purpose = "tide_service_v2";
-    private readonly StripeClient? stripe;
-    private readonly HttpClient? http;
+    private readonly StripeHttpTransport? transport;
     public string Environment { get; }
     public string Origin { get; } = "";
     public string AccountId { get; } = "";
     public string MethodConfiguration { get; } = "";
     public string WebhookSecret { get; } = "";
-    public bool Ready => stripe is not null;
+    public bool Ready => transport is not null;
     public bool CheckoutReady { get; }
     public bool GuestCheckoutReady { get; }
 
@@ -39,7 +38,7 @@ public sealed class ServiceBillingProvider : IDisposable
         var configuredOrigin = configuration["ServiceBilling:PublicOrigin"] ?? "";
         if (Uri.TryCreate(configuredOrigin, UriKind.Absolute, out var origin) && origin.Scheme == "https" && origin.IsDefaultPort
             && origin.UserInfo.Length == 0 && configuredOrigin == origin.GetLeftPart(UriPartial.Authority)) Origin = configuredOrigin;
-        var apiBase = StripeClient.DefaultApiBase;
+        var apiBase = StripeHttpTransport.ApiOrigin;
         var testApi = configuration["ServiceBilling:DevelopmentApiBase"];
         if (!string.IsNullOrEmpty(testApi))
         {
@@ -54,9 +53,7 @@ public sealed class ServiceBillingProvider : IDisposable
             || !WebhookSecret.StartsWith("whsec_", StringComparison.Ordinal) || WebhookSecret.Length < 16
             || !Regex.IsMatch(AccountId, "^acct_[A-Za-z0-9]+$") || Origin.Length == 0
             || Environment == "live" && configuration["ServiceBilling:LiveEnabled"] != "true") return;
-        if (StripeConfiguration.ApiVersion != ApiVersion) throw new InvalidOperationException("The service billing SDK API version must match its reviewed notification version.");
-        http = new HttpClient(new BoundedStripeHandler(new Uri(apiBase))) { Timeout = TimeSpan.FromSeconds(20), MaxResponseContentBufferSize = 1024 * 1024 };
-        stripe = new StripeClient(key, httpClient: new SystemNetHttpClient(http, maxNetworkRetries: 1, enableTelemetry: false), apiBase: apiBase);
+        transport = new StripeHttpTransport(key, apiBase, !string.IsNullOrEmpty(testApi));
         CheckoutReady = configuration["ServiceBilling:CheckoutEnabled"] == "true" && configuration["ServiceBilling:CardsOnlyVerified"] == "true"
             && Regex.IsMatch(MethodConfiguration, "^pmc_[A-Za-z0-9]+$");
         GuestCheckoutReady = CheckoutReady && configuration["ServiceBilling:GuestCheckoutEnabled"] == "true";
@@ -86,13 +83,9 @@ public sealed class ServiceBillingProvider : IDisposable
     {
         NeedReady();
         if (!path.StartsWith("/v1/", StringComparison.Ordinal) || path.Contains("..", StringComparison.Ordinal) || path.Contains('#')) throw Review();
-        string? content = null;
-        if (parameters is not null) { using var encoded = new FormUrlEncodedContent(parameters); content = await encoded.ReadAsStringAsync(ct); }
-        var response = await stripe!.RawRequestAsync(method, path, content, new RawRequestOptions { IdempotencyKey = key }, ct);
-        if (response.Content.Length > 1024 * 1024) throw Unavailable();
-        using var json = JsonDocument.Parse(response.Content, new JsonDocumentOptions { MaxDepth = 48 });
-        if (json.RootElement.ValueKind != JsonValueKind.Object) throw Review();
-        return json.RootElement.Clone();
+        // Software billing is always a platform request. Merchant account headers cannot cross this boundary.
+        return method == HttpMethod.Get ? await transport!.GetAsync(path, null, ct)
+            : await transport!.PostFormAsync(path, parameters!, null, key, ct, retryUncertainWrite: true);
     }
     public void NeedReady() { if (!Ready) throw Unavailable(); }
     public static BillingException Unavailable() => new("Payments are being connected. Please try again later.", 503, "billing_unavailable");
@@ -111,18 +104,7 @@ public sealed class ServiceBillingProvider : IDisposable
     public static string? ObjectId(JsonElement value, string key) => ObjectId(P(value, key));
     public static IReadOnlyList<JsonElement> Data(JsonElement value)
     { var data = P(value, "data"); if (data.ValueKind != JsonValueKind.Array) throw Review(); return data.EnumerateArray().Select(x => x.Clone()).ToArray(); }
-    public void Dispose() => http?.Dispose();
-
-    private sealed class BoundedStripeHandler(Uri expected) : DelegatingHandler(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
-    {
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-        {
-            if (request.RequestUri is not { } uri || uri.Scheme != expected.Scheme || uri.Host != expected.Host || uri.Port != expected.Port) throw new HttpRequestException("Unexpected payment provider destination.");
-            var response = await base.SendAsync(request, ct);
-            try { await response.Content.LoadIntoBufferAsync(1024 * 1024, ct); return response; }
-            catch { response.Dispose(); throw; }
-        }
-    }
+    public void Dispose() => transport?.Dispose();
 }
 
 internal static class BillingJsonExtensions

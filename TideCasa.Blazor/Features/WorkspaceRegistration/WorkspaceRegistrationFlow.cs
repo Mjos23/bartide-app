@@ -28,7 +28,7 @@ public static class WorkspaceRegistrationFlow
             var result = await client.RegisterWorkspaceAsync(new(form["requestId"].ToString(), form["businessName"].ToString(), form["contactName"].ToString(),
                 form["area"].ToString(), plan, form["acknowledged"] == "true", form["phone"].ToString(), form["website"].ToString(), form["notes"].ToString()), token, context.Connection.RemoteIpAddress, context.RequestAborted);
             return result.Succeeded && result.Value is not null
-                ? Results.LocalRedirect($"/workspace/{Uri.EscapeDataString(result.Value.TenantId)}/billing?{query}")
+                ? Results.LocalRedirect($"/workspace/{Uri.EscapeDataString(result.Value.TenantId)}/{(plan == "restaurant" ? "onboarding" : "billing")}?{query}")
                 : Results.LocalRedirect($"/start/{plan}?{query}&notice={(result.Status == System.Net.HttpStatusCode.Conflict ? "review" : "unconfirmed")}");
         }
         catch (Exception e) when (e is AntiforgeryValidationException or InvalidDataException or BadHttpRequestException) { return Results.LocalRedirect("/start/restaurant?notice=expired"); }

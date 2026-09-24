@@ -1,8 +1,9 @@
-"""Merchant integration against the official SDK, local fake Stripe, real API/SQLite.
+"""Merchant integration against standard .NET HTTP, local fake Stripe, real API/SQLite.
 
 All data and credentials are synthetic. The fake provider binds strictly to loopback;
 processes run copied DLLs and never contact a real payment or identity service.
 """
+import base64
 import concurrent.futures
 import copy
 from datetime import datetime, timezone
@@ -34,6 +35,9 @@ CALLS, ACCOUNTS, SESSIONS, KEYS, REFUNDS = [], {}, {}, {}, {}
 FAIL_ONCE = set()
 BAD_PAYMENT = {}
 BAD_CHARGE = {}
+OMIT_PAYMENT, OMIT_CHARGE = set(), set()
+PROVIDER_FAILURES, EMBEDDED_BAD = {}, {}
+REFUND_PAGE_SIZE, REFUND_FAULT = 100, None
 
 
 class StripeFake(BaseHTTPRequestHandler):
@@ -51,17 +55,27 @@ class StripeFake(BaseHTTPRequestHandler):
         account = self.headers.get('Stripe-Account')
         key = self.headers.get('Idempotency-Key')
         with LOCK:
-            CALLS.append({'method': self.command, 'path': path, 'account': account, 'key': key, 'body': body})
-            if self.headers.get('Authorization') != 'Bearer rk_test_synthetic_000000000':
+            CALLS.append({'method': self.command, 'path': path, 'account': account, 'key': key, 'body': body, 'query': urllib.parse.urlsplit(self.path).query,
+                'version': self.headers.get('Stripe-Version'), 'content_type': self.headers.get('Content-Type')})
+            if self.headers.get('Authorization') != 'Basic ' + base64.b64encode(b'rk_test_synthetic_000000000:').decode():
                 return self.reply(401, {'error': {'type': 'authentication_error', 'message': 'synthetic key'}})
+            if self.headers.get('Stripe-Version') != '2026-08-26.dahlia':
+                return self.reply(400, {'error': {'type': 'invalid_request_error', 'message': 'wrong version'}})
+            if self.command == 'POST' and not self.headers.get('Content-Type', '').startswith('application/json' if path.startswith('/v2/') else 'application/x-www-form-urlencoded'):
+                return self.reply(400, {'error': {'type': 'invalid_request_error', 'message': 'wrong encoding'}})
+            if path.startswith('/v2/') and account is not None:
+                return self.reply(400, {'error': {'type': 'invalid_request_error', 'message': 'unexpected account context'}})
+            if path in PROVIDER_FAILURES:
+                return self.reply(*PROVIDER_FAILURES[path])
             if path == '/v2/core/accounts' and self.command == 'POST':
                 if key in KEYS: result = ACCOUNTS[KEYS[key]]
                 else:
                     ident = 'acct_merchant' + str(len(ACCOUNTS) + 1)
                     result = {'id': ident, 'object': 'v2.core.account', 'livemode': False, 'closed': False,
                         'dashboard': 'full', 'identity': {'country': 'us'}, 'metadata': body.get('metadata'),
-                        'configuration': {'merchant': {'applied': True, 'capabilities': {'card_payments': {'status': 'active'}}}},
-                        'defaults': {'responsibilities': {'fees_collector': 'stripe', 'losses_collector': 'stripe'}}, 'requirements': {}}
+                        'configuration': {'merchant': {'applied': True, 'capabilities': {'card_payments': {'status': 'active'}, 'stripe_balance': {'payouts': {'status': 'active'}}}}},
+                        'defaults': {'responsibilities': {'fees_collector': 'stripe', 'losses_collector': 'stripe'}},
+                        'requirements': {'entries': [], 'summary': {'minimum_deadline': None}}}
                     ACCOUNTS[ident] = result; KEYS[key] = ident
                 if 'account' in FAIL_ONCE:
                     FAIL_ONCE.remove('account'); return self.reply(500, {'error': {'type': 'api_error', 'message': 'uncertain create'}})
@@ -71,6 +85,12 @@ class StripeFake(BaseHTTPRequestHandler):
             if path == '/v2/core/account_links':
                 return self.reply(200, {'object': 'v2.core.account_link', 'account': body['account'], 'livemode': False,
                     'url': 'https://connect.stripe.com/setup/synthetic', 'expires_at': '2026-09-21T00:00:00Z'})
+            if path == '/v1/account_sessions':
+                if account is not None or body.get('account') not in ACCOUNTS:
+                    return self.reply(400, {'error': {'type': 'invalid_request_error'}})
+                return self.reply(200, {'object': 'account_session', 'account': body['account'], 'livemode': False,
+                    'client_secret': 'accs_secret_synthetic_never_persist_000000000', 'expires_at': int(time.time()) + 3600,
+                    'components': {'account_onboarding': {'enabled': True}, 'notification_banner': {'enabled': True}}, **EMBEDDED_BAD})
             if path == '/v1/checkout/sessions' and self.command == 'POST':
                 if key in KEYS: result = SESSIONS[KEYS[key]]
                 else:
@@ -107,10 +127,20 @@ class StripeFake(BaseHTTPRequestHandler):
                         'payment_method_details': {'type': 'card', 'card': {'brand': 'visa', 'last4': '4242'}}}}
                 result.update(BAD_PAYMENT)
                 result['latest_charge'].update(BAD_CHARGE)
+                for field in OMIT_CHARGE: result['latest_charge'].pop(field, None)
+                for field in OMIT_PAYMENT: result.pop(field, None)
                 return self.reply(200, result)
             if path == '/v1/refunds' and self.command == 'GET':
-                charge = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)['charge'][0]
-                return self.reply(200, {'object': 'list', 'data': REFUNDS.get(charge, []), 'has_more': False, 'url': '/v1/refunds'})
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                charge = query['charge'][0]; refunds = REFUNDS.get(charge, [])
+                cursor = query.get('starting_after', [None])[0]
+                offset = next((i + 1 for i, refund in enumerate(refunds) if refund['id'] == cursor), 0) if cursor else 0
+                page = refunds[offset:offset + REFUND_PAGE_SIZE]; more = offset + len(page) < len(refunds)
+                if REFUND_FAULT == 'duplicate' and cursor: page, more = refunds[:1], False
+                if REFUND_FAULT == 'empty-more': page, more = [], True
+                result = {'object': 'list', 'data': page, 'has_more': more, 'url': 'https://untrusted.example.invalid/refunds'}
+                if REFUND_FAULT == 'missing-more': result.pop('has_more')
+                return self.reply(200, result)
             return self.reply(404, {'error': {'type': 'invalid_request_error', 'message': 'Unknown local fixture path ' + path}})
     do_GET = do_POST = handle_request
 
@@ -176,6 +206,15 @@ def ssr_checks():
     form, page = native_form(owner_browser, '/workspace/bistro/payments', '/onboarding')
     check('Private setup page is not cached', 'no-store' in page[2].get('Cache-Control', ''))
     check('Owner setup explains separate restaurant funds and sandbox', 'connected Stripe account' in page[1] and 'No real charges' in page[1])
+    check('Owner checklist separates verification, card acceptance, payouts and checkout', all(label in page[1] for label in ['Business verification', 'Card acceptance', 'Payout readiness', 'BarTide phone checkout', 'Your next step', 'Last checked:']))
+    check('Owner page does not imply existing-account migration', 'does not move payment history' in page[1] and 'not available here yet' in page[1])
+    session_form, session_page = native_form(owner_browser, '/workspace/bistro/payments', '/session')
+    check('Embedded component has no secret in page HTML', 'Continue setup here' in session_page[1] and 'accs_secret_' not in session_page[1])
+    session_fields = {**session_form['fields'], 'confirm_us': 'true'}
+    check('Embedded web session rejects missing CSRF', web(owner_browser, session_form['action'], {k: v for k, v in session_fields.items() if k != '__RequestVerificationToken'})[0] == 400)
+    check('Embedded web session rejects foreign origin', web(owner_browser, session_form['action'], session_fields, {'Origin': 'https://foreign.example.invalid'})[0] == 400)
+    web_session = web(owner_browser, session_form['action'], session_fields)
+    check('Embedded web session requires owner cookie and is not cached', web_session[0] == 200 and json.loads(web_session[1])['clientSecret'].startswith('accs_secret_') and web_session[2].get('Cache-Control') == 'no-store')
     missing = {k: v for k, v in form['fields'].items() if k != '__RequestVerificationToken'}
     check('Onboarding form rejects missing CSRF', web(owner_browser, form['action'], missing)[0] == 400)
     check('Onboarding form rejects foreign origin', web(owner_browser, form['action'], form['fields'], {'Origin': 'https://foreign.example.invalid'})[0] == 400)
@@ -188,6 +227,12 @@ def ssr_checks():
     check('Anonymous hosted refresh requires sign in', '/signin?' in web(anon, '/merchant-payments/bistro/refresh')[2].get('Location', ''))
     page = web(anon, '/order/bistro')
     check('Public ordering offers sandbox phone checkout', page[0] == 200 and 'Secure card checkout' in page[1] and 'merchant-payments.js' in page[1])
+    if os.environ.get('MERCHANT_BROWSER_HOLD') == 'true':
+        # Optional local visual review. Only synthetic cookies/credentials exist in this fixture.
+        (s.RUN / 'browser-fixture.json').write_text(json.dumps({'web': WEB, 'api': s.API}), encoding='utf-8')
+        print('Browser fixture: ' + WEB, flush=True)
+        until = time.monotonic() + 480
+        while time.monotonic() < until and not (s.RUN / 'browser-done').exists(): time.sleep(.5)
 
 
 def pay(session):
@@ -210,6 +255,8 @@ def launch(extra=None):
         'MerchantPayments__PublicBaseUrl': 'https://ordering.example.invalid', 'MerchantPayments__ApiBaseUrl': f'http://127.0.0.1:{FAKE.server_port}',
         'MerchantPayments__AllowLocalTestProvider': 'true', 'MerchantPayments__OnboardingEnabled': 'true',
         'MerchantPayments__CheckoutEnabled': 'true', 'MerchantPayments__CardsOnlyVerified': 'true',
+        'MerchantPayments__EmbeddedOnboardingEnabled': 'true', 'MerchantPayments__EmbeddedOnboardingVerified': 'true',
+        'MerchantPayments__PublishableKey': 'pk_test_synthetic_000000000',
         'MerchantPayments__ConnectWebhookSecret': SNAPSHOT, 'MerchantPayments__AccountWebhookSecret': THIN, **(extra or {})})
     output = (s.RUN / ('api-' + str(len(s.PROCESSES)) + '.log')).open('w', encoding='utf-8'); s.LOGS.append(output)
     proc = subprocess.Popen([str(s.SDK), str(copied / 'TideCasa.Api.dll')], cwd=s.ROOT / 'TideCasa.Api', env=env,
@@ -260,7 +307,29 @@ def signed(path, payload, secret, age=0):
     with response: return response.status, response.read().decode()
 
 
+def refund_pagination_checks(charge, intent, order, request):
+    global REFUND_PAGE_SIZE, REFUND_FAULT
+    original = copy.deepcopy(REFUNDS[charge])
+    try:
+        for fault in ['duplicate', 'empty-more', 'missing-more', 'too-many', 'invalid-cursor']:
+            count = 101 if fault == 'too-many' else 2
+            REFUNDS[charge] = [{'id': 're_page' + str(i), 'object': 'refund', 'charge': charge,
+                'payment_intent': intent, 'amount': 1, 'currency': 'usd', 'status': 'failed'} for i in range(count)]
+            if fault == 'invalid-cursor': REFUNDS[charge][0]['id'] = 're_../untrusted'
+            REFUND_PAGE_SIZE = 100 if fault == 'too-many' else 1; REFUND_FAULT = fault
+            before = len(CALLS); response = track(order, request)
+            pages = [c for c in CALLS[before:] if c['path'] == '/v1/refunds']
+            check('Unsafe refund pagination fails closed ' + fault, response[0] == 409)
+            check('Unsafe refund pagination stays bounded ' + fault, len(pages) == (2 if fault == 'duplicate' else 1))
+        current = operation(order['receipt']['orderId'])['order']['receipt']
+        check('Rejected refund pages preserve the saved financial and fulfillment result', current['status'] == 'preparing'
+            and current['paymentStatus'] == 'partially_refunded')
+    finally:
+        REFUNDS[charge] = original; REFUND_PAGE_SIZE = 100; REFUND_FAULT = None
+
+
 def run():
+    global REFUND_PAGE_SIZE
     proc = launch({'MerchantPayments__OnboardingEnabled': 'false'})
     for args in [('bistro',), ('foreign', s.BOB), ('draft', s.ALICE, 'draft'), ('basic', s.ALICE, 'active', False)]: s.seed(*args)
     for ident, person, role in [('merchant-kitchen', s.STAFF, 'kitchen'), ('merchant-driver', s.BOB, 'driver')]:
@@ -276,11 +345,14 @@ def run():
     check('Anonymous owner endpoint denied', api(owner())[0] == 401)
     check('Cross-owner onboarding denied', onboard(person='bob')[0] == 403)
     check('Staff onboarding denied', onboard(person='staff')[0] == 403)
-    check('Draft onboarding denied', onboard('draft')[0] == 404)
+    calls_before_draft = len(CALLS)
+    check('Draft owner can read private onboarding status', api(owner('draft'), person='alice')[0] == 200)
+    check('Unconnected private status makes no provider calls', len(CALLS) == calls_before_draft)
     check('Unenrolled onboarding denied', onboard('basic')[0] == 403)
     check('US business acknowledgment required', onboard(confirmUsBusiness=False)[0] == 400)
     FAIL_ONCE.add('account')
     check('Uncertain account creation retained', onboard()[0] == 503)
+    check('Uncertain account status offers safe resume', api(owner(), person='alice')[1]['connectionState'] == 'creating')
     response = onboard(); check('Account creation safely retries saved key', response[0] == 200 and len(ACCOUNTS) == 1, response)
     posts = [x for x in CALLS if x['path'] == '/v2/core/accounts' and x['method'] == 'POST']
     check('Account retry has immutable key and parameters', posts[0]['key'] == posts[1]['key'] and posts[0]['body'] == posts[1]['body'])
@@ -288,6 +360,7 @@ def run():
     check('Only merchant configuration requested', list(body['configuration']) == ['merchant'])
     account = next(iter(ACCOUNTS))
     check('Fresh account readiness', api(owner(), person='alice')[1]['phoneCheckoutAvailable'])
+    readiness_checks(account)
     check('Public phone availability enabled after readiness', api('/api/v1/restaurants/bistro/menu')[1]['checkout']['phonePaymentAvailable'])
     request = new_order(); response = checkout(request); check('Server quote reserves checkout', response[0] == 200, response[:3]); first = response[1]; session = session_for(first)
     check('Pending phone order withheld from kitchen', first['receipt']['status'] == 'awaiting_payment' and first['receipt']['paymentStatus'] == 'pending')
@@ -317,9 +390,23 @@ def run():
     BAD_CHARGE['payment_method_details'] = {'type': 'card', 'card': {'wallet': {'type': 'apple_pay'}}}
     check('Wallet charge cannot satisfy cards-only confirmation', track(first, request)[0] == 409)
     BAD_CHARGE.clear()
+    for field in ['livemode', 'object', 'amount', 'amount_received', 'status', 'currency', 'latest_charge']:
+        OMIT_PAYMENT.add(field)
+        check('Missing intent evidence cannot mark paid ' + field, track(first, request)[0] == 409)
+        OMIT_PAYMENT.clear()
+    for field in ['livemode', 'object', 'paid', 'captured', 'amount', 'amount_captured', 'amount_refunded', 'currency', 'payment_method_details']:
+        OMIT_CHARGE.add(field)
+        check('Missing charge evidence cannot mark paid ' + field, track(first, request)[0] == 409)
+        OMIT_CHARGE.clear()
+    for field in ['id', 'object', 'livemode', 'amount_total', 'currency', 'status', 'payment_status', 'expires_at']:
+        value = SESSIONS[session].pop(field)
+        check('Missing session evidence cannot mark paid ' + field, track(first, request)[0] == 409)
+        SESSIONS[session][field] = value
     check('Invalid signature rejected', signed('/api/stripe/connect/webhook', {}, THIN)[0] == 400)
     check('Expired signature rejected', signed('/api/stripe/connect/webhook', {}, SNAPSHOT, 600)[0] == 400)
     check('Live notification rejected', notify(session, livemode=True)[0] == 400)
+    check('Missing notification mode cannot imply sandbox', notify(session, livemode=None)[0] == 400)
+    check('Future signed notification rejected', signed('/api/stripe/connect/webhook', {}, SNAPSHOT, -600)[0] == 400)
     check('Foreign account notification rejected', notify(session, account='acct_foreignunknown')[0] == 400)
     check('API-version mismatch rejected', notify(session, api_version='2020-08-27')[0] == 400)
     check('Signed notification reconciles paid order', notify(session)[0] == 202)
@@ -335,8 +422,16 @@ def run():
     REFUNDS[charge][0]['status'] = 'failed'; refund = track(first, request); check('Failed refund does not reduce payment', refund[1]['state'] == 'paid' and refund[1]['refundedCents'] == 0)
     check('Failed refund restores available action at unchanged fulfillment step', refund[1]['receipt']['status'] == 'preparing' and 'ready' in operation(first['receipt']['orderId'])['allowedActions'])
     REFUNDS[charge][0]['status'] = 'succeeded'; refund = track(first, request); check('Partial refund read back exactly', refund[1]['state'] == 'partially_refunded' and refund[1]['refundedCents'] == 200)
+    refund_pagination_checks(charge, intent, first, request)
     REFUNDS[charge].append({'id': 're_synthetic2', 'object': 'refund', 'charge': charge, 'payment_intent': intent, 'amount': first['receipt']['quote']['totalCents']-200, 'currency': 'usd', 'status': 'succeeded'})
+    REFUND_PAGE_SIZE = 1; before_pages = len(CALLS)
     refund = track(first, request); check('Full refund retains financial result without rewriting fulfillment', refund[1]['state'] == 'refunded' and refund[1]['receipt']['status'] == 'preparing')
+    pages = [c for c in CALLS[before_pages:] if c['path'] == '/v1/refunds']
+    check('Refund pagination preserves charge/account and uses a validated saved cursor', len(pages) == 2
+        and all(c['account'] == account and urllib.parse.parse_qs(c['query'])['charge'] == [charge] for c in pages)
+        and 'starting_after' not in urllib.parse.parse_qs(pages[0]['query'])
+        and urllib.parse.parse_qs(pages[1]['query'])['starting_after'] == ['re_synthetic1'])
+    REFUND_PAGE_SIZE = 100
     active = operation(first['receipt']['orderId'])
     check('Fully refunded active order exposes only owner close action', active['allowedActions'] == ['cancelled'])
     check('Kitchen cannot close refunded active order', operation(first['receipt']['orderId'], 'staff')['allowedActions'] == [] and api('/api/v1/tenants/bistro/ordering/orders/' + first['receipt']['orderId'], {'expectedVersion': active['order']['version'], 'action': 'cancelled'}, 'staff')[0] == 409)
@@ -424,10 +519,104 @@ def run():
     check('Thin event cannot select foreign account context', signed('/api/stripe/accounts/webhook', {**thin, 'context': 'acct_foreignaccount'}, THIN)[0] == 400)
     ACCOUNTS[account]['configuration']['merchant']['capabilities']['card_payments']['status'] = 'active'; api(owner(), person='alice')
     ssr_checks()
+    embedded_checks(account)
+    private_preparation_checks()
+    proc.terminate(); proc.wait(); proc = launch({'MerchantPayments__EmbeddedOnboardingVerified': 'false'})
+    check('Unverified embedded setup is unavailable while hosted fallback remains', not api(owner(), person='alice')[1]['embeddedOnboardingAvailable'] and api(owner(tail='/session'), {'requestKey': str(uuid.uuid4()), 'confirmUsBusiness': True}, 'alice')[0] == 503 and onboard()[0] == 200)
     proc.terminate(); proc.wait(); proc = launch({'MerchantPayments__RestrictedKey': 'rk_live_synthetic_000000000'})
     check('Live keys fail closed', api(owner(), person='alice')[1]['state'] == 'disabled')
     proc.terminate(); proc.wait(); proc = launch({'MerchantPayments__ApiBaseUrl': 'http://192.0.2.1:9999'})
     check('Non-loopback fake provider fails closed', api(owner(), person='alice')[1]['state'] == 'disabled')
+
+
+def private_preparation_checks():
+    s.seed('building', status='building', enabled=False)
+    request = new_order()
+    for tenant in ('draft', 'building'):
+        s.alter_config(lambda config: config.update(enabled=False, accepting_orders=False), tenant)
+        response = onboard(tenant)
+        check(tenant + ' owner can start private Stripe onboarding', response[0] == 200, response[:3])
+        account = s.sql('SELECT account_id FROM tide_merchant_accounts WHERE tenant_id=?', (tenant,))[0][0]
+        check(tenant + ' saves a separate sandbox account', account in ACCOUNTS and not ACCOUNTS[account]['livemode'])
+        status = api(owner(tenant), person='alice')
+        check(tenant + ' prepared Stripe never advertises public checkout', status[0] == 200
+            and status[1]['connectionState'] == 'connected' and not status[1]['phoneCheckoutAvailable']
+            and status[1]['checkoutState'] == 'awaiting_launch' and status[1]['nextAction'] == 'prepare_launch'
+            and status[1]['testOrderUrl'] is None, status[:3])
+        session_request = {'requestKey': str(uuid.uuid4()), 'confirmUsBusiness': True}
+        session = api(owner(tenant, '/session'), session_request, 'alice')
+        check(tenant + ' owner can continue embedded setup privately', session[0] == 200 and session[1]['clientSecret'].startswith('accs_secret_'))
+        invited = api('/api/v1/tenants/' + tenant + '/team/members',
+            {'name': 'Private manager', 'email': 'bob@example.invalid', 'role': 'manager'}, 'alice')
+        check(tenant + ' private manager fixture is authorized', invited[0] == 200
+            and api('/api/v1/tenants/' + tenant + '/menu', person='bob')[0] == 200)
+        before = len(CALLS)
+        check(tenant + ' private manager cannot manage banking', onboard(tenant, person='bob')[0] == 403
+            and api(owner(tenant, '/session'), session_request, 'bob')[0] == 403)
+        check(tenant + ' private guest checkout stays blocked', checkout(request, tenant=tenant)[0] == 409)
+        check(tenant + ' denied banking and checkout make no provider calls', len(CALLS) == before)
+        check(tenant + ' private payment setup creates no guest order or activation',
+            s.sql('SELECT COUNT(*) FROM bartide_enhanced_orders WHERE tenant_id=?', (tenant,))[0][0] == 0
+            and s.sql('SELECT status FROM bartide_customers WHERE id=?', (tenant,))[0][0] == tenant
+            and not json.loads(s.sql('SELECT settings_json FROM bartide_enhanced_configs WHERE tenant_id=?', (tenant,))[0][0])['enabled'])
+
+
+def readiness_checks(account):
+    original = copy.deepcopy(ACCOUNTS[account])
+    def status(): return api(owner(), person='alice')[1]
+    ready = status()
+    check('Owner readiness separates cards, payouts and checkout', ready['connectionState'] == 'connected' and ready['cardPaymentsState'] == 'active' and ready['payoutsState'] == 'active' and ready['checkoutState'] == 'ready_for_test' and ready['nextAction'] == 'test_order')
+    check('Owner sees saved business contact and a checked timestamp', ready['businessEmail'] == 'bistro@example.invalid' and ready['checkedAt'] and not ready['stale'])
+    check('Owner test order uses saved restaurant route', ready['testOrderUrl'] == 'https://ordering.example.invalid/order/bistro')
+    try:
+        for deadline, who, expected, action in [('currently_due', 'user', 'needs_input', 'continue_setup'), ('past_due', 'user', 'needs_input', 'continue_setup'), ('currently_due', 'stripe', 'pending_review', 'wait_for_review')]:
+            ACCOUNTS[account]['requirements'] = {'entries': [{'awaiting_action_from': who, 'description': 'PRIVATE_IDENTITY_MARKER'}], 'summary': {'minimum_deadline': {'status': deadline}}}
+            value = status()
+            check('Readiness next action ' + deadline + '/' + who, value['connectionState'] == expected and value['nextAction'] == action and not value['phoneCheckoutAvailable'])
+            check('Readiness excludes raw identity requirements', 'PRIVATE_IDENTITY_MARKER' not in json.dumps(value))
+        ACCOUNTS[account] = copy.deepcopy(original)
+        ACCOUNTS[account]['configuration']['merchant']['capabilities']['stripe_balance']['payouts']['status'] = 'pending'
+        value = status()
+        check('Card acceptance cannot imply payout readiness', value['cardPaymentsState'] == 'active' and value['payoutsState'] == 'pending' and value['nextAction'] == 'wait_for_review')
+        ACCOUNTS[account]['configuration']['merchant']['capabilities'].pop('stripe_balance')
+        check('Missing payout capability stays unknown', status()['payoutsState'] == 'unknown')
+        ACCOUNTS[account] = copy.deepcopy(original)
+        ACCOUNTS[account]['configuration']['merchant']['capabilities']['card_payments'].pop('status')
+        value = status()
+        check('Missing card capability blocks checkout', value['connectionState'] == 'unknown' and not value['phoneCheckoutAvailable'] and checkout(new_order())[0] == 409)
+        ACCOUNTS[account] = copy.deepcopy(original); ACCOUNTS[account].pop('requirements')
+        check('Missing requirements are not ready', not status()['phoneCheckoutAvailable'])
+        ACCOUNTS[account] = copy.deepcopy(original); ACCOUNTS[account]['requirements']['summary']['minimum_deadline'] = {}
+        check('Missing deadline status is incomplete evidence', status()['connectionState'] == 'unknown' and not status()['phoneCheckoutAvailable'])
+        ACCOUNTS[account] = copy.deepcopy(original); ACCOUNTS[account]['closed'] = True
+        check('Closed account needs review', status()['connectionState'] == 'restricted' and not status()['phoneCheckoutAvailable'])
+        ACCOUNTS[account] = copy.deepcopy(original); ACCOUNTS[account].pop('livemode')
+        check('Missing account mode cannot imply sandbox', status()['connectionState'] == 'restricted' and checkout(new_order())[0] == 409)
+        ACCOUNTS[account] = copy.deepcopy(original)
+        PROVIDER_FAILURES['/v2/core/accounts/' + account] = (503, {'error': {'type': 'api_error', 'message': 'PRIVATE_PROVIDER_ERROR'}})
+        value = status()
+        check('Provider outage retains binding and gives stale recovery action', value['stale'] and value['nextAction'] == 'refresh' and not value['phoneCheckoutAvailable'] and s.sql("SELECT account_id FROM tide_merchant_accounts WHERE tenant_id='bistro'")[0][0] == account)
+        check('Provider errors and credentials stay out of owner response', 'PRIVATE_PROVIDER_ERROR' not in json.dumps(value) and 'rk_test_' not in json.dumps(value))
+    finally:
+        ACCOUNTS[account] = original; PROVIDER_FAILURES.clear(); status()
+
+
+def embedded_checks(account):
+    request = {'requestKey': str(uuid.uuid4()), 'confirmUsBusiness': True}
+    before = len(CALLS)
+    check('Embedded session rejects anonymous and foreign owners', api(owner(tail='/session'), request)[0] == 401 and api(owner(tail='/session'), request, 'bob')[0] == 403 and api(owner(tail='/session'), request, 'staff')[0] == 403)
+    check('Denied sessions make no provider calls', len(CALLS) == before)
+    check('Embedded session requires confirmation', api(owner(tail='/session'), {**request, 'confirmUsBusiness': False}, 'alice')[0] == 400)
+    response = api(owner(tail='/session'), {**request, 'account': 'acct_browserinjected'}, 'alice')
+    check('Embedded session returns short-lived secret without caching', response[0] == 200 and response[1]['clientSecret'].startswith('accs_secret_') and response[1]['expiresAt'] > time.time() and response[3].get('Cache-Control') == 'no-store', response[0])
+    created = [c for c in CALLS if c['path'] == '/v1/account_sessions'][-1]
+    check('Embedded session selects saved account and only scoped components', created['account'] is None and created['body'] == {'account': account, 'components[account_onboarding][enabled]': 'true', 'components[notification_banner][enabled]': 'true'})
+    for changes in [{'livemode': True}, {'livemode': None}, {'account': 'acct_wrongbinding'}, {'client_secret': None}, {'expires_at': int(time.time()) - 1}, {'components': {'payments': {'enabled': True}}}]:
+        EMBEDDED_BAD.update(changes)
+        check('Unsafe embedded session response rejected ' + next(iter(changes)), api(owner(tail='/session'), request, 'alice')[0] == 409)
+        EMBEDDED_BAD.clear()
+    check('Client secrets absent from durable account records', 'accs_secret_' not in str(s.sql('SELECT * FROM tide_merchant_accounts')) and 'accs_secret_' not in str(s.sql('SELECT * FROM tide_merchant_notification_inbox')))
+    check('Client secrets absent from application logs', all('accs_secret_' not in path.read_text(encoding='utf-8', errors='replace') for path in s.RUN.glob('*.log')))
 
 
 if __name__ == '__main__':

@@ -20,6 +20,11 @@
                     @if (project.Status == "building") { <p>Build began: @Date(project.EnrolledAt)<br />Ready for review: @Date(project.BuildReadyAt)</p> }
                     @if (project.LaunchBlockReason is not null) { <p class="ordering-note">@project.LaunchBlockReason</p> }
                     <p><a href="@($"/workspace/{Uri.EscapeDataString(project.Id)}/menu")">Review the app's menu or services →</a></p>
+                    @if (project.Vertical == "bartide" && project.Status is "draft" or "building")
+                    {
+                        <p><a href="@($"/workspace/{Uri.EscapeDataString(project.Id)}/onboarding")">Review client setup and readiness →</a></p>
+                        <p><a href="@($"/workspace/{Uri.EscapeDataString(project.Id)}/preview")">Open saved private preview →</a></p>
+                    }
                     @if (project.CanLaunch || project.Status is "active" or "paused")
                     {
                         <form action="@($"/owner/launch-review/{Uri.EscapeDataString(project.Id)}/transition")" method="post" data-enhance="false"><AntiforgeryToken />

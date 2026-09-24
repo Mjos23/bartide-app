@@ -9,6 +9,7 @@ public static class MerchantPaymentsFlow
     public static void MapTideCasaMerchantPayments(this WebApplication app)
     {
         app.MapPost("/merchant-payments/{tenant}/onboarding", OnboardAsync);
+        app.MapPost("/merchant-payments/{tenant}/session", SessionAsync);
         app.MapGet("/merchant-payments/{tenant}/refresh", RefreshAsync);
     }
     public static string Page(string tenant) => "/workspace/" + Uri.EscapeDataString(tenant) + "/payments";
@@ -43,6 +44,22 @@ public static class MerchantPaymentsFlow
         var status = await api.StatusAsync(tenant, token, context.RequestAborted);
         if (!status.Succeeded || status.Value?.State is not ("ready" or "onboarding" or "restricted")) return Results.LocalRedirect(Page(tenant) + "?notice=unavailable");
         return Redirect(tenant, await api.OnboardAsync(tenant, new(Guid.NewGuid().ToString("D"), true), token, context.RequestAborted));
+    }
+    private static async Task<IResult> SessionAsync(string tenant, HttpContext context, IAntiforgery csrf, MerchantPaymentsClient api)
+    {
+        Headers(context);
+        if (context.Items.ContainsKey(AuthFlow.UnavailableItem)) return AuthFlow.ServiceUnavailable();
+        if (context.User.Identity?.IsAuthenticated != true || context.Items[AuthFlow.TokenItem] is not string token) return Results.Unauthorized();
+        if (!context.Request.HasFormContentType || !SameOrigin(context.Request)) return Results.BadRequest();
+        try
+        {
+            await csrf.ValidateRequestAsync(context); var form = await context.Request.ReadFormAsync(context.RequestAborted);
+            if (form.Count > 5 || form.Files.Count != 0 || form.Any(x => x.Value.Count != 1) || !Guid.TryParseExact(form["request_key"], "D", out _)
+                || form["confirm_us"].ToString() != "true") return Results.BadRequest();
+            var result = await api.SessionAsync(tenant, new(form["request_key"].ToString(), true), token, context.RequestAborted);
+            return result.Succeeded && result.Value is not null ? Results.Ok(result.Value) : Results.StatusCode((int)result.Status);
+        }
+        catch (Exception error) when (error is AntiforgeryValidationException or InvalidDataException or BadHttpRequestException) { return Results.BadRequest(); }
     }
     private static IResult Redirect(string tenant, RestaurantApiResult<TideCasa.Contracts.MerchantHostedLink> result)
     {

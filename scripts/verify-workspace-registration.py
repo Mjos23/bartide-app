@@ -62,7 +62,7 @@ try:
     check('Owner association exposes explicit ownership',access[1]['workspaces'][0]['isOwner'] is True)
     owner=login('alice'); new=login('bob')
     page=web('/start/restaurant?appStores=true&referralCode=COAST-20',client=owner)
-    check('Existing workspace continues to billing and preserves store choice',page[0]==200 and '/billing?appStores=true' in page[1] and '/account/workspace' not in page[1])
+    check('Existing restaurant continues to onboarding and preserves store choice',page[0]==200 and '/onboarding?appStores=true' in page[1] and '/account/workspace' not in page[1])
     check('Existing workspace name safely encoded','<script>Restaurant</script>' not in page[1] and '&lt;script&gt;' in page[1])
     check('Existing workspace retains referral through package review','referralCode=COAST-20' in page[1])
     forms,response=forms_for(new,'/start/business?appStores=true&referralCode=COAST-20','New business registration form renders')

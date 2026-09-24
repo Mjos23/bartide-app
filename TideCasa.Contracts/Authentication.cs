@@ -21,5 +21,5 @@ public sealed record AuthUser(string UserId, string Email, string DisplayName, s
 public sealed record AuthSession(string AccessToken, string TokenType, int ExpiresIn, AuthUser User);
 public sealed record AuthNotice(string Message);
 public sealed record WorkspaceAccess(string TenantId, string Slug, string Name, string Status,
-    bool CanPrepare, bool CanEdit, string? StaffRole, string? StaffMemberId, string? LearnerId, bool IsOwner = false);
+    bool CanPrepare, bool CanEdit, string? StaffRole, string? StaffMemberId, string? LearnerId, bool IsOwner = false, string Vertical = "bartide");
 public sealed record AccountOverview(AuthUser User, IReadOnlyList<WorkspaceAccess> Workspaces);

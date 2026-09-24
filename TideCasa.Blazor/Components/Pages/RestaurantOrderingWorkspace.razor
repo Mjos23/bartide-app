@@ -8,6 +8,7 @@
     <header class="ordering-nav"><a href="/account">← Your account</a><span>BarTide · Tables and orders</span></header>
     <main class="ordering-main">
         <p class="bt-one-kicker">YOUR RESTAURANT</p><h1>@(workspace?.Name ?? "Tables and orders")</h1>
+        <TideCasa.Blazor.Components.Onboarding.SetupReturnLink TenantId="@TenantId" />
         @if (error is not null)
         {
             <div class="ordering-notice" role="alert"><p>@error</p><a href="@CurrentPath">Try loading again</a></div>
@@ -15,9 +16,17 @@
         else if (workspace is not null)
         {
             @if (RestaurantOrderingFlow.Notice(Notice) is { } notice) { <p class="ordering-notice" role="status">@notice</p> }
-            <p>Give each table a QR code. Guests can scan, choose their food, add an optional tip and send their order to your team.</p>
-            <p class="ordering-note">Orders placed with “Pay staff” are unpaid and await your team’s acceptance. Phone payments will become available after your business’s Stripe connection is ready.</p>
-            <p><a class="bt-one-link" href="@($"/order/{Uri.EscapeDataString(workspace.Slug)}")">Open your ordering page →</a></p>
+            @if (IsPublished)
+            {
+                <p>Give each table a QR code. Guests can scan, choose their food, add an optional tip and send their order to your team.</p>
+                <p class="ordering-note">Orders placed with “Pay staff” are unpaid and await your team’s acceptance. Phone payments will become available after your business’s Stripe connection is ready.</p>
+                <p><a class="bt-one-link" href="@($"/order/{Uri.EscapeDataString(workspace.Slug)}")">Open your ordering page →</a></p>
+            }
+            else
+            {
+                <p>Prepare your table names for launch. Your restaurant stays private while you finish setup.</p>
+                <p class="ordering-note">Public table links and printable QR codes become available after publication. No guest orders are accepted from this private workspace.</p>
+            }
             <section class="ordering-panel" aria-labelledby="tables-title">
                 <h2 id="tables-title">Your tables</h2>
                 @if (workspace.CanManage)
@@ -25,7 +34,7 @@
                     <form method="post" action="@($"/ordering/manage/{Uri.EscapeDataString(TenantId)}/tables")" data-enhance="false" class="ordering-table-form">
                         <AntiforgeryToken /><input type="hidden" name="version" value="@workspace.ConfigVersion" />
                         <label class="desk-field">Table name<input type="text" name="label" required maxlength="40" placeholder="For example, Patio 3" /></label>
-                        <button class="bt-one-button" type="submit" disabled="@(workspace.Tables.Count >= 100)">Create table QR</button>
+                        <button class="bt-one-button" type="submit" disabled="@(workspace.Tables.Count >= 100)">@(IsPublished ? "Create table QR" : "Save table for launch")</button>
                     </form>
                     @if (workspace.Tables.Count >= 100) { <p>You have reached the 100-table limit.</p> }
                 }
@@ -34,8 +43,8 @@
                     @foreach (var table in workspace.Tables)
                     {
                         <article class="ordering-table-card">
-                            <h3>@table.Label</h3><p>@(table.Enabled ? "Ready for guests" : "QR link disabled")</p>
-                            @if (table.Enabled)
+                            <h3>@table.Label</h3><p>@(table.Enabled ? IsPublished ? "Ready for guests" : "Ready for launch · private" : IsPublished ? "QR link disabled" : "Excluded from launch")</p>
+                            @if (table.Enabled && IsPublished)
                             {
                                 <img class="ordering-qr" src="@QrPath(table)" width="200" height="200" alt="@($"Scan to order at {table.Label}")" />
                                 <p><a href="@OrderPath(table)">Open this table’s order page</a></p>
@@ -46,14 +55,16 @@
                                 <form method="post" action="@($"/ordering/manage/{Uri.EscapeDataString(TenantId)}/tables/{Uri.EscapeDataString(table.Id)}")" data-enhance="false">
                                     <AntiforgeryToken /><input type="hidden" name="version" value="@workspace.ConfigVersion" />
                                     <input type="hidden" name="enabled" value="@(!table.Enabled ? "true" : "false")" />
-                                    <button class="ordering-secondary" type="submit">@(table.Enabled ? "Disable QR link" : "Enable QR link")</button>
+                                    <button class="ordering-secondary" type="submit">@(IsPublished ? table.Enabled ? "Disable QR link" : "Enable QR link" : table.Enabled ? "Exclude from launch" : "Include for launch")</button>
                                 </form>
                             }
                         </article>
                     }
                 </div>
-                <p class="ordering-note">A QR link identifies the table. It does not verify that a guest is physically at the venue. Disabling a table prevents new orders through its link.</p>
+                @if (IsPublished) { <p class="ordering-note">A QR link identifies the table. It does not verify that a guest is physically at the venue. Disabling a table prevents new orders through its link.</p> }
             </section>
+            @if (IsPublished)
+            {
             <section class="ordering-panel" aria-labelledby="orders-title">
                 <div class="ordering-section-heading"><h2 id="orders-title">Recent orders</h2><a href="@CurrentPath">Refresh</a></div>
                 @if (workspace.Orders.Count == 0) { <p>No orders have been received yet.</p> }
@@ -75,6 +86,7 @@
                 </div>
                 <p><a class="bt-one-link" href="@($"/workspace/{Uri.EscapeDataString(TenantId)}/operations")">Manage orders and deliveries →</a></p>
             </section>
+            }
         }
     </main>
 </div>
@@ -85,6 +97,7 @@
     private TideCasa.Contracts.RestaurantOrderingWorkspace? workspace;
     private string? error;
     private string CurrentPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/ordering";
+    private bool IsPublished => (HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.Workspaces.Any(access => access.TenantId == TenantId && access.Status == "active") == true;
     protected override async Task OnInitializedAsync()
     {
         if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { error = "Sign in again to open this workspace."; HttpContext.Response.StatusCode = 401; return; }

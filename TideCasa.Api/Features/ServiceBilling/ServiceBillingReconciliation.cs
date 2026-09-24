@@ -2,7 +2,7 @@ using TideCasa.Api.Infrastructure;
 using System.Globalization;
 using System.Text.Json;
 using System.Data.Common;
-using Stripe;
+using TideCasa.Api.Infrastructure.Payments;
 using static TideCasa.Api.Features.ServiceBilling.ServiceBillingProvider;
 
 namespace TideCasa.Api.Features.ServiceBilling;
@@ -17,12 +17,13 @@ public sealed partial class ServiceBillingStore
         "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "customer.subscription.paused", "customer.subscription.resumed",
         "charge.refunded", "refund.created", "refund.updated", "refund.failed"];
 
-    public async Task AcceptWebhookAsync(string raw, string signature, CancellationToken ct)
+    public async Task AcceptWebhookAsync(ReadOnlyMemory<byte> raw, string signature, CancellationToken ct)
     {
         provider.NeedReady();
-        try { EventUtility.ValidateSignature(raw, signature, provider.WebhookSecret, 300); }
-        catch (StripeException) { throw new BillingException("The payment notification signature is invalid.", 400, "invalid_signature"); }
+        try { StripeWebhookSignature.Verify(raw.Span, signature, provider.WebhookSecret); }
+        catch (StripeSignatureException) { throw new BillingException("The payment notification signature is invalid.", 400, "invalid_signature"); }
         using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 48 }); var root = document.RootElement;
+        StripeJson.RejectDuplicateProperties(root);
         if (S(root, "api_version") != ApiVersion || S(root, "object") != "event" || P(root, "livemode").ValueKind is not (JsonValueKind.True or JsonValueKind.False)
             || B(root, "livemode") != (provider.Environment == "live") || P(root, "account").ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null))
             throw new BillingException("This notification belongs to a different payment context.", 400, "wrong_context");

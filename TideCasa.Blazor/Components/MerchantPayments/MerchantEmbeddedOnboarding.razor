@@ -1,0 +1,48 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<div class="merchant-embedded">
+    <button class="bt-one-button" type="button" disabled="@(busy || mounted)" @onclick="Start">@(busy ? "Opening secure Stripe setup…" : "Continue setup here")</button>
+    @if (mounted) { <button type="button" class="bt-one-link" @onclick="Close">Close secure setup</button> }
+    <p role="status" aria-live="polite">@message</p>
+    <div @ref="container" aria-label="Secure Stripe account setup"></div>
+</div>
+@code {
+    [Parameter] public string FormId { get; set; } = "";
+    private ElementReference container;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<MerchantEmbeddedOnboarding>? callback;
+    private bool busy, mounted;
+    private string message = "Stripe securely collects verification documents and bank details. Hosted setup remains available below.";
+    private async Task Start()
+    {
+        busy = true;
+        try
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "/merchant-onboarding.js");
+            callback ??= DotNetObjectReference.Create(this);
+            var result = await module.InvokeAsync<string>("mount", FormId, container, callback);
+            mounted = result == "mounted";
+            message = mounted ? "Complete the remaining steps in Stripe below, then refresh the connection status."
+                : result == "confirm" ? "Confirm your saved business details first." : "Secure setup could not load. Try again or continue on Stripe’s website below.";
+        }
+        catch (JSException) { message = "Secure setup could not load. Continue on Stripe’s website below."; }
+        finally { busy = false; }
+    }
+    [JSInvokable] public Task Report(string state)
+    {
+        message = state == "exit" ? "Stripe setup has closed. Refresh the connection status to verify what remains."
+            : "Stripe could not finish loading. Close this setup and use the hosted option below.";
+        return InvokeAsync(StateHasChanged);
+    }
+    private async Task Close()
+    {
+        if (module is not null) await module.InvokeVoidAsync("dispose", container);
+        mounted = false; message = "Setup closed. Refresh the connection status before testing an order.";
+    }
+    public async ValueTask DisposeAsync()
+    {
+        try { if (module is not null) { await module.InvokeVoidAsync("dispose", container); await module.DisposeAsync(); } }
+        catch (JSDisconnectedException) { }
+        callback?.Dispose();
+    }
+}

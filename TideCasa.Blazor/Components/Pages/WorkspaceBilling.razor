@@ -20,6 +20,7 @@
         else if (workspace is not null)
         {
             <p class="billing-intro">@workspace.Name · Your Tide Casa service payments, invoices and monthly renewal.</p>
+            @if (CanContinueSetup) { <p><a class="bt-one-button secondary" href="@SetupPath">Continue your app setup and private preview →</a></p> }
             @if (workspace.Environment == "sandbox") { <p class="billing-notice">Payment testing is separate from live billing. Sandbox payments do not start a live build.</p> }
             @if (ServiceBillingFlow.Notice(NoticeCode) is { } notice) { <p class="billing-notice" role="status">@notice</p> }
             @if (Checkout == "returned") { <p class="billing-notice" role="status">Your saved payment status is shown below. If confirmation is still pending, this page checks again for a short time. Returning from checkout alone does not confirm payment. <a href="@CurrentPath">Refresh billing</a></p> }
@@ -131,6 +132,8 @@
     private ServiceBillingWorkspace? workspace; private ServiceBillingQuote? quote; private string? error, quoteError;
     private string RequestId { get; } = Guid.NewGuid().ToString("D");
     private string CurrentPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/billing";
+    private bool CanContinueSetup => (HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.Workspaces.Any(access => access.TenantId == TenantId && access.CanPrepare && access.Vertical == "bartide") == true;
+    private string SetupPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/onboarding?appStores=" + AppStores.ToString().ToLowerInvariant() + "&referralCode=" + Uri.EscapeDataString(ReferralCode is { Length: <= 32 } ? ReferralCode : "");
     private bool ShouldRefresh => Checkout == "returned" && Poll is >= 0 and < 10 && workspace is not null && workspace.Orders.Any(x => x.Status is "pending" or "processing");
     protected override async Task OnInitializedAsync()
     {

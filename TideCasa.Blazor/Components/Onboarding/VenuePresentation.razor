@@ -1,0 +1,47 @@
+@using System.Globalization
+@using System.Text.RegularExpressions
+<div class="@("venue-site venue-" + SafeStyle)" style="@("--venue-accent:" + SafeAccent)">
+    <header class="venue-nav">
+        <a class="venue-logo" href="#venue-home">@if (Brand.LogoChoice == "photo" && PhotoPath(Brand.LogoPhotoId) is { } logo) { <img src="@logo" alt="@Business.Name" /> } else { <span>@Business.Name</span> }</a>
+        <nav aria-label="Restaurant"><a href="#venue-menu">Menu</a><a href="#venue-visit">Visit us</a>@if (OrderingAvailable && !Private) { <a class="venue-order-link" href="@OrderPath">Order</a> }</nav>
+    </header>
+    <main id="venue-home">
+        <section class="@("venue-hero " + (PhotoPath(Brand.CoverPhotoId) is null ? "venue-hero-text" : ""))">
+            <div class="venue-hero-copy"><p class="venue-eyebrow">@(string.IsNullOrWhiteSpace(Business.City) ? "GOOD COMPANY STARTS HERE" : Business.City + (string.IsNullOrWhiteSpace(Business.Region) ? "" : ", " + Business.Region))</p><h1>@Business.Name</h1>@if (!string.IsNullOrWhiteSpace(Brand.Introduction)) { <p class="venue-introduction">@Brand.Introduction</p> }<div class="venue-hero-actions"><a class="venue-button" href="#venue-menu">Explore our menu</a>@if (OrderingAvailable && !Private) { <a class="venue-text-link" href="@OrderPath">Place an order →</a> }</div></div>
+            @if (PhotoPath(Brand.CoverPhotoId) is { } cover) { <img class="venue-cover" src="@cover" alt="@Business.Name" /> }
+        </section>
+        <section class="venue-menu" id="venue-menu" aria-labelledby="venue-menu-title"><div class="venue-section-title"><p class="venue-eyebrow">SOMETHING FOR YOU</p><h2 id="venue-menu-title">Our menu</h2></div>
+            @if (Items.Count == 0) { <p>Our menu is being prepared.</p> }
+            @foreach (var category in Categories)
+            {
+                var categoryItems = Items.Where(item => item.CategoryId == category.Id).ToArray();
+                @if (categoryItems.Length > 0)
+                {
+                    <section class="venue-category"><h3>@category.Name</h3><div class="venue-menu-grid">@foreach (var item in categoryItems) { <article class="venue-menu-item">@if (PhotoPath(item.PhotoId) is { } photo) { <img src="@photo" alt="@item.Name" loading="lazy" /> }<div><div class="venue-item-title"><h4>@item.Name</h4><strong>@(item.PriceCents is { } cents ? Money(cents) : item.PriceLabel)</strong></div>@if (!string.IsNullOrWhiteSpace(item.Description)) { <p>@item.Description</p> }@if (!item.Available) { <small class="venue-unavailable">Currently unavailable</small> }</div></article> }</div></section>
+                }
+            }
+        </section>
+        <section class="venue-visit" id="venue-visit" aria-labelledby="venue-visit-title"><div><p class="venue-eyebrow">COME ON OVER</p><h2 id="venue-visit-title">Find us here</h2><address>@Business.Address<br />@Business.City@(!string.IsNullOrWhiteSpace(Business.Region) ? ", " + Business.Region : "") @Business.PostalCode</address><div class="venue-contact">@if (!string.IsNullOrWhiteSpace(Business.Phone)) { <a href="@("tel:" + PhoneTarget)">@Business.Phone</a> }@if (!string.IsNullOrWhiteSpace(Business.PublicEmail)) { <a href="@("mailto:" + Uri.EscapeDataString(Business.PublicEmail))">@Business.PublicEmail</a> }@if (SafeWebsite is { } website) { <a href="@website" target="_blank" rel="noopener noreferrer">Our website ↗</a> }</div></div><div><h3>Opening hours</h3>@if (!Private && PublishedHours is not null) { <div class="venue-hours">@foreach (var line in PublishedHours.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)) { <p>@line</p> }</div> } else { <dl class="venue-hours">@foreach (var day in Enumerable.Range(0, 7)) { var hours = Business.Hours.FirstOrDefault(value => value.Day == day); <div><dt>@DayName(day)</dt><dd>@HoursText(hours)</dd></div> }</dl> }<small>Hours are in the venue’s local time.</small></div></section>
+    </main>
+    <footer class="venue-footer"><span>@Business.Name</span><a href="/restaurant">Made with BarTide</a></footer>
+</div>
+@code {
+    [Parameter, EditorRequired] public OnboardingBusiness Business { get; set; } = default!;
+    [Parameter, EditorRequired] public OnboardingBrand Brand { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyList<RestaurantCategory> Categories { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<RestaurantMenuItem> Items { get; set; } = [];
+    [Parameter] public string TenantId { get; set; } = "";
+    [Parameter] public string Slug { get; set; } = "";
+    [Parameter] public bool Private { get; set; }
+    [Parameter] public bool OrderingAvailable { get; set; }
+    [Parameter] public string? PublishedHours { get; set; }
+    private string SafeStyle => Brand.Style is "coastal" or "classic" or "night" ? Brand.Style : "coastal";
+    private string SafeAccent => Brand.Accent is { } accent && Regex.IsMatch(accent, "^#[a-fA-F0-9]{6}$", RegexOptions.CultureInvariant) ? accent : "#24766b";
+    private string? SafeWebsite => Uri.TryCreate(Business.Website, UriKind.Absolute, out var uri) && uri.Scheme == "https" && uri.UserInfo.Length == 0 ? uri.AbsoluteUri : null;
+    private string PhoneTarget => new(Business.Phone.Where(value => char.IsAsciiDigit(value) || value == '+').ToArray());
+    private string OrderPath => "/order/" + Uri.EscapeDataString(Slug);
+    private string? PhotoPath(string? id) => Guid.TryParseExact(id, "D", out _) ? Private ? "/private-media/" + Uri.EscapeDataString(TenantId) + "/photo/" + Uri.EscapeDataString(id!) : "/media/" + Uri.EscapeDataString(id!) : null;
+    private static string Money(int cents) => (cents / 100m).ToString("C2", CultureInfo.GetCultureInfo("en-US"));
+    private static string DayName(int day) => CultureInfo.GetCultureInfo("en-US").DateTimeFormat.DayNames[day];
+    private static string HoursText(OnboardingHours? hours) => hours is null ? "To be confirmed" : hours.Closed ? "Closed" : string.IsNullOrWhiteSpace(hours.Opens) || string.IsNullOrWhiteSpace(hours.Closes) ? "To be confirmed" : hours.Opens + "–" + hours.Closes + (hours.Overnight ? " (next day)" : "");
+}

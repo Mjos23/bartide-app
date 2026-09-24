@@ -16,6 +16,7 @@ using TideCasa.Blazor.Features.LaunchReview;
 using TideCasa.Blazor.Features.BusinessPosts;
 using TideCasa.Blazor.Features.SalesPipeline;
 using TideCasa.Blazor.Features.EmailTracking;
+using TideCasa.Blazor.Features.ClientOnboarding;
 using TideCasa.Blazor.Components;
 using TideCasa.Blazor.Services;
 using System.Net;
@@ -98,6 +99,10 @@ builder.Services.AddHttpClient<RestaurantManagementClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(20);
     client.MaxResponseContentBufferSize = 8 * 1024 * 1024;
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
+builder.Services.AddHttpClient<ClientOnboardingClient>(client =>
+{
+    client.BaseAddress = authApiBase; client.Timeout = TimeSpan.FromSeconds(30); client.MaxResponseContentBufferSize = 4 * 1024 * 1024;
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }).RemoveAllLoggers();
 builder.Services.AddHttpClient<StaffTrainingClient>(client =>
 {
     client.BaseAddress = authApiBase;
@@ -169,6 +174,7 @@ app.Use(async (context, next) =>
         || context.Request.Path.StartsWithSegments("/private-media")
         || context.Request.Path.StartsWithSegments("/owner")
         || context.Request.Path.StartsWithSegments("/start")
+        || context.Request.Path.StartsWithSegments("/onboarding")
         || context.Request.Path.StartsWithSegments("/service-billing")
         || context.Request.Path.StartsWithSegments("/merchant-payments")
         || context.Request.Path.StartsWithSegments("/referral-forms")
@@ -192,6 +198,7 @@ app.UseAntiforgery();
 app.MapTideCasaAuthentication();
 app.MapRestaurantOrdering();
 app.MapRestaurantManagement();
+app.MapClientOnboarding();
 app.MapStaffTrainingForms();
 app.MapTideCasaMedia();
 app.MapRewardForms();

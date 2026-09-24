@@ -1,0 +1,165 @@
+@page "/workspace/{TenantId}/onboarding"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.Globalization
+@using TideCasa.Blazor.Features.ClientOnboarding
+@inject ClientOnboardingClient Api
+@inject RestaurantManagementClient MenuApi
+<PageTitle>Your BarTide setup</PageTitle>
+<HeadContent><link rel="stylesheet" href="/client-onboarding.css" /><meta name="robots" content="noindex,nofollow" /><script src="/client-onboarding.js" defer></script></HeadContent>
+<div class="client-onboarding">
+    <header class="onboarding-nav"><a href="/account">← Your account</a><a href="/restaurant" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="132" height="44" /></a></header>
+    <main class="onboarding-shell">
+        <p class="onboarding-eyebrow">LET’S MAKE IT YOURS</p>
+        <h1>@(workspace?.Name ?? "Your BarTide setup")</h1>
+        @if (error is not null) { <div class="onboarding-notice" role="alert">@error</div> }
+        @if (ClientOnboardingFlow.Notice(Notice) is { } notice) { <div class="onboarding-notice" role="@(Notice is "saved" or "approved" ? "status" : "alert")">@notice</div> }
+        @if (workspace is not null)
+        {
+            <p class="onboarding-intro">A few clear steps, at your pace. Save each section, then come back whenever you’re ready. Your workspace stays private while you prepare it.</p>
+            <div class="onboarding-summary"><span>@ReadySections of 6 sections ready</span><span>@SavedAt</span><span>@(workspace.IsOwner ? "Business owner" : "Manager preparation access")</span></div>
+            <nav class="onboarding-steps" aria-label="Setup checklist">
+                @foreach (var section in Sections)
+                {
+                    <a href="@("#" + section.Id)"><span class="onboarding-step-number">@section.Number</span><span><strong>@section.Title</strong><small class="@("onboarding-state " + SectionState(section.Id))">@StateLabel(SectionState(section.Id))</small></span></a>
+                }
+            </nav>
+            @if (workspace.Checks.FirstOrDefault(check => check.State == "needs_attention") is { } next)
+            {
+                <aside class="onboarding-next"><strong>Your next step</strong><p>@next.Message</p><a href="@FixPath(next)">Take care of this →</a></aside>
+            }
+            <section class="onboarding-card" id="business" aria-labelledby="business-title">
+                <div class="onboarding-section-heading"><span>01</span><div><h2 id="business-title">Your business</h2><p>The details guests will use to find you and get in touch.</p></div><small class="@("onboarding-state " + SectionState("business"))">@StateLabel(SectionState("business"))</small></div>
+                <form action="@FormPath("business")" method="post" data-enhance="false">
+                    <AntiforgeryToken />@ContextFields()
+                    <label>Business name<input name="name" maxlength="120" required value="@workspace.Business.Name" autocomplete="organization" /></label>
+                    <div class="onboarding-fields"><label>Public contact email<input name="publicEmail" type="email" maxlength="254" value="@workspace.Business.PublicEmail" autocomplete="email" /><small>Shown to guests. Your account email stays separate.</small></label><label>Public phone<input name="phone" type="tel" maxlength="30" value="@workspace.Business.Phone" autocomplete="tel" /></label></div>
+                    <label>Street address<input name="address" maxlength="200" value="@workspace.Business.Address" autocomplete="street-address" /></label>
+                    <div class="onboarding-fields"><label>City<input name="city" maxlength="100" value="@workspace.Business.City" autocomplete="address-level2" /></label><label>State (two letters)<input name="region" maxlength="2" value="@workspace.Business.Region" autocomplete="address-level1" placeholder="FL" /></label></div>
+                    <div class="onboarding-fields"><label>ZIP code<input name="postalCode" maxlength="10" value="@workspace.Business.PostalCode" autocomplete="postal-code" placeholder="33706 or 33706-1234" /></label><label>Country<select name="country"><option value="US" selected="@(workspace.Business.Country == "US")">United States</option></select><small>Current setup supports US businesses and USD.</small></label></div>
+                    <div class="onboarding-fields"><label>Time zone<select name="timeZone">@foreach (var zone in TimeZones) { <option value="@zone.Id" selected="@(workspace.Business.TimeZone == zone.Id)">@zone.Name</option> }</select></label><label>Existing website (optional)<input name="website" type="url" maxlength="2048" value="@workspace.Business.Website" placeholder="https://" /></label></div>
+                    <fieldset><legend>Weekly hours</legend><p class="onboarding-help">Use the venue’s local time. For a late closing, select “Closes next day.” Mark closed days explicitly.</p>
+                        <div class="onboarding-hours-head" aria-hidden="true"><span>Day</span><span>Opens</span><span>Closes</span><span>Choices</span></div>
+                        @foreach (var day in Enumerable.Range(0, 7))
+                        {
+                            var hours = workspace.Business.Hours.FirstOrDefault(value => value.Day == day) ?? new OnboardingHours(day, false, "", "");
+                            <div class="onboarding-hours-row"><strong>@DayName(day)</strong><label><span class="onboarding-sr">@DayName(day) opens</span><input name="@("opens_" + day)" type="time" value="@hours.Opens" /></label><label><span class="onboarding-sr">@DayName(day) closes</span><input name="@("closes_" + day)" type="time" value="@hours.Closes" /></label><div class="onboarding-hours-options"><label class="onboarding-check"><input name="@("closed_" + day)" type="checkbox" value="true" checked="@hours.Closed" /><span>Closed</span></label><label class="onboarding-check"><input name="@("overnight_" + day)" type="checkbox" value="true" checked="@hours.Overnight" /><span>Closes next day</span></label></div></div>
+                        }
+                    </fieldset>
+                    <button class="onboarding-button" type="submit">Save business details</button>
+                </form>
+                @ChecksFor("business")
+            </section>
+            <section class="onboarding-card" id="brand" aria-labelledby="brand-title">
+                <div class="onboarding-section-heading"><span>02</span><div><h2 id="brand-title">Your look and menu</h2><p>Your name, your atmosphere, and your exact menu.</p></div><small class="@("onboarding-state " + SectionState("brand"))">@StateLabel(SectionState("brand"))</small></div>
+                <form action="@FormPath("brand")" method="post" data-enhance="false">
+                    <AntiforgeryToken />@ContextFields()
+                    <div class="onboarding-fields"><label>Style<select name="style"><option value="coastal" selected="@(workspace.Brand.Style == "coastal")">Coastal · light and relaxed</option><option value="classic" selected="@(workspace.Brand.Style == "classic")">Classic · warm and welcoming</option><option value="night" selected="@(workspace.Brand.Style == "night")">Night · dark and bold</option></select></label><label>Accent color<input type="color" name="accent" value="@workspace.Brand.Accent" /><small>Used for highlights in your preview.</small></label></div>
+                    <label>A short introduction<textarea name="introduction" rows="3" maxlength="250" placeholder="Tell guests what makes your place yours.">@workspace.Brand.Introduction</textarea><small>Up to 250 characters.</small></label>
+                    <div class="onboarding-fields"><label>Your logo<select name="logoChoice"><option value="text" selected="@(workspace.Brand.LogoChoice == "text")">Use my business name as a text logo</option><option value="photo" selected="@(workspace.Brand.LogoChoice == "photo")">Use an uploaded logo photo</option></select></label><label>Logo photo<select name="logoPhotoId"><option value="">No logo photo selected</option>@foreach (var photo in photos) { <option value="@photo.Id" selected="@(workspace.Brand.LogoPhotoId == photo.Id)">@PhotoLabel(photo)</option> }</select></label></div>
+                    <label>Cover photo (optional)<select name="coverPhotoId"><option value="">Continue without a cover photo</option>@foreach (var photo in photos) { <option value="@photo.Id" selected="@(workspace.Brand.CoverPhotoId == photo.Id)">@PhotoLabel(photo)</option> }</select></label>
+                    <button class="onboarding-button" type="submit">Save your look</button>
+                </form>
+                <div class="onboarding-tool-links"><a href="@WorkspacePath("media")">Upload logo and photos →</a><a href="@WorkspacePath("menu")">Edit menu, categories and prices →</a></div>
+                <p class="onboarding-help">@workspace.MenuItemCount menu @(workspace.MenuItemCount == 1 ? "item" : "items") saved. Menu photos and PDFs are source material; enter and confirm the actual item names and prices in the menu editor. We never guess prices or ingredients.</p>
+                @if (photos.Count > 0) { <div class="onboarding-photo-strip" aria-label="Your uploaded photos">@foreach (var photo in photos.Take(8)) { <figure><img src="@PrivatePhoto(photo.Id)" alt="@PhotoLabel(photo)" loading="lazy" /><figcaption>@PhotoLabel(photo)</figcaption></figure> }</div> }
+                @ChecksFor("brand")
+            </section>
+            <section class="onboarding-card" id="service" aria-labelledby="service-title">
+                <div class="onboarding-section-heading"><span>03</span><div><h2 id="service-title">How you serve</h2><p>Start with a menu, or prepare ordering for the services you offer.</p></div><small class="@("onboarding-state " + SectionState("service"))">@StateLabel(SectionState("service"))</small></div>
+                <form action="@FormPath("service")" method="post" data-enhance="false">
+                    <AntiforgeryToken />@ContextFields()
+                    <label class="onboarding-check onboarding-choice"><input name="ordering" type="checkbox" value="true" checked="@workspace.Service.Ordering" /><span><strong>Prepare guest ordering</strong><small>Leave unchecked for a menu-only launch. Saving setup does not open orders.</small></span></label>
+                    <fieldset><legend>Ordering services</legend><p class="onboarding-help">These choices apply when guest ordering is selected.</p><div class="onboarding-checkbox-grid"><label class="onboarding-check"><input name="dineIn" type="checkbox" value="true" checked="@workspace.Service.DineIn" /><span>At the table</span></label><label class="onboarding-check"><input name="pickup" type="checkbox" value="true" checked="@workspace.Service.Pickup" /><span>Pickup</span></label><label class="onboarding-check"><input name="delivery" type="checkbox" value="true" checked="@workspace.Service.Delivery" /><span>Our own delivery</span></label></div>
+                    <div class="onboarding-fields"><label>Table labels<textarea name="tableLabels" rows="3" maxlength="4200" placeholder="Table 1&#10;Patio 1">@string.Join("\n", workspace.Service.TableLabels)</textarea><small>For table ordering, one label per line. Up to 100 tables.</small></label><label>Pickup instructions<textarea name="pickupInstructions" rows="3" maxlength="500" placeholder="Where should guests collect their order?">@workspace.Service.PickupInstructions</textarea></label></div></fieldset>
+                    <fieldset><legend>Paying for orders</legend><label class="onboarding-check"><input name="payStaff" type="checkbox" value="true" checked="@workspace.Service.PayStaff" /><span>Guests pay our staff directly</span></label><label class="onboarding-check"><input name="requestCards" type="checkbox" value="true" checked="@workspace.Service.RequestCards" /><span>Request online card payments at launch</span></label><p class="onboarding-help">Online card payments need a separate live payment review. The current Stripe setup is a sandbox and cannot satisfy a live launch requirement.</p>
+                    <div class="onboarding-fields"><label>Confirmed tax rate (%)<input name="taxPercent" type="number" min="0" max="25" step="0.01" value="@Amount(workspace.Service.TaxBasisPoints)" placeholder="For example, 7.00" /><small>Enter the rate you have confirmed for your orders. Enter 0 only if that is correct. Leave blank while checking.</small></label><label>Staff payment instructions<textarea name="paymentInstructions" rows="2" maxlength="500" placeholder="For example, pay at the bar when you collect your order.">@workspace.Service.PaymentInstructions</textarea></label></div><label class="onboarding-check"><input name="tips" type="checkbox" value="true" checked="@workspace.Service.Tips" /><span>Offer optional tips</span></label></fieldset>
+                    <details class="onboarding-details" open="@workspace.Service.Delivery"><summary>Delivery details · only needed for your own delivery</summary><label>Delivery ZIP codes<textarea name="deliveryZips" rows="2" maxlength="500" placeholder="33706, 33707">@string.Join(", ", workspace.Service.DeliveryZips)</textarea><small>Up to 50 five-digit ZIP codes, separated by commas.</small></label><div class="onboarding-fields"><label>Delivery fee ($)<input name="deliveryFee" type="number" min="0" max="50" step="0.01" value="@Amount(workspace.Service.DeliveryFeeCents)" /></label><label>Minimum order before fees ($)<input name="deliveryMinimum" type="number" min="0" max="1000" step="0.01" value="@Amount(workspace.Service.DeliveryMinimumCents)" /></label></div><label>Maximum simultaneous delivery orders<input name="deliveryCapacity" type="number" min="1" max="30" value="@workspace.Service.DeliveryCapacity" /></label></details>
+                    <button class="onboarding-button" type="submit">Save service choices</button>
+                </form>
+                @ChecksFor("service")
+            </section>
+            <section class="onboarding-card" id="team" aria-labelledby="team-title">
+                <div class="onboarding-section-heading"><span>04</span><div><h2 id="team-title">Your team and extras</h2><p>Choose who will look after orders. Add the extras when you’re ready.</p></div><small class="@("onboarding-state " + SectionState("team"))">@StateLabel(SectionState("team"))</small></div>
+                <form action="@FormPath("team")" method="post" data-enhance="false">
+                    <AntiforgeryToken />@ContextFields()
+                    <label class="onboarding-check"><input name="ownerHandlesOrders" type="checkbox" value="true" checked="@workspace.Team.OwnerHandlesOrders" /><span>The business owner will receive and handle orders</span></label>
+                    <label>Responsible team member’s sign-in email<input name="orderContact" type="email" maxlength="254" value="@workspace.Team.OrderContact" placeholder="manager@example.com" /><small>When the owner will not handle orders, enter the exact email of an active manager, bartender or server from your team.</small></label>
+                    <fieldset><legend>It’s fine to do these later</legend><label class="onboarding-check"><input name="eventsLater" type="checkbox" value="true" checked="@workspace.Team.EventsLater" /><span>Set up events later</span></label><label class="onboarding-check"><input name="rewardsLater" type="checkbox" value="true" checked="@workspace.Team.RewardsLater" /><span>Set up guest rewards later</span></label><label class="onboarding-check"><input name="trainingLater" type="checkbox" value="true" checked="@workspace.Team.TrainingLater" /><span>Add staff training later</span></label><p class="onboarding-help">These extras do not block your core setup. Selecting them here records your preference; prepare their content in the corresponding workspace tools.</p></fieldset>
+                    <button class="onboarding-button" type="submit">Save team plan</button>
+                </form>
+                <div class="onboarding-tool-links"><a href="@WorkspacePath("team")">Manage team invitations and roles →</a></div>
+                <p class="onboarding-help">The owner can add a manager using their exact account email. Managers can help with content and preparation. Banking, plan purchases and final content approval stay with the owner.</p>
+                @ChecksFor("team")
+            </section>
+            <section class="onboarding-card" id="payments" aria-labelledby="payments-title">
+                <div class="onboarding-section-heading"><span>05</span><div><h2 id="payments-title">Your plan and getting paid</h2><p>Two separate steps, with clear responsibilities.</p></div><small class="@("onboarding-state " + SectionState("payments"))">@StateLabel(SectionState("payments"))</small></div>
+                <div class="onboarding-payment-cards"><section><span class="onboarding-eyebrow">PAYING BARTIDE</span><h3>Your app and service plan</h3><p>Review your setup package, saved purchase and monthly maintenance. Creating a workspace is free.</p>@if (workspace.IsOwner) { <a class="onboarding-button secondary" href="@BillingPath">Review plan and billing</a> } else { <p class="onboarding-help">The business owner completes this step.</p> }<p class="onboarding-help">Already purchased? Review your linked purchase here. Do not pay again to recover a purchase.</p></section><section><span class="onboarding-eyebrow">GETTING PAID BY GUESTS</span><h3>Your restaurant’s payments</h3><p>Stripe collects banking and business verification securely. You can continue preparing your menu while verification is pending.</p>@if (workspace.IsOwner) { <a class="onboarding-button secondary" href="@WorkspacePath("payments")">Open Stripe payment setup</a> } else { <p class="onboarding-help">Only the owner can manage Stripe.</p> }<p class="onboarding-help">Current connection: test setup only. No real card charges. Menu-only and staff-payment scopes can be reviewed separately.</p></section></div>
+                @ChecksFor("payments")
+            </section>
+            <section class="onboarding-card" id="launch" aria-labelledby="launch-title">
+                <div class="onboarding-section-heading"><span>06</span><div><h2 id="launch-title">Preview and launch</h2><p>See your saved details as a complete page, then approve the exact version for review.</p></div><small class="@("onboarding-state " + SectionState("launch"))">@StateLabel(SectionState("launch"))</small></div>
+                @if (workspace.ApprovalCurrent) { <p class="onboarding-success">Your current preview has been approved for BarTide review.</p> }
+                <p>Build a private preview after saving your sections and menu. Any later change requires a fresh preview and approval.</p>
+                <div class="onboarding-tool-links"><form action="@FormPath("build")" method="post" data-enhance="false"><AntiforgeryToken />@ContextFields()<button class="onboarding-button" type="submit">@(workspace.ReleaseId is null ? "Build my private preview" : "Refresh my private preview")</button></form>@if (workspace.ReleaseId is not null) { <a class="onboarding-button secondary" href="@ClientOnboardingFlow.Preview(TenantId)">Open private preview</a> }</div>
+                <p class="onboarding-help">The pilot includes a BarTide review with you before publication and follows the current 30-day build period. Content approval does not activate billing, open orders or make the app public.</p>
+                @if (workspace.BuildReadyAt is { } due && DateTimeOffset.TryParse(due, out var scheduled)) { <p>Scheduled build-ready date: <strong>@scheduled.ToString("MMMM d, yyyy", CultureInfo.GetCultureInfo("en-US"))</strong>.</p> }
+                <p><a href="/service-terms">Review service and billing terms →</a></p>
+                @ChecksFor("launch")
+            </section>
+            <footer class="onboarding-footer"><p>Need a hand? <a href="mailto:hello@tide.casa">hello@tide.casa</a></p><a href="/account">Back to your account</a></footer>
+        }
+    </main>
+</div>
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [SupplyParameterFromQuery(Name = "appStores")] public bool AppStores { get; set; }
+    [SupplyParameterFromQuery(Name = "referralCode")] public string? ReferralCode { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private OnboardingWorkspace? workspace;
+    private IReadOnlyList<RestaurantPhotoOption> photos = [];
+    private string? error;
+    private static readonly (string Id, string Title, string Number)[] Sections = [("business", "Your business", "1"), ("brand", "Your look and menu", "2"), ("service", "How you serve", "3"), ("team", "Your team and extras", "4"), ("payments", "Your plan and payments", "5"), ("launch", "Preview and launch", "6")];
+    private static readonly (string Id, string Name)[] TimeZones = [("America/New_York", "Eastern"), ("America/Chicago", "Central"), ("America/Denver", "Mountain"), ("America/Phoenix", "Arizona"), ("America/Los_Angeles", "Pacific"), ("America/Anchorage", "Alaska"), ("Pacific/Honolulu", "Hawaii"), ("America/Puerto_Rico", "Puerto Rico")];
+    private string SafeReferral => ReferralCode is { Length: <= 32 } ? ReferralCode : "";
+    private string WorkspacePath(string page) => "/workspace/" + Uri.EscapeDataString(TenantId) + "/" + page;
+    private string BillingPath => WorkspacePath("billing") + "?appStores=" + AppStores.ToString().ToLowerInvariant() + "&referralCode=" + Uri.EscapeDataString(SafeReferral);
+    private string FormPath(string section) => "/onboarding/" + Uri.EscapeDataString(TenantId) + "/" + section;
+    private string PrivatePhoto(string id) => "/private-media/" + Uri.EscapeDataString(TenantId) + "/photo/" + Uri.EscapeDataString(id);
+    private string SavedAt => DateTimeOffset.TryParse(workspace?.UpdatedAt, out var date) ? "Saved " + date.ToString("MMM d, h:mm tt 'UTC'", CultureInfo.GetCultureInfo("en-US")) : "Save a section to begin";
+    private int ReadySections => Sections.Count(section => SectionState(section.Id) == "ready");
+    private string SectionState(string section)
+    {
+        var checks = workspace?.Checks.Where(check => check.Section == section).ToArray() ?? [];
+        return checks.Any(check => check.State == "needs_attention") ? "needs_attention" : checks.Any(check => check.State == "waiting") ? "waiting" : checks.Length > 0 && checks.All(check => check.State is "ready" or "optional") ? "ready" : "optional";
+    }
+    private static string StateLabel(string state) => state switch { "ready" => "Ready", "needs_attention" => "Needs your attention", "waiting" => "Waiting for verification", _ => "Do this when ready" };
+    private static string DayName(int day) => CultureInfo.GetCultureInfo("en-US").DateTimeFormat.DayNames[day];
+    private static string Amount(int? cents) => cents is { } value ? (value / 100m).ToString("0.00", CultureInfo.InvariantCulture) : "";
+    private string PhotoLabel(RestaurantPhotoOption photo) => "Photo " + (photos.ToList().FindIndex(value => value.Id == photo.Id) + 1) + (DateTimeOffset.TryParse(photo.CreatedAt, out var date) ? " · " + date.ToString("MMM d", CultureInfo.GetCultureInfo("en-US")) : "");
+    private string FixPath(OnboardingCheck check) => check.ActionPath.StartsWith("/", StringComparison.Ordinal) && !check.ActionPath.StartsWith("//", StringComparison.Ordinal) && !check.ActionPath.Contains('\\') ? check.ActionPath : "#" + (Sections.Any(section => section.Id == check.Section) ? check.Section : "launch");
+    private RenderFragment ContextFields() => builder =>
+    {
+        var fields = new[] { ("revision", workspace!.Revision.ToString(CultureInfo.InvariantCulture)), ("appStores", AppStores.ToString().ToLowerInvariant()), ("referralCode", SafeReferral) };
+        foreach (var (name, value) in fields) { builder.OpenElement(0, "input"); builder.AddAttribute(1, "type", "hidden"); builder.AddAttribute(2, "name", name); builder.AddAttribute(3, "value", value); builder.CloseElement(); }
+    };
+    private RenderFragment ChecksFor(string section) => builder =>
+    {
+        builder.OpenElement(0, "ul"); builder.AddAttribute(1, "class", "onboarding-checks");
+        foreach (var check in workspace!.Checks.Where(check => check.Section == section))
+        {
+            builder.OpenElement(2, "li"); builder.AddAttribute(3, "class", check.State); builder.OpenElement(4, "span"); builder.AddContent(5, StateLabel(check.State)); builder.CloseElement(); builder.AddContent(6, check.Message); builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Items[AuthFlow.TokenItem] is not string token) { HttpContext.Response.StatusCode = 401; error = "Sign in again to continue setup."; return; }
+        var result = await Api.WorkspaceAsync(TenantId, token, HttpContext.RequestAborted);
+        if (!result.Succeeded || result.Value is null) { HttpContext.Response.StatusCode = result.Uncertain ? 503 : 403; error = result.Uncertain ? "Your setup could not be loaded. Please try again shortly." : "This setup is not available to your account."; return; }
+        workspace = result.Value;
+        var menu = await MenuApi.GetMenuAsync(TenantId, token, HttpContext.RequestAborted);
+        if (menu.Succeeded && menu.Value?.Photos is { } available) photos = available;
+    }
+}

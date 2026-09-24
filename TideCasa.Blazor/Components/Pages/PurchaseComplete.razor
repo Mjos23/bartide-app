@@ -40,7 +40,7 @@
                     <label>Business name<input name="businessName" required maxlength="120" autocomplete="organization" /></label>
                     <label>Your name<input name="contactName" required maxlength="120" autocomplete="name" value="@account.User.DisplayName" /></label>
                     <label>City and state<input name="area" required maxlength="120" autocomplete="address-level2" /></label>
-                    <button type="submit">Save details and open my account</button><p>Your purchase is already paid. Saving these details does not charge you again.</p>
+                    <button type="submit">Save details and continue my setup</button><p>Your purchase is already paid. Saving these details does not charge you again. @(purchase.Plan == "restaurant" ? "Continue from billing to your saved setup checklist and private preview." : "Review your saved purchase and app setup next.")</p>
                 </form>
                 <p><a href="@("/signin?return_to=" + Uri.EscapeDataString(CurrentPath))">Use a different account</a></p>
             }

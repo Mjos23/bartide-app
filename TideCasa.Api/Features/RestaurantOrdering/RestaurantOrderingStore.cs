@@ -97,7 +97,7 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
         var initialStatus = merchant is null ? "new" : "awaiting_payment";
         var initialPayment = merchant is null ? "unpaid" : "pending";
         var receipt = new RestaurantOrderReceipt(id, id[..8].ToUpperInvariant(), initialStatus, initialPayment, quote, now);
-        var table = ResolveTable(venue, request.Order.TableToken, required: request.Order.Fulfillment == "dine-in");
+        var table = ResolveTable(venue, request.Order.TableToken, required: request.Order.Fulfillment == "dine-in", label: request.Order.TableLabel);
         var payload = new JsonObject
         {
             ["id"] = id, ["number"] = receipt.Number, ["status"] = initialStatus, ["payment_status"] = initialPayment,
@@ -139,9 +139,9 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
     public async Task<RestaurantOrderingWorkspace> WorkspaceAsync(string tenantId, AuthUser user, CancellationToken ct)
     {
         await using var db = await database.OpenAsync(ct);
-        using var tx = db.BeginTransaction(deferred: true);
-        var venue = await ReadVenueAsync(db, tx, tenantId, true, ct);
-        RequireOwner(venue, user);
+        using var tx = db.BeginTransaction(deferred: false);
+        var venue = await ReadVenueAsync(db, tx, tenantId, true, ct, allowPreparation: true);
+        await RequireManagerAsync(db, tx, venue, user, ct, allowPreparation: true);
         var orders = new List<RestaurantManagedOrder>();
         await using var query = Command(db, tx, "SELECT payload_json FROM bartide_enhanced_orders WHERE tenant_id=@tenant ORDER BY created_at DESC LIMIT 100", ("@tenant", venue.Id));
         await using var reader = await query.ExecuteReaderAsync(ct);
@@ -151,6 +151,8 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
             orders.Add(new(Receipt(payload), String(payload, "customer_name"), String(payload, "phone"), String(payload, "address"),
                 String(payload, "zip"), String(payload, "note"), Integer(payload, "version", 0, int.MaxValue, 0)));
         }
+        await reader.DisposeAsync();
+        await tx.CommitAsync(ct);
         return new(venue.Id, venue.Slug, venue.Name, venue.ConfigVersion, true, venue.Tables, orders);
     }
 
@@ -183,8 +185,8 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
     {
         await using var db = await database.OpenAsync(ct);
         using var tx = db.BeginTransaction(deferred: false);
-        var venue = await ReadVenueAsync(db, tx, tenantId, true, ct);
-        RequireOwner(venue, user);
+        var venue = await ReadVenueAsync(db, tx, tenantId, true, ct, allowPreparation: true);
+        await RequireManagerAsync(db, tx, venue, user, ct, allowPreparation: true);
         if (venue.ConfigVersion != expectedVersion) throw new OrderingException("Table settings changed. Refresh and try again.", 409, "stale_settings");
         var tables = venue.Tables.ToList();
         change(tables);
@@ -192,6 +194,7 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
         if (checkout is null) { checkout = new(); venue.Config["checkout"] = checkout; }
         checkout["tables"] = JsonSerializer.SerializeToNode(tables, Json);
         checkout["dine_in_enabled"] = tables.Any(table => table.Enabled);
+        if (venue.Status != "active") venue.Config["accepting_orders"] = false;
         await using var update = Command(db, tx, "UPDATE bartide_enhanced_configs SET settings_json=@json,version=version+1,updated_at=@now WHERE tenant_id=@tenant AND version=@version",
             ("@json", venue.Config.ToJsonString(Json)), ("@now", Stamp()), ("@tenant", tenantId), ("@version", expectedVersion));
         if (await update.ExecuteNonQueryAsync(ct) != 1) throw new OrderingException("Table settings changed. Refresh and try again.", 409, "stale_settings");
@@ -205,9 +208,10 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
             throw new OrderingException("Choose menu items, an order type and a payment option.");
         var options = Options(venue, phoneReady);
         if (!options.AcceptingOrders) throw new OrderingException("This restaurant is not accepting orders right now.", 409, "ordering_closed");
-        if (request.Fulfillment != "dine-in" && !string.IsNullOrEmpty(request.TableToken)) throw new OrderingException("Table codes are only used for dine-in orders.");
+        if (request.Fulfillment != "dine-in" && (!string.IsNullOrEmpty(request.TableToken) || !string.IsNullOrEmpty(request.TableLabel)))
+            throw new OrderingException("Tables are only used for dine-in orders.");
         if (request.Fulfillment != "delivery" && !string.IsNullOrEmpty(request.DeliveryZip)) throw new OrderingException("A delivery ZIP is only used for delivery.");
-        var table = ResolveTable(venue, request.TableToken, request.Fulfillment == "dine-in");
+        var table = ResolveTable(venue, request.TableToken, request.Fulfillment == "dine-in", request.TableLabel);
         if (request.Fulfillment == "dine-in" && !options.DineInEnabled || request.Fulfillment == "pickup" && !options.PickupEnabled)
             throw new OrderingException("That order type is unavailable.");
         if (request.PaymentMethod == "staff" && !options.PayStaffEnabled) throw new OrderingException("Paying staff is unavailable for online orders.");
@@ -261,20 +265,40 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
             String(config, "pickup_instructions"), String(config, "payment_instructions"));
     }
 
-    private static RestaurantTable? ResolveTable(Venue venue, string? token, bool required)
+    private static RestaurantTable? ResolveTable(Venue venue, string? token, bool required, string? label = null)
     {
-        if (string.IsNullOrEmpty(token)) return required ? throw new OrderingException("Scan the QR code at your table to start a dine-in order.") : null;
-        var table = TokenPattern.IsMatch(token) ? venue.Tables.FirstOrDefault(table => table.Enabled && table.Token == token) : null;
-        if (table is null || !Boolean(venue.Config["checkout"] as JsonObject ?? new(), "dine_in_enabled", false))
-            throw new OrderingException("This table code is unavailable. Please ask a staff member.", 404, "not_found");
-        return table;
+        if (label is not null && (label.Length > 40 || label.Any(char.IsControl)))
+            throw new OrderingException("Use the table number or name shown at your table.", 400, "invalid_table");
+        label = label?.Trim();
+        if (string.IsNullOrEmpty(token) && string.IsNullOrEmpty(label))
+            return required ? throw new OrderingException("Enter your table number or scan the QR code at your table.", 400, "table_required") : null;
+        var enabled = Boolean(venue.Config["checkout"] as JsonObject ?? new(), "dine_in_enabled", false);
+        RestaurantTable? scanned = null, entered = null;
+        if (!string.IsNullOrEmpty(token))
+        {
+            scanned = TokenPattern.IsMatch(token) ? venue.Tables.FirstOrDefault(table => table.Enabled && table.Token == token) : null;
+            if (scanned is null || !enabled)
+                throw new OrderingException("This table code is unavailable. Please ask a staff member.", 404, "not_found");
+        }
+        if (!string.IsNullOrEmpty(label))
+        {
+            // Resolve only configured, active tables in this restaurant; never store unchecked guest text.
+            entered = venue.Tables.FirstOrDefault(table => table.Enabled && table.Label.Equals(label, StringComparison.OrdinalIgnoreCase));
+            if (entered is null && label.All(char.IsAsciiDigit))
+                entered = venue.Tables.FirstOrDefault(table => table.Enabled && table.Label.Equals("Table " + label, StringComparison.OrdinalIgnoreCase));
+            if (entered is null || !enabled)
+                throw new OrderingException("That table is unavailable. Check its number or ask a staff member.", 404, "table_unavailable");
+        }
+        if (scanned is not null && entered is not null && scanned.Id != entered.Id)
+            throw new OrderingException("The entered table does not match the scanned table.", 400, "table_mismatch");
+        return scanned ?? entered;
     }
 
     private static async Task<Venue> ReadVenueAsync(DbConnection db, DbTransaction tx, string key, bool byId, CancellationToken ct, bool allowPreparation = false)
     {
         if (string.IsNullOrWhiteSpace(key) || key.Length > 200) throw new OrderingException("Restaurant not found.", 404, "not_found");
         await using var query = Command(db, tx, """
-            SELECT c.id,c.slug,c.name,c.menu_json,c.version,c.user_id,e.settings_json,e.version
+            SELECT c.id,c.slug,c.name,c.menu_json,c.version,c.user_id,e.settings_json,e.version,c.status,c.vertical
             FROM bartide_customers c LEFT JOIN bartide_enhanced_configs e ON e.tenant_id=c.id
             WHERE
             """ + (allowPreparation && byId ? " c.vertical IN ('bartide','tide-casa') AND c.status IN ('active','draft','building') AND " : " c.vertical='bartide' AND c.status='active' AND ")
@@ -317,16 +341,20 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
             if (tables.Select(table => table.Id).Distinct().Count() != tables.Count || tables.Select(table => table.Token).Distinct().Count() != tables.Count) throw Unavailable();
         }
         return new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.ReadInt32(4), reader.IsDBNull(5) ? null : reader.GetString(5),
-            config, reader.IsDBNull(7) ? -1 : reader.ReadInt32(7), categoryList, itemList, tables);
+            config, reader.IsDBNull(7) ? -1 : reader.ReadInt32(7), categoryList, itemList, tables, reader.GetString(8), reader.GetString(9));
     }
 
     private static string? PhotoId(string source) => source.StartsWith("/media/", StringComparison.Ordinal)
         && Guid.TryParseExact(source[7..], "D", out _) ? source[7..] : null;
 
-    private static void RequireOwner(Venue venue, AuthUser user)
+    private static async Task RequireManagerAsync(DbConnection db, DbTransaction tx, Venue venue, AuthUser user, CancellationToken ct, bool allowPreparation = false)
     {
-        if (user is null || (!user.IsPlatformOwner && user.UserId != venue.OwnerId) || !Boolean(venue.Config, "enabled", false))
-            throw new OrderingException("Restaurant owner access is required.", 403, "forbidden");
+        var preparation = allowPreparation && venue.Vertical == "bartide" && (venue.Status is "draft" or "building");
+        if (venue.Vertical != "bartide" || (!preparation && !Boolean(venue.Config, "enabled", false)) || (!user.IsPlatformOwner && user.UserId != venue.OwnerId
+            && !await TenantStaffAccess.IsManagerAsync(db, tx, venue.Id, user, ct, allowPreparation)))
+            throw new OrderingException("Restaurant owner or manager access is required.", 403, "forbidden");
+        if (venue.ConfigVersion < 0)
+            throw new OrderingException("Start business setup before configuring restaurant service.", 409, "setup_required");
     }
 
     private static RestaurantOrderReceipt Receipt(JsonObject payload)
@@ -388,5 +416,5 @@ public sealed partial class RestaurantOrderingStore(ApplicationDatabase database
     }
     private static OrderingException Unavailable() => new("This restaurant's ordering settings need review. Please contact the restaurant.", 503, "invalid_configuration");
     private sealed record Venue(string Id, string Slug, string Name, int MenuVersion, string? OwnerId, JsonObject Config, int ConfigVersion,
-        IReadOnlyList<RestaurantCategory> Categories, IReadOnlyList<RestaurantMenuItem> Items, IReadOnlyList<RestaurantTable> Tables);
+        IReadOnlyList<RestaurantCategory> Categories, IReadOnlyList<RestaurantMenuItem> Items, IReadOnlyList<RestaurantTable> Tables, string Status, string Vertical);
 }

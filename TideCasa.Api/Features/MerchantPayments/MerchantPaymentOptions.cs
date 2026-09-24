@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using Stripe;
 
 namespace TideCasa.Api.Features.MerchantPayments;
 
@@ -23,6 +22,8 @@ public sealed class MerchantPaymentOptions
     public bool OnboardingEnabled { get; }
     public bool CheckoutEnabled { get; }
     public bool LocalTest { get; }
+    public string PublishableKey { get; }
+    public bool EmbeddedOnboardingEnabled { get; }
     public MerchantPaymentOptions(IConfiguration configuration, IHostEnvironment environment)
     {
         var section = configuration.GetSection("MerchantPayments");
@@ -40,25 +41,15 @@ public sealed class MerchantPaymentOptions
         OnboardingEnabled = Configured && section.GetValue<bool>("OnboardingEnabled");
         CheckoutEnabled = OnboardingEnabled && section.GetValue<bool>("CheckoutEnabled") && section.GetValue<bool>("CardsOnlyVerified")
             && ValidSecret(SnapshotSecret) && ValidSecret(ThinSecret);
+        PublishableKey = section["PublishableKey"] ?? "";
+        EmbeddedOnboardingEnabled = OnboardingEnabled && section.GetValue<bool>("EmbeddedOnboardingEnabled")
+            && section.GetValue<bool>("EmbeddedOnboardingVerified") && Regex.IsMatch(PublishableKey, "^pk_test_[A-Za-z0-9_]{12,240}$");
     }
     public static bool AccountId(string? value) => value is not null && Regex.IsMatch(value, "^acct_[A-Za-z0-9]{6,80}$");
     public static bool ValidSecret(string value) => Regex.IsMatch(value, "^whsec_[A-Za-z0-9_]{12,240}$");
     private static bool IsLocalOrigin(string? value, out Uri? uri) => Uri.TryCreate(value, UriKind.Absolute, out uri) && uri.Scheme == "http" && uri.Host == "127.0.0.1" && uri.UserInfo.Length == 0 && uri.AbsolutePath == "/" && uri.Query.Length == 0 && uri.Fragment.Length == 0;
     public bool HostedUrl(string? url, bool onboarding) => Uri.TryCreate(url, UriKind.Absolute, out var parsed) && parsed.Scheme == "https" && parsed.UserInfo.Length == 0 && parsed.IsDefaultPort
         && (onboarding ? parsed.IdnHost == "connect.stripe.com" : parsed.IdnHost == "checkout.stripe.com");
-    public StripeClient CreateClient() => new(Key, httpClient: new SystemNetHttpClient(new HttpClient(new BoundedProviderHandler(new Uri(ApiBase ?? StripeClient.DefaultApiBase)))
-        { Timeout = TimeSpan.FromSeconds(20), MaxResponseContentBufferSize = 1024 * 1024 }, maxNetworkRetries: 0, enableTelemetry: false), apiBase: ApiBase);
-    private sealed class BoundedProviderHandler(Uri expected) : DelegatingHandler(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
-    {
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-        {
-            if (request.RequestUri is not { } uri || uri.Scheme != expected.Scheme || uri.Host != expected.Host || uri.Port != expected.Port)
-                throw new HttpRequestException("Unexpected payment provider destination.");
-            var response = await base.SendAsync(request, ct);
-            try { await response.Content.LoadIntoBufferAsync(1024 * 1024, ct); return response; }
-            catch { response.Dispose(); throw; }
-        }
-    }
     public void RequireOnboarding() { if (!OnboardingEnabled) throw new MerchantFailure("Restaurant payment setup is not available yet.", 503, "merchant_disabled"); }
     public void RequireCheckout() { if (!CheckoutEnabled) throw new MerchantFailure("Phone payments are not available yet. Choose pay staff.", 503, "phone_unavailable"); }
 }

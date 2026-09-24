@@ -9,6 +9,7 @@ public sealed class MerchantPaymentsClient(HttpClient client, OrderingRequestCon
 {
     public Task<RestaurantApiResult<MerchantPaymentStatus>> StatusAsync(string tenant, string token, CancellationToken ct) => Send<MerchantPaymentStatus>("api/v1/tenants/" + Uri.EscapeDataString(tenant) + "/payments/connect", null, token, ct);
     public Task<RestaurantApiResult<MerchantHostedLink>> OnboardAsync(string tenant, StartMerchantOnboardingRequest body, string token, CancellationToken ct) => Send<MerchantHostedLink>("api/v1/tenants/" + Uri.EscapeDataString(tenant) + "/payments/connect/onboarding", body, token, ct);
+    public Task<RestaurantApiResult<MerchantEmbeddedSession>> SessionAsync(string tenant, StartMerchantOnboardingRequest body, string token, CancellationToken ct) => Send<MerchantEmbeddedSession>("api/v1/tenants/" + Uri.EscapeDataString(tenant) + "/payments/connect/session", body, token, ct);
     public async Task<RestaurantApiResult<T>> Send<T>(string path, object? body, string? token, CancellationToken ct)
     {
         if (context.ClientAddress is null) return new(HttpStatusCode.ServiceUnavailable, default);

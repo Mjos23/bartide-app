@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Data.Common;
-using Stripe;
+using TideCasa.Api.Infrastructure.Payments;
 using TideCasa.Api.Features.Authentication;
 using TideCasa.Api.Infrastructure;
 using TideCasa.Contracts;
@@ -35,8 +35,7 @@ public static class ServiceBillingEndpoints
             if (context.Request.Headers["Stripe-Signature"].Count != 1 || context.Request.Headers["Stripe-Signature"].ToString().Length > 4096) return Results.BadRequest();
             using var body = new MemoryStream(); var buffer = new byte[16384];
             for (;;) { var read = await context.Request.Body.ReadAsync(buffer, ct); if (read == 0) break; if (body.Length + read > 256 * 1024) return Results.StatusCode(413); body.Write(buffer, 0, read); }
-            var raw = new UTF8Encoding(false, true).GetString(body.ToArray());
-            await store.AcceptWebhookAsync(raw, context.Request.Headers["Stripe-Signature"].ToString(), ct);
+            await store.AcceptWebhookAsync(body.ToArray(), context.Request.Headers["Stripe-Signature"].ToString(), ct);
             return Results.Ok(new { received = true });
         }).WithMetadata(new ApiBodyLimit(256 * 1024)).AddEndpointFilter<ServiceBillingFilter>();
     }
@@ -51,7 +50,7 @@ public sealed class ServiceBillingFilter : IEndpointFilter
         catch (BillingException error) { return Problem(error.Status, error.Message, error.Code); }
         catch (Exception error) when (error is JsonException or DecoderFallbackException or ArgumentException or FormatException)
         { return Problem(400, "Check the billing request and try again.", "invalid_billing_request"); }
-        catch (Exception error) when (error is DbException or StripeException or HttpRequestException or OperationCanceledException or InvalidOperationException or OverflowException)
+        catch (Exception error) when (error is DbException or StripeTransportException or HttpRequestException or OperationCanceledException or InvalidOperationException or OverflowException)
         { return Problem(503, "Billing is temporarily unavailable. Check your saved billing history before trying again.", "billing_unavailable"); }
     }
     private static IResult Problem(int status, string title, string code) => Results.Problem(statusCode: status, title: title, extensions: new Dictionary<string, object?> { ["code"] = code });

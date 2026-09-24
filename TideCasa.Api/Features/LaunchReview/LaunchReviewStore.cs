@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Data.Common;
 using TideCasa.Api.Infrastructure;
 using TideCasa.Contracts;
+using TideCasa.Api.Features.ClientOnboarding;
 
 namespace TideCasa.Api.Features.LaunchReview;
 
@@ -31,6 +32,10 @@ public sealed class LaunchReviewStore(ApplicationDatabase database)
         await using var reader = await command.ExecuteReaderAsync(ct);
         var projects = new List<LaunchReviewProject>(); var now = DateTimeOffset.UtcNow;
         while (await reader.ReadAsync(ct)) projects.Add(View(Read(reader), now));
+        await reader.DisposeAsync();
+        for (var index = 0; index < projects.Count; index++)
+            if (projects[index].CanLaunch && await ClientOnboardingStore.LaunchBlockAsync(db, tx, projects[index].Id, ct) is { } reason)
+                projects[index] = projects[index] with { CanLaunch = false, LaunchBlockReason = reason };
         var more = projects.Count > 100; if (more) projects.RemoveAt(100);
         return new(projects, more ? projects[^1].Id : null);
     }
@@ -56,6 +61,8 @@ public sealed class LaunchReviewStore(ApplicationDatabase database)
             if (request.Status != "active" || !request.ReviewedWithCustomer) throw new LaunchReviewException("Review the finished app with the customer and confirm approval before launch.", 400, "launch_review_required");
             var view = View(project, now);
             if (!view.CanLaunch) throw new LaunchReviewException(view.LaunchBlockReason ?? "This build is not ready for launch.", 409, "launch_not_ready");
+            if (await ClientOnboardingStore.LaunchBlockAsync(db, tx, id, ct, publish: true) is { } reason)
+                throw new LaunchReviewException(reason, 409, "launch_not_ready");
         }
         else if (!(project.Status == "active" && request.Status == "paused" || project.Status == "paused" && request.Status == "active"))
             throw new LaunchReviewException("This publication change is unavailable.", 409, "launch_transition");

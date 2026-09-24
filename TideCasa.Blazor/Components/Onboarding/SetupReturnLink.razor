@@ -1,0 +1,10 @@
+@if (CanPrepare)
+{
+    <p><a class="bt-one-link" href="@SetupPath">← Your setup checklist and private preview</a></p>
+}
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private bool CanPrepare => (HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.Workspaces.Any(workspace => workspace.TenantId == TenantId && workspace.Vertical == "bartide" && workspace.CanPrepare && workspace.Status is "draft" or "building") == true;
+    private string SetupPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/onboarding";
+}

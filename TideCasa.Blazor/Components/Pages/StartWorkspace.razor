@@ -4,11 +4,11 @@
 <PageTitle>Your business | Tide Casa</PageTitle>
 <div class="bt-unified rewards-page"><header class="rewards-nav"><a href="/account">← Your account</a><span>Tide Casa · Get started</span></header><main class="rewards-main"><p class="bt-one-kicker">LET’S BUILD YOUR APP</p><h1>Your business.</h1>
 @if (Plan is not ("restaurant" or "business")) { <p>Choose a <a href="/purchase/restaurant">restaurant app</a> or <a href="/purchase/business">business app</a>.</p> }
-else if (existing is not null) { <section class="rewards-panel"><h2>@existing.Name</h2><p>Your workspace is already connected to this account. Continue there to review your package.</p><a class="bt-one-button" href="@($"/workspace/{Uri.EscapeDataString(existing.TenantId)}/billing?appStores={AppStores.ToString().ToLowerInvariant()}&referralCode={Uri.EscapeDataString(SafeReferral)}")">Continue to package review</a></section> }
+else if (existing is not null) { <section class="rewards-panel"><h2>@existing.Name</h2><p>Your workspace is already connected to this account. Continue your saved setup and review your package there.</p><a class="bt-one-button" href="@($"/workspace/{Uri.EscapeDataString(existing.TenantId)}/{(existing.Vertical == "bartide" ? "onboarding" : "billing")}?appStores={AppStores.ToString().ToLowerInvariant()}&referralCode={Uri.EscapeDataString(SafeReferral)}")">Continue your setup</a></section> }
 else
 {
     @if (Notice is not null) { <p class="rewards-notice" role="alert">@(Notice == "review" ? "Your account needs a workspace review. Check your account before starting again." : "Your workspace was not confirmed. Check the details and try again.")</p> }
-    <p>Save your details for a private workspace. Review payment and monthly maintenance on the next page.</p>
+    <p>Start a free private workspace. Save your business details, prepare your app and review the setup package at your pace.</p>
     <form class="rewards-panel" method="post" action="/account/workspace" data-enhance="false"><AntiforgeryToken />
         <input type="hidden" name="requestId" value="@requestId" /><input type="hidden" name="plan" value="@Plan" /><input type="hidden" name="appStores" value="@AppStores.ToString().ToLowerInvariant()" />
         <input type="hidden" name="referralCode" value="@SafeReferral" />
@@ -19,7 +19,7 @@ else
         <label>Website (optional)<input name="website" type="url" maxlength="2048" placeholder="https://" /></label>
         <label>What should we know? (optional)<textarea name="notes" maxlength="2000" rows="4"></textarea></label>
         <label><input name="acknowledged" type="checkbox" value="true" required /> I’ve reviewed the $600 setup and $149/month maintenance. @(AppStores ? "The optional app-store service adds $300 once." : "") Creating this workspace does not charge me.</label>
-        <button type="submit">Save and review package</button>
+        <button type="submit">Save and start my setup</button>
     </form>
 }
 </main></div>
