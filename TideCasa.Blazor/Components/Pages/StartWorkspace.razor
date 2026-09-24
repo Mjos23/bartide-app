@@ -4,7 +4,7 @@
 <PageTitle>Your business | Tide Casa</PageTitle>
 <div class="bt-unified rewards-page"><header class="rewards-nav"><a href="/account">← Your account</a><span>Tide Casa · Get started</span></header><main class="rewards-main"><p class="bt-one-kicker">LET’S BUILD YOUR APP</p><h1>Your business.</h1>
 @if (Plan is not ("restaurant" or "business")) { <p>Choose a <a href="/purchase/restaurant">restaurant app</a> or <a href="/purchase/business">business app</a>.</p> }
-else if (existing is not null) { <section class="rewards-panel"><h2>@existing.Name</h2><p>Your workspace is already connected to this account. Continue your saved setup and review your package there.</p><a class="bt-one-button" href="@($"/workspace/{Uri.EscapeDataString(existing.TenantId)}/{(existing.Vertical == "bartide" ? "onboarding" : "billing")}?appStores={AppStores.ToString().ToLowerInvariant()}&referralCode={Uri.EscapeDataString(SafeReferral)}")">Continue your setup</a></section> }
+else if (existing is not null) { <section class="rewards-panel"><h2>@existing.Name</h2><p>Your workspace is already connected to this account. Continue your saved setup and review your package there.</p><a class="bt-one-button" href="@($"/workspace/{Uri.EscapeDataString(existing.TenantId)}/{(existing.Vertical == "bartide" && (existing.Status is "draft" or "building") ? "onboarding" : "billing")}?appStores={AppStores.ToString().ToLowerInvariant()}&referralCode={Uri.EscapeDataString(SafeReferral)}")">Continue your setup</a></section> }
 else
 {
     @if (Notice is not null) { <p class="rewards-notice" role="alert">@(Notice == "review" ? "Your account needs a workspace review. Check your account before starting again." : "Your workspace was not confirmed. Check the details and try again.")</p> }

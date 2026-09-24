@@ -132,7 +132,7 @@
     private ServiceBillingWorkspace? workspace; private ServiceBillingQuote? quote; private string? error, quoteError;
     private string RequestId { get; } = Guid.NewGuid().ToString("D");
     private string CurrentPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/billing";
-    private bool CanContinueSetup => (HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.Workspaces.Any(access => access.TenantId == TenantId && access.CanPrepare && access.Vertical == "bartide") == true;
+    private bool CanContinueSetup => (HttpContext.Items[AuthFlow.AccountItem] as AccountOverview)?.Workspaces.Any(access => access.TenantId == TenantId && access.CanPrepare && access.Vertical == "bartide" && (access.Status is "draft" or "building")) == true;
     private string SetupPath => "/workspace/" + Uri.EscapeDataString(TenantId) + "/onboarding?appStores=" + AppStores.ToString().ToLowerInvariant() + "&referralCode=" + Uri.EscapeDataString(ReferralCode is { Length: <= 32 } ? ReferralCode : "");
     private bool ShouldRefresh => Checkout == "returned" && Poll is >= 0 and < 10 && workspace is not null && workspace.Orders.Any(x => x.Status is "pending" or "processing");
     protected override async Task OnInitializedAsync()
