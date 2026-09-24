@@ -12,14 +12,44 @@ public static class BusinessPostsFlow
 {
     public static string Owner(string id) => "/workspace/" + Uri.EscapeDataString(id) + "/posts";
     public static string Public(string slug) => "/updates/" + Uri.EscapeDataString(slug);
+    public static string Manifest(string slug) => Public(slug) + "/manifest.webmanifest";
     public static string Manage(string id) => "/post-management/" + Uri.EscapeDataString(id);
     public static string Subscriptions(string slug) => "/post-subscriptions/" + Uri.EscapeDataString(slug);
     public static void MapBusinessPostForms(this WebApplication app)
     {
+        app.MapGet("/updates/{slug}/manifest.webmanifest", BusinessManifest);
         app.MapPost("/post-management/{tenant}/create", Create);
         app.MapPost("/post-management/{tenant}/{post}/{action}", Transition);
         app.MapPost("/post-subscriptions/{slug}/subscribe", Subscribe);
         app.MapPost("/post-subscriptions/{slug}/{id}/remove", Unsubscribe);
+    }
+    private static async Task<IResult> BusinessManifest(string slug, HttpContext context, BusinessPostsClient api)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        if (!Identifier(slug)) return Results.NotFound();
+        var response = await api.SendAsync<BusinessPostsFeed>(BusinessPostsClient.PublicPath(slug), HttpMethod.Get, null, null, context.RequestAborted);
+        if ((int)response.Status == StatusCodes.Status404NotFound) return Results.NotFound();
+        if (!response.Succeeded || response.Value is not { } feed || string.IsNullOrWhiteSpace(feed.Name) ||
+            string.IsNullOrEmpty(feed.TenantId) || string.IsNullOrEmpty(feed.Slug) || !Identifier(feed.TenantId) || !Identifier(feed.Slug))
+            return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+        var icons = context.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase) ? "/app-icons/" : "/tide-casa/app-icons/";
+        return Results.Json(new
+        {
+            id = "/business-app/" + Uri.EscapeDataString(feed.TenantId),
+            name = feed.Name,
+            short_name = feed.Name,
+            start_url = Public(feed.Slug),
+            scope = "/",
+            display = "standalone",
+            background_color = "#f7faf8",
+            theme_color = "#123b48",
+            prefer_related_applications = false,
+            icons = new[]
+            {
+                new { src = icons + "icon-192.png", sizes = "192x192", type = "image/png", purpose = "any" },
+                new { src = icons + "icon-512.png", sizes = "512x512", type = "image/png", purpose = "any" }
+            }
+        }, contentType: "application/manifest+json");
     }
     private static async Task<IResult> Create(string tenant, HttpContext context, IAntiforgery csrf, BusinessPostsClient api)
     {

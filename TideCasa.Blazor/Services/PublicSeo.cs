@@ -13,8 +13,8 @@ public static class PublicSeo
         "Tide Casa builds and hosts custom apps for small businesses. Explore menus, rewards, team tools and events, then book a personal walkthrough.",
         "https://tide.casa/");
     private static readonly PublicPageSeo Bar = new(
-        "BarTide | Apps for Bars and Restaurants | Tide Casa",
-        "BarTide by Tide Casa brings menus, customer rewards, team tools and events into one app for bars and restaurants. Explore the sample and book a demo.",
+        "BarTide | Your Bar, Your Own App",
+        "Put your bar on your customers' phones with your own app. Explore direct ordering, customer tools and potential savings on delivery-app commissions.",
         "https://bar.tide.casa/");
     private static readonly PublicPageSeo Sample = new(
         "Explore the BarTide Restaurant App | Tide Casa",
@@ -24,10 +24,6 @@ public static class PublicSeo
         "Book a Small Business App Demo | Tide Casa",
         "Book a personal Tide Casa or BarTide walkthrough. Discuss your small business, explore the app tools and agree on the features that fit your needs.",
         "https://tide.casa/book-a-demo");
-    private static readonly PublicPageSeo Careers = new(
-        "Sales Engineer Opportunities | Tide Casa",
-        "Help small businesses get their own apps with Tide Casa. Learn about the sales engineer role, referral commissions and application process.",
-        "https://tide.casa/careers");
     private static readonly PublicPageSeo Terms = new(
         "App Pricing, Maintenance and Service Terms | Tide Casa",
         "Review Tide Casa and BarTide app setup, monthly maintenance, build and launch steps, cancellation terms and optional app-store submission support.",
@@ -43,7 +39,6 @@ public static class PublicSeo
         "/restaurant" => Bar,
         "/enhanced-demo" => Sample,
         "/book-a-demo" or "/contact" => Demo,
-        "/careers" => Careers,
         "/service-terms" => Terms,
         _ => null
     };
@@ -89,7 +84,7 @@ public static class PublicSeo
         app.MapGet("/sitemap.xml", (HttpContext context) =>
         {
             PublicPageSeo[] pages = context.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase)
-                ? [Bar, Sample] : [Tide, Demo, Careers, Terms];
+                ? [Bar, Sample] : [Tide, Demo, Terms];
             XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
             var document = new XDocument(new XElement(ns + "urlset",
                 pages.Select(page => new XElement(ns + "url", new XElement(ns + "loc", page.Canonical)))));

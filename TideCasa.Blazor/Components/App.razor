@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link rel="icon" href="/tide-casa/favicon.svg" />
-    <link rel="manifest" href="@(IsBarHost ? "/bartide.webmanifest" : "/tide-casa.webmanifest")" />
+    <link rel="manifest" href="@ManifestHref" />
     <link rel="apple-touch-icon" sizes="180x180" href="@(IsBarHost ? "/app-icons/icon-180.png" : "/tide-casa/app-icons/icon-180.png")" />
     <meta name="theme-color" content="#123b48" />
     <link rel="stylesheet" href="/brand.css" />
@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/bartide-one.css" />
     <link rel="stylesheet" href="/tide-casa/homepage.css?v=payment-first-20260921" />
     <link rel="stylesheet" href="/bartide-night.css" />
+    <link rel="stylesheet" href="/bartide-pitch.css?v=20260924" />
     <link rel="stylesheet" href="/install.css" />
     <link rel="stylesheet" href="/app.css" />
     <link rel="stylesheet" href="/restaurant-management.css" />
@@ -31,6 +32,7 @@
     <script src="/merchant-payments.js"></script>
     <script src="/business-posts.js"></script>
     <script src="/email-tracking.js?v=20260923"></script>
+    <script src="/bartide-savings.js?v=20260924"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>
 </html>
@@ -40,5 +42,14 @@
     private IComponentRenderMode? PageRenderMode => HttpContext.AcceptsInteractiveRouting() ? InteractiveServer : null;
     private string? protectedOrderingContext;
     private bool IsBarHost => HttpContext.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase);
+    private string ManifestHref
+    {
+        get
+        {
+            var updates = System.Text.RegularExpressions.Regex.Match(HttpContext.Request.Path.Value ?? "", "^/updates/([A-Za-z0-9_-]{1,128})/?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            return updates.Success ? TideCasa.Blazor.Features.BusinessPosts.BusinessPostsFlow.Manifest(updates.Groups[1].Value)
+                : IsBarHost ? "/bartide.webmanifest" : "/tide-casa.webmanifest";
+        }
+    }
     protected override void OnInitialized() => protectedOrderingContext = OrderingContext.ProtectForCircuit();
 }

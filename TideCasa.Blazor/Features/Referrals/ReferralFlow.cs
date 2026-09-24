@@ -8,7 +8,6 @@ public static class ReferralFlow
 {
     public static void MapReferralForms(this WebApplication app)
     {
-        app.MapPost("/account/referrals/apply", (HttpContext c, IAntiforgery csrf, ReferralsClient client) => SaveAsync(null, c, csrf, client)).RequireAuthorization();
         app.MapPost("/account/referrals/{id}/review", (string id, HttpContext c, IAntiforgery csrf, ReferralsClient client) => SaveAsync(id, c, csrf, client)).RequireAuthorization();
     }
     private static async Task<IResult> SaveAsync(string? id, HttpContext context, IAntiforgery csrf, ReferralsClient client)

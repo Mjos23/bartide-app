@@ -1,7 +1,8 @@
-"""Exercise careers, verified referral profiles and owner reviews on synthetic API/SSR fixtures.
+"""Verify retired recruitment routes and existing referral members on API/SSR fixtures.
 
 Copies compiled binaries, uses a local identity provider, and never sends mail or
-contacts Stripe. Ledger fixtures are deliberately seeded SQL, not payment proof.
+contacts Stripe. Existing member and ledger fixtures are explicitly seeded SQL;
+they are not new applications or proof of provider payments.
 """
 import importlib.util
 import shutil
@@ -20,13 +21,29 @@ build_root = Path(os.environ.get('TIDE_TEST_BUILD_ROOT',str(ROOT))).resolve()
 for project in ('TideCasa.Api','TideCasa.Blazor'):
     shutil.copytree(build_root/project/'bin/Debug/net10.0',runtime/project/'bin/Debug/net10.0', ignore=shutil.ignore_patterns("libSkiaSharp.pdb"))
 support.ROOT = runtime
+os.environ['TIDE_TEST_BUILD_ROOT'] = str(runtime)
 OFF = {'DOTNET_ENVIRONMENT':'Development','Notifications__Mode':'disabled','Notifications__ResendApiKey':'',
        'Media__Provider':'disabled','ServiceBilling__RestrictedKey':'','ServiceBilling__CheckoutEnabled':'false',
        'ServiceBilling__LiveEnabled':'false','ServiceBilling__DevelopmentApiBase':'','MerchantPayments__RestrictedKey':'',
-       'MerchantPayments__OnboardingEnabled':'false','MerchantPayments__CheckoutEnabled':'false','MerchantPayments__ApiBaseUrl':''}
+       'MerchantPayments__OnboardingEnabled':'false','MerchantPayments__CheckoutEnabled':'false','MerchantPayments__ApiBaseUrl':'',
+       'ServiceBilling__GuestCheckoutEnabled':'false','WebPush__Enabled':'false','PublicDemo__Enabled':'false',
+       'Storage__Provider':'Sqlite','ConnectionStrings__Application':'','DataProtection__Provider':'FileSystem',
+       'DOTNET_PROCESSOR_COUNT':'1'}
 PATH='/api/v1/referrals'
 TERMS='2026-09-19'
-APPLICATION={'name':'Alice <script>alert(1)</script> Synthetic','introduction':'I enjoy technology and helping our local businesses prepare their apps.','acceptedTerms':True,'termsVersion':TERMS}
+RETIRED_APPLICATION={'name':'Alice <script>alert(1)</script> Synthetic','introduction':'I enjoy technology and helping our local businesses prepare their apps.','acceptedTerms':True,'termsVersion':TERMS}
+
+
+def seed_existing_profile(person, name):
+    """Model a historical accepted profile using the schema/store's pending defaults."""
+    user=USERS[person+'@example.invalid']
+    ident=str(uuid.uuid5(uuid.NAMESPACE_URL,'tide-referral-verification:'+person))
+    sql("""INSERT INTO tide_referral_profiles(
+        id,user_id,email,name,introduction,status,code,discount_percent,
+        terms_version,terms_accepted_at,review_token,created_at,updated_at)
+        VALUES(?,?,?,?,?,'pending',NULL,0,?,?,'',?,?)""",
+        (ident,'supabase:'+user['id'],user['email'],name,RETIRED_APPLICATION['introduction'],TERMS,NOW,NOW,NOW))
+    return ident
 
 
 def dashboard(token):
@@ -50,25 +67,20 @@ try:
         check('Verified synthetic API sign-in '+person,response[0]==200)
         tokens[person]=response[1]['accessToken']
     check('Anonymous referral dashboard is private',call(PATH)[0]==401)
-    check('Anonymous cannot create referral profile',call(PATH+'/apply',APPLICATION)[0]==401)
+    for person,token in [('anonymous',None),*tokens.items()]:
+        check('Retired API application route returns 404 for '+person,call(PATH+'/apply',RETIRED_APPLICATION,token)[0]==404)
+    check('Retired application requests create no profiles',sql('SELECT COUNT(*) FROM tide_referral_profiles')[0][0]==0)
     for person in ('alice','bob','staff'):
         data=dashboard(tokens[person]);check('No application exposure for '+person,data['profile'] is None and data['applications']==[] and not data['owner'])
-    for change in ({'acceptedTerms':False},{'termsVersion':'old'},{'name':None},{'name':'x'*101},{'introduction':'short'},{'introduction':'x'*1501},{'introduction':'control\u0001 character application'}):
-        check('Invalid application rejected '+next(iter(change)),call(PATH+'/apply',{**APPLICATION,**change},tokens['alice'])[0]==400)
-    check('Large JSON body rejected before persistence',call(PATH+'/apply',{**APPLICATION,'introduction':'x'*40000},tokens['alice'])[0]==413)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        responses=list(pool.map(lambda _:call(PATH+'/apply',APPLICATION,tokens['alice']),range(4)))
-    check('Concurrent exact applications create one durable profile',all(x[0]==200 for x in responses) and sql('SELECT COUNT(*) FROM tide_referral_profiles')[0][0]==1)
-    own=dashboard(tokens['alice'])['profile'];alice_id=own['id']
-    check('New profile awaits review with accepted terms',own['status']=='pending' and own['code'] is None and own['termsVersion']==TERMS)
-    check('Profile identity is verified session ID',sql('SELECT user_id,email FROM tide_referral_profiles WHERE id=?',(alice_id,))[0]==('supabase:'+ALICE,'alice@example.invalid'))
-    check('Changed duplicate application cannot overwrite',call(PATH+'/apply',{**APPLICATION,'name':'Changed'},tokens['alice'])[0]==409)
+    alice_id=seed_existing_profile('alice',RETIRED_APPLICATION['name'])
+    own=dashboard(tokens['alice'])['profile']
+    check('Existing pending profile retains accepted terms',own['id']==alice_id and own['status']=='pending' and own['code'] is None and own['termsVersion']==TERMS and own['termsAcceptedAt']==NOW)
+    check('Existing profile resolves by verified session ID',sql('SELECT user_id,email FROM tide_referral_profiles WHERE id=?',(alice_id,))[0]==('supabase:'+ALICE,'alice@example.invalid'))
     check('Other customer cannot read Alice profile',dashboard(tokens['bob'])['profile'] is None)
     for person in ('alice','bob','staff'):
         check('Nonowner cannot review '+person,call(PATH+'/'+alice_id+'/review',{'expectedReviewToken':'','status':'active','code':'FORGED','discountPercent':100},tokens[person])[0]==403)
-    bob_application={**APPLICATION,'name':'Bob Synthetic','userId':'supabase:'+ALICE,'profileId':alice_id}
-    check('Client-supplied identity cannot target another profile',call(PATH+'/apply',bob_application,tokens['bob'])[0]==200 and dashboard(tokens['bob'])['profile']['id']!=alice_id)
-    bob_id=dashboard(tokens['bob'])['profile']['id']
+    bob_id=seed_existing_profile('bob','Bob Synthetic')
+    check('Existing members receive only their own profile',dashboard(tokens['bob'])['profile']['id']==bob_id and dashboard(tokens['alice'])['profile']['id']==alice_id)
     owner=dashboard(tokens['platform'])
     check('Only platform owner receives review snapshots and applicant emails',owner['owner'] and len(owner['applications'])==2 and all('reviewToken' in row and 'email' in row for row in owner['applications']))
     check('Applicant response excludes review tokens, email and user IDs',all(field not in json.dumps(dashboard(tokens['alice'])) for field in ('reviewToken','userId','alice@example.invalid','bob@example.invalid')))
@@ -90,10 +102,11 @@ try:
     response=review(alice_id,current,status='paused')
     check('Audit failure rolls back the profile update',response[0]>=400 and sql('SELECT status,code,discount_percent,review_token FROM tide_referral_profiles WHERE id=?',(alice_id,))[0]==before)
     sql('DROP TRIGGER synthetic_review_failure')
-    check('Exact reapplication preserves approved profile',call(PATH+'/apply',APPLICATION,tokens['alice'])[0]==200 and dashboard(tokens['alice'])['profile']['status']=='active')
+    before=sql('SELECT * FROM tide_referral_profiles WHERE id=?',(alice_id,))[0]
+    check('Retired reapplication cannot alter an approved profile',call(PATH+'/apply',{**RETIRED_APPLICATION,'name':'Changed'},tokens['alice'])[0]==404 and sql('SELECT * FROM tide_referral_profiles WHERE id=?',(alice_id,))[0]==before)
     sql('UPDATE tide_referral_profiles SET email=? WHERE id=?',('platform@example.invalid',alice_id))
     check('Matching email never grants profile ownership',dashboard(tokens['platform'])['profile'] is None and dashboard(tokens['alice'])['profile']['id']==alice_id)
-    check('Duplicate verified email does not create or claim profile',call(PATH+'/apply',{**APPLICATION,'name':'Platform'},tokens['platform'])[0]==409 and dashboard(tokens['platform'])['profile'] is None)
+    check('Retired route cannot create or claim a matching-email profile',call(PATH+'/apply',{**RETIRED_APPLICATION,'name':'Platform','userId':'supabase:'+ALICE,'profileId':alice_id},tokens['platform'])[0]==404 and dashboard(tokens['platform'])['profile'] is None and sql('SELECT COUNT(*) FROM tide_referral_profiles')[0][0]==2)
     sql('UPDATE tide_referral_profiles SET email=? WHERE id=?',('alice@example.invalid',alice_id))
     # Ledger fixtures exercise display only; payment-authoritative writes are tested separately.
     for ident,profile,kind,environment,gross,refunded,commission in [('live-initial',alice_id,'initial','live',60000,10000,10000),('live-month',alice_id,'recurring','live',5000,0,500),('sandbox-hidden',alice_id,'initial','sandbox',99000,0,19800),('other-profile',bob_id,'initial','live',70000,0,14000)]:
@@ -107,38 +120,43 @@ try:
     check('Paused code cannot transfer to another applicant',review(bob_id,code='ALICE-TEST')[0]==409)
     check('Owner may reactivate same code',review(alice_id,current)[0]==200)
     launch('TideCasa.Blazor',WEB,{**OFF,'Api__BaseUrl':API+'/','DataProtection__KeysPath':str(RUN/'keys')})
-    public=web('/careers')
-    check('Public careers page renders promised rates and application link',public[0]==200 and '20%' in public[1] and '10%' in public[1] and '/account/referrals' in public[1] and 'automatic payouts' in public[1])
+    for path in ('/careers','/careers/'):
+        public=web(path)
+        check('Retired careers page returns 404 '+path,public[0]==404 and 'noindex' in public[2].get('X-Robots-Tag',''))
+    for path in ('/','/restaurant','/book-a-demo'):
+        public=web(path)
+        check('Public navigation has no hiring link '+path,public[0]==200 and '/careers' not in public[1] and '/account/referrals/apply' not in public[1])
+    sitemap=web('/sitemap.xml')
+    check('Public sitemap omits retired careers page',sitemap[0]==200 and '/careers' not in sitemap[1])
     check('Anonymous private workspace requires sign-in',web('/account/referrals')[0] in (302,303,401))
     alice_web,bob_web,staff_web,owner_web=(login(p) for p in ('alice','bob','staff','platform'))
-    forms,page=forms_for(alice_web,'/account/referrals','Applicant private profile renders')
-    check('Applicant HTML is private and encoded','no-store' in page[2].get('Cache-Control','') and '<script>alert(1)</script>' not in page[1] and '&lt;script&gt;' in page[1])
-    check('Applicant cannot see owner review controls or other applicant email','/review' not in page[1] and 'bob@example.invalid' not in page[1] and all(token not in page[1] for token in TOKENS))
+    forms,page=forms_for(alice_web,'/account/referrals','Existing member private profile renders')
+    check('Member HTML is private and encoded','no-store' in page[2].get('Cache-Control','') and '<script>alert(1)</script>' not in page[1] and '&lt;script&gt;' in page[1])
+    check('Member cannot see owner review controls or another member email','/review' not in page[1] and 'bob@example.invalid' not in page[1] and all(token not in page[1] for token in TOKENS))
+    check('Existing member retains commission terms in private workspace',all(text in page[1] for text in ('id="commission-terms"','20%','10%','automatic payouts')) and '/careers' not in page[1])
     check('Share link retains code for reviewed checkout','/purchase/restaurant?ref=ALICE-TEST' in page[1] and 'alone does not confirm a discount' in page[1])
-    staff_forms,_=forms_for(staff_web,'/account/referrals','Native referral application renders')
-    apply_form=find_form(staff_forms,'/apply')
-    for origin in ('https://foreign.example.invalid','null'):
-        check('Native cross-origin application rejected '+origin,post(staff_web,apply_form,{'name':'Staff','introduction':APPLICATION['introduction'],'acceptedTerms':'true'},headers={'Origin':origin})[0]==400)
-    response=post(staff_web,apply_form,{'name':'Staff','introduction':APPLICATION['introduction'],'acceptedTerms':'true'},remove=('__RequestVerificationToken',))
-    check('Missing application CSRF cannot create profile','notice=expired' in response[2].get('Location','') and dashboard(tokens['staff'])['profile'] is None)
-    response=post(staff_web,apply_form,{'name':'Staff','introduction':'x'*40000,'acceptedTerms':'true'})
-    check('Oversized form cannot create profile',response[0] in (302,303,400,413) and dashboard(tokens['staff'])['profile'] is None)
-    staff_body={'name':'Staff Synthetic','introduction':'私'*1500,'acceptedTerms':'true'}
-    saved(post(staff_web,apply_form,staff_body),'Maximum Unicode application saved through native form')
-    saved(post(staff_web,apply_form,staff_body),'Native application retry remains idempotent')
-    check('Native application does not duplicate profile',sql('SELECT COUNT(*) FROM tide_referral_profiles WHERE user_id=?',('supabase:'+STAFF,))[0][0]==1)
+    staff_forms,staff_page=forms_for(staff_web,'/account/referrals','Nonmember workspace renders without recruitment')
+    check('Nonmember receives no recruitment form',not any(form['action'].endswith('/apply') for form in staff_forms) and 'no referral profile linked' in staff_page[1] and 'Send my application' not in staff_page[1])
+    check('Commission terms stay in the existing-member workspace','id="commission-terms"' not in staff_page[1])
+    staff_account_forms,staff_account=forms_for(staff_web,'/account')
+    check('Account retains neutral existing-member access','Referral workspace' in staff_account[1] and '/account/referrals' in staff_account[1])
+    staff_csrf=find_form(staff_account_forms,'/auth/session/signout')['fields']['__RequestVerificationToken']
+    cached_form={'action':'/account/referrals/apply','fields':{'__RequestVerificationToken':staff_csrf,**RETIRED_APPLICATION,'acceptedTerms':'true'}}
+    check('Cached native application submission returns 404',post(staff_web,cached_form)[0]==404)
+    check('Retired native submission creates no member record',dashboard(tokens['staff'])['profile'] is None and sql('SELECT COUNT(*) FROM tide_referral_profiles')[0][0]==2)
     owner_forms,page=forms_for(owner_web,'/account/referrals','Platform owner reviews render')
+    check('Owner retains commission terms without recruitment','id="commission-terms"' in page[1] and '/careers' not in page[1] and not any(form['action'].endswith('/apply') for form in owner_forms))
     check('All owner forms carry antiforgery',all('__RequestVerificationToken' in f['fields'] for f in owner_forms))
     owner_form=find_form(owner_forms,'/'+alice_id+'/review')
     before=sql('SELECT review_token FROM tide_referral_profiles WHERE id=?',(alice_id,))[0][0]
     check('Cross-origin review cannot mutate profile',post(owner_web,owner_form,{'status':'paused'},headers={'Origin':'https://foreign.example.invalid'})[0]==400)
     response=post(owner_web,owner_form,{'status':'paused'},remove=('__RequestVerificationToken',))
     check('Missing review CSRF cannot mutate profile','notice=expired' in response[2].get('Location','') and sql('SELECT review_token FROM tide_referral_profiles WHERE id=?',(alice_id,))[0][0]==before)
-    check('Nonowner forged owner URL rejected',post(staff_web,owner_form,{'status':'paused','__RequestVerificationToken':apply_form['fields']['__RequestVerificationToken']})[0]==403)
+    check('Nonowner forged owner URL rejected',post(staff_web,owner_form,{'status':'paused','__RequestVerificationToken':staff_csrf})[0]==403)
     saved(post(owner_web,owner_form,{'status':'paused'}),'Platform owner changes status through native form')
     check('Stale native review requires refresh','notice=changed' in post(owner_web,owner_form,{'status':'active'})[2].get('Location',''))
     page=web('/account/referrals',client=alice_web)
-    check('Paused applicant sees history but no active share control','paused for new purchases' in page[1] and 'Open my referral link' not in page[1] and '$105.00' in page[1])
+    check('Paused member sees history but no active share control','paused for new purchases' in page[1] and 'Open my referral link' not in page[1] and '$105.00' in page[1])
     check('Referral fixtures preserve foreign keys',sql('PRAGMA foreign_key_check')==[])
 finally:
     for proc in PROCESSES:

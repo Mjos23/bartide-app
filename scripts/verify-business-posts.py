@@ -210,6 +210,17 @@ def decrypt(request):
     return json.loads(outcome.stdout)
 
 
+def manifest_links(document):
+    class Links(forms_module.HTMLParser):
+        def __init__(self): super().__init__(convert_charrefs=True); self.links=[]
+        def handle_starttag(self, tag, attributes):
+            attributes=dict(attributes)
+            if tag=='link' and 'manifest' in attributes.get('rel','').split():
+                self.links.append(attributes.get('href'))
+    parser=Links(); parser.feed(document)
+    return parser.links
+
+
 def run():
     api = launch(label='api-push-disabled')
     for person in ('alice', 'bob', 'staff', 'platform'):
@@ -263,6 +274,22 @@ def run():
     anon, alice, bob = browser(), login('alice'), login('bob')
     rendered = web('/updates/bistro', client=anon)
     check('Public update page safely HTML encodes customer content', rendered[0] == 200 and '<script>alert(1)</script>' not in rendered[1] and '&lt;script&gt;alert(1)&lt;/script&gt;' in rendered[1] and '<img src=x onerror=alert(1)>' not in rendered[1])
+    check('Business updates page selects exactly its own install manifest', manifest_links(rendered[1]) == ['/updates/bistro/manifest.webmanifest'])
+    install=web('/updates/bistro/manifest.webmanifest',client=anon)
+    check('Active business manifest is public JSON with no-store', install[0] == 200 and install[2].get('Content-Type','').split(';')[0] == 'application/manifest+json' and 'no-store' in install[2].get('Cache-Control',''), install[:2])
+    manifest=json.loads(install[1])
+    check('Installed business app returns to its updates with stable identity', manifest['start_url'] == '/updates/bistro' and manifest['id'] == '/business-app/bistro' and manifest['scope'] == '/' and manifest['display'] == 'standalone')
+    check('Install manifest uses the public business name and existing icons', manifest['name'] == feed[1]['name'] and manifest['short_name'] == feed[1]['name'] and {(icon['src'],icon['sizes'],icon['type']) for icon in manifest['icons']} == {('/tide-casa/app-icons/icon-192.png','192x192','image/png'),('/tide-casa/app-icons/icon-512.png','512x512','image/png')})
+    bar_install=web('/updates/bistro/manifest.webmanifest',headers={'Host':'bar.tide.casa'})
+    check('BarTide-host business manifest retains BarTide icons', bar_install[0] == 200 and {icon['src'] for icon in json.loads(bar_install[1])['icons']} == {'/app-icons/icon-192.png','/app-icons/icon-512.png'})
+    other_install=web('/updates/foreign/manifest.webmanifest')
+    check('Different businesses keep distinct installed-app identities', other_install[0] == 200 and json.loads(other_install[1])['id'] == '/business-app/foreign' and json.loads(other_install[1])['start_url'] == '/updates/foreign')
+    other_updates=web('/updates/foreign')
+    check('Other business update page selects its own manifest', other_updates[0] == 200 and manifest_links(other_updates[1]) == ['/updates/foreign/manifest.webmanifest'])
+    for slug in ('missing','draft','paused','disabled','invalid.slug'):
+        check('Unavailable or invalid business has no install manifest: '+slug, web('/updates/'+slug+'/manifest.webmanifest')[0] == 404)
+    check('Marketing homepage retains its default install manifest', manifest_links(web('/')[1]) == ['/tide-casa.webmanifest'])
+    check('BarTide homepage retains its default install manifest', manifest_links(web('/',headers={'Host':'bar.tide.casa'})[1]) == ['/bartide.webmanifest'])
     check('Anonymous post-management page requires sign-in', web('/workspace/bistro/posts',client=anon)[0] in (302,303,401))
     check('Other owner cannot see management page', web('/workspace/bistro/posts',client=bob)[0] == 403)
     inactive = web('/workspace/paused/posts',client=alice)
@@ -288,7 +315,8 @@ def run():
     check('Owner can discard an unpublished draft without notification', transition(discard['id'],'hide')[0] == 200 and rows('SELECT state FROM tide_business_posts WHERE id=?',(discard['id'],))[0][0] == 'hidden' and rows('SELECT COUNT(*) FROM tide_push_outbox WHERE post_id=?',(discard['id'],))[0][0] == 0)
     check('Original tenant/menu/contact records remain unchanged', rows('SELECT * FROM bartide_customers ORDER BY id') == baseline)
     history = rows('SELECT * FROM tide_feature_migrations ORDER BY version')
-    check('Eighth additive migration has recorded source checksum', history[-1][0] == 8 and history[-1][2] == hashlib.sha256((s.ROOT/'TideCasa.Api/FeatureMigrations/0008_business_posts.sql').read_bytes()).hexdigest())
+    business_post_migrations = [entry for entry in history if entry[0] == 8]
+    check('Eighth additive migration has recorded source checksum', len(business_post_migrations) == 1 and business_post_migrations[0][2] == hashlib.sha256((s.ROOT/'TideCasa.Api/FeatureMigrations/0008_business_posts.sql').read_bytes()).hexdigest())
     stop(api)
     api = launch(extra=push_options(),label='api-push-enabled')
     check('Restart preserves published and hidden state', call(public(),person=None)[1]['posts'][0]['id'] == draft['id'] and rows('SELECT state FROM tide_business_posts WHERE id=?',(native_id,))[0][0] == 'hidden')

@@ -2,18 +2,18 @@
 @attribute [Authorize]
 @attribute [ExcludeFromInteractiveRouting]
 @inject ReferralsClient Api
-<PageTitle>Sales engineer workspace | Tide Casa</PageTitle>
+<PageTitle>Referral workspace | Tide Casa</PageTitle>
 <HeadContent><link rel="stylesheet" href="/referrals.css" /></HeadContent>
-<div class="bt-unified"><SiteHeader IsBarTide="false" /><main class="referral-public referral-workspace"><h1>Sales engineer workspace</h1>
+<div class="bt-unified"><SiteHeader IsBarTide="false" /><main class="referral-public referral-workspace"><h1>Referral workspace</h1>
 @if (Notice is not null) { <p class="referral-alert" role="status">@Message(Notice)</p> }
 @if (dashboard is null) { <p role="alert">Your workspace could not be loaded. <a href="/account/referrals">Refresh to try again.</a></p> }
 else
 {
     @if (dashboard.Owner)
     {
-        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Sales engineer applications</h2><p>Approve profiles and choose their customer discount. Discounts apply only to initial setup and the optional app-store package. Maintenance stays $149/month.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
-        @if (dashboard.Applications.Count == 0) { <p>No applications yet.</p> }
-        @if (dashboard.Applications.Count == 200) { <p>The latest 200 applications are shown, with pending applications first.</p> }
+        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Existing referral profiles</h2><p>Manage existing profiles and their customer discount. Discounts apply only to initial setup and the optional app-store package. Maintenance stays $149/month.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
+        @if (dashboard.Applications.Count == 0) { <p>No referral profiles to review.</p> }
+        @if (dashboard.Applications.Count == 200) { <p>The latest 200 profiles are shown, with pending reviews first.</p> }
         @foreach (var application in dashboard.Applications)
         {
             var profile = application.Profile;
@@ -25,12 +25,12 @@ else
     }
     @if (dashboard.Profile is not { } own)
     {
-        <section class="editor-card"><h2>Tell us a little about yourself.</h2><p>Have a love for tech? Help onboard clients and earn 20% of eligible initial sales plus 10% of recurring maintenance.</p><form class="referral-application" method="post" action="/account/referrals/apply" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="termsVersion" value="@dashboard.TermsVersion" /><label>Your name<input name="name" required maxlength="100" autocomplete="name" /></label><label>Why would you like to be a sales engineer?<textarea name="introduction" required minlength="20" maxlength="1500" rows="5" placeholder="Tell us about your interest in technology, the businesses you know, or how you would help new clients."></textarea></label><label class="referral-consent"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I understand the <a href="/careers#commission-terms" target="_blank" rel="noreferrer">commission terms</a>: 20% of collected initial sales and 10% of collected maintenance, after discounts and refunds, excluding tax. Approval is required, self-referrals do not qualify, and payout arrangements are confirmed separately.</span></label><button class="button" type="submit">Send my application</button></form></section>
+        <section class="editor-card"><h2>Existing referral members</h2><p>There is no referral profile linked to this account.</p></section>
     }
     else
     {
         <section class="editor-card"><p class="eyebrow">@Statuses.GetValueOrDefault(own.Status, "Awaiting review")</p><h2>@own.Name</h2>
-        @if (own.Status == "pending") { <p>Your application is saved. Tide Casa will review it and set up your code. Check this workspace for your status.</p> }
+        @if (own.Status == "pending") { <p>Your existing profile is awaiting review. Check this workspace for your status.</p> }
         @if (own.Status == "declined") { <p>Your application has been reviewed and is not approved at this time. <a href="/book-a-demo">Get in touch with Tide Casa</a> for questions.</p> }
         @if (own.Status == "paused") { <p>Your code is paused for new purchases. Existing sales and maintenance attribution remain visible below.</p> }
         @if (own.Code is not null)
@@ -45,7 +45,11 @@ else
         else { <div class="referral-table-wrap"><table><caption>Your latest 100 verified sales and maintenance payments</caption><thead><tr><th scope="col">Paid</th><th scope="col">Sale</th><th scope="col">Collected</th><th scope="col">Refunded</th><th scope="col">Commission</th></tr></thead><tbody>@foreach (var sale in dashboard.Sales) { <tr><td>@Date(sale.PaidAt)</td><td>@(sale.Kind == "initial" ? "Initial sale · 20%" : "Maintenance · 10%")</td><td>@Money(sale.GrossCents)</td><td>@Money(sale.RefundedCents)</td><td>@Money(sale.CommissionCents)</td></tr> }</tbody></table></div> }
         </section>
     }
-    <p><a href="/careers#commission-terms">How commissions work</a> · <a href="/account">My account</a></p>
+    @if (dashboard.Profile is not null || dashboard.Owner)
+    {
+        <section class="editor-card" id="commission-terms"><h2>Commission terms</h2><p>Initial commission is 20% of the amount collected for app setup and any app-store package, after discounts and refunds. Maintenance commission is 10% of each collected maintenance payment. Taxes are excluded. Processor fees are not deducted from the commission basis.</p><p>Only verified payments count. Canceled or unpaid bills do not earn commission, and refunds reduce the related commission. Self-referrals are not eligible. A paused code cannot be used for new purchases; already attributed maintenance remains on your sales record.</p><p>Your workspace tracks accrued commissions, not money already sent. Payment arrangements are confirmed directly with Tide Casa; the website does not send automatic payouts or promise a payout date. Earnings depend on completed sales.</p></section>
+    }
+    <p><a href="/account">My account</a></p>
 }
 </main><SiteFooter IsBarTide="false" /></div>
 @code {
