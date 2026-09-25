@@ -13,6 +13,8 @@ public sealed record RestaurantApiResult<T>(HttpStatusCode Status, T? Value, str
 
 public sealed partial class RestaurantOrderingClient(HttpClient client, OrderingRequestContext requestContext)
 {
+    public Task<RestaurantApiResult<NearbyRestaurantResults>> NearbyAsync(NearbyRestaurantRequest body, CancellationToken ct = default) =>
+        SendAsync<NearbyRestaurantResults>(HttpMethod.Post, "api/v1/restaurants/nearby", body, null, ct);
     public Task<RestaurantApiResult<RestaurantMenu>> GetMenuAsync(string slug, string? table, CancellationToken ct = default) =>
         SendAsync<RestaurantMenu>(HttpMethod.Get, RestaurantPath(slug) + "/menu" + (string.IsNullOrWhiteSpace(table) ? "" : "?table=" + Uri.EscapeDataString(table)), null, null, ct);
 

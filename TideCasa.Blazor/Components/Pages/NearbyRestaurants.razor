@@ -1,0 +1,101 @@
+@page "/restaurants"
+@page "/nearby"
+@implements IDisposable
+@inject RestaurantOrderingClient Api
+@inject IJSRuntime JS
+<PageTitle>Restaurants near you | BarTide</PageTitle>
+<HeadContent><link rel="stylesheet" href="/restaurant-discovery.css?v=20260925" /><meta name="description" content="Find BarTide restaurants near you, closest first. Open a menu and order directly from the restaurant." /></HeadContent>
+<div class="bt-unified restaurant-ordering nearby-restaurants">
+    <header class="ordering-nav"><a href="/" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="140" height="47" /></a><nav aria-label="Customer navigation"><a href="/account">Your account</a><a href="/driver">Drive with BarTide</a></nav></header>
+    <main class="ordering-main">
+        <section class="nearby-intro">
+            <p class="bt-one-kicker">GOOD FOOD, CLOSE BY</p>
+            <h1>Your neighborhood.<br />Your next order.</h1>
+            <p>Find restaurants in BarTide and order directly. Always closest first.</p>
+            <button type="button" class="bt-one-button" @onclick="LocateAsync" disabled="@busy">@(locating ? "Finding your location…" : location is null ? "Find restaurants near me" : "Update my location")</button>
+            <p class="ordering-note">We ask your browser for location access when you tap. Your search location is not saved. Distances are approximate straight-line miles.</p>
+        </section>
+        @if (error is not null) { <p class="ordering-notice" role="alert">@error</p> }
+        @if (location is not null)
+        {
+            <form class="nearby-search" @onsubmit="SearchAsync" @onsubmit:preventDefault>
+                <label class="desk-field">Restaurant name<input type="search" @bind="search" maxlength="80" placeholder="Search restaurants, or leave blank for all" disabled="@busy" /></label>
+                <button type="submit" class="ordering-secondary" disabled="@busy">Search nearby</button>
+            </form>
+            <p role="status" aria-live="polite">@(busy ? "Finding nearby restaurants…" : searched ? $"{restaurants.Count} restaurant{(restaurants.Count == 1 ? "" : "s")} shown · closest first" : "Your location is ready. Search to find restaurants.")</p>
+            @if (searched && restaurants.Count == 0 && !busy)
+            {
+                <section class="ordering-panel"><h2>No matching restaurants yet</h2><p>Try another restaurant name or search with the name left blank. Restaurants appear here after adding their location and choosing to be listed.</p></section>
+            }
+            <div class="nearby-results">
+                @foreach (var restaurant in restaurants)
+                {
+                    <article class="ordering-panel nearby-card" @key="restaurant.Slug">
+                        <p class="nearby-distance">@Distance(restaurant.DistanceMiles)</p>
+                        <h2>@restaurant.Name</h2><p>@restaurant.Address</p>
+                        @if (!string.IsNullOrWhiteSpace(restaurant.Tagline)) { <p class="ordering-note">@restaurant.Tagline</p> }
+                        <p class="nearby-service">@(restaurant.PickupEnabled ? "Pickup" : "")@(restaurant.PickupEnabled && restaurant.DeliveryEnabled ? " · " : "")@(restaurant.DeliveryEnabled ? "Delivery" : "")</p>
+                        @if (!restaurant.AcceptingOrders) { <p class="ordering-note">Ordering is paused right now.</p> }
+                        <a class="bt-one-button" href="@($"/order/{Uri.EscapeDataString(restaurant.Slug)}")">@(restaurant.AcceptingOrders ? "View menu & order" : "View menu")</a>
+                    </article>
+                }
+            </div>
+            @if (hasMore) { <button type="button" class="ordering-secondary" @onclick="MoreAsync" disabled="@busy">Show more restaurants</button> }
+            <p class="ordering-note">Delivery areas, order minimums and availability are confirmed by each restaurant at checkout.</p>
+        }
+        <section class="ordering-panel nearby-driver"><h2>Deliver for the places you know.</h2><p>Sign up as a BarTide driver. Each restaurant must offer you work and you must accept before you can handle its deliveries. Joining alone does not give access to orders.</p><a class="bt-one-link" href="/driver/signin?return_to=%2Fdriver">Create your driver profile →</a></section>
+    </main>
+</div>
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private BrowserLocation? location;
+    private readonly List<NearbyRestaurant> restaurants = [];
+    private string search = "", appliedSearch = "";
+    private string? error;
+    private bool busy, locating, searched, hasMore;
+    private sealed record BrowserLocation(double Latitude, double Longitude, double Accuracy, string? Error);
+    private async Task LocateAsync()
+    {
+        if (busy) return;
+        busy = locating = true; error = null;
+        try
+        {
+            var result = await JS.InvokeAsync<BrowserLocation>("restaurantDiscovery.locate", lifetime.Token);
+            if (lifetime.IsCancellationRequested) return;
+            if (result.Error is not null)
+            {
+                error = result.Error == "denied" ? "Location access is blocked. Allow location for this site in your browser settings, then try again. You can still order using a restaurant’s direct menu link."
+                    : "We couldn’t find your location. Check your device’s location settings and try again.";
+                return;
+            }
+            location = result; restaurants.Clear(); searched = hasMore = false;
+            appliedSearch = search.Trim();
+            await FetchAsync(false);
+        }
+        catch (Exception e) when (e is JSException or OperationCanceledException) { if (!lifetime.IsCancellationRequested) error = "Location is unavailable. Please try again."; }
+        finally { busy = locating = false; }
+    }
+    private async Task SearchAsync()
+    {
+        if (busy || location is null) return;
+        busy = true; appliedSearch = search.Trim(); restaurants.Clear(); searched = hasMore = false;
+        try { await FetchAsync(false); } finally { busy = false; }
+    }
+    private async Task MoreAsync()
+    {
+        if (busy || location is null) return;
+        busy = true;
+        try { await FetchAsync(true); } finally { busy = false; }
+    }
+    private async Task FetchAsync(bool append)
+    {
+        error = null;
+        var response = await Api.NearbyAsync(new(location!.Latitude, location.Longitude, appliedSearch, append ? restaurants.Count : 0), lifetime.Token);
+        if (lifetime.IsCancellationRequested) return;
+        if (!response.Succeeded) { error = "Restaurant search is temporarily unavailable. Please try again."; return; }
+        restaurants.AddRange(response.Value!.Restaurants);
+        hasMore = response.Value.HasMore; searched = true;
+    }
+    private static string Distance(double miles) => miles < .1 ? "Less than 0.1 mile away" : miles.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " miles away";
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

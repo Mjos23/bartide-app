@@ -6,6 +6,7 @@
     <header class="pitch-nav pitch-wrap">
         <a class="pitch-brand" href="@PublicSeo.Link(Navigation.Uri, "/restaurant")" aria-label="BarTide home"><img src="/assets/bartide-logo.png" width="180" height="60" alt="BarTide" /></a>
         <nav aria-label="Main navigation">
+            <a href="/restaurants">Order nearby</a>
             <a class="pitch-nav-detail" href="@SectionHref("included")">What you get</a>
             <a href="/account">Log in</a>
             <a class="pitch-nav-demo" href="/book-a-demo">Book a demo <span aria-hidden="true">↗</span></a>
@@ -97,4 +98,3 @@
     private string SectionHref(string id) => new Uri(Navigation.Uri).PathAndQuery + "#" + id;
     private string TideCasaHomeHref => new Uri(Navigation.Uri).Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase) ? "https://tide.casa/" : "/";
 }
-

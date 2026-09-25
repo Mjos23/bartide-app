@@ -35,6 +35,28 @@
                     <button class="bt-one-button" type="submit">Save restaurant details</button>
                 </form>
             </section>
+            <section class="ordering-panel" aria-labelledby="directory-title">
+                <h2 id="directory-title">Help nearby customers find you</h2>
+                <p>Set your restaurant’s physical location. Customers see listed restaurants in order of distance and can open your menu to order directly.</p>
+                <form method="post" action="@FormPath("directory")" data-enhance="false" data-restaurant-location>
+                    <AntiforgeryToken /><input type="hidden" name="version" value="@editor.Version" />
+                    <label class="desk-field">Restaurant street address<input name="address" value="@editor.Directory?.Address" maxlength="300" autocomplete="street-address" placeholder="Street, city, state and ZIP code" /></label>
+                    <button class="ordering-secondary" type="button" data-capture-restaurant-location>Use my location at the restaurant</button>
+                    <p class="ordering-note">Use this button while you are at the restaurant, then check the map. From elsewhere, enter the restaurant’s coordinates below.</p>
+                    <p data-restaurant-location-status role="status" aria-live="polite"></p>
+                    <details><summary>Restaurant map coordinates</summary>
+                        <div class="rm-field-grid">
+                            <label class="desk-field">Latitude<input name="latitude" type="number" step="any" min="-90" max="90" value="@editor.Directory?.Latitude?.ToString(CultureInfo.InvariantCulture)" /></label>
+                            <label class="desk-field">Longitude<input name="longitude" type="number" step="any" min="-180" max="180" value="@editor.Directory?.Longitude?.ToString(CultureInfo.InvariantCulture)" /></label>
+                        </div>
+                        <p class="ordering-note">You can copy these two numbers from your restaurant’s pin in a map app.</p>
+                    </details>
+                    <p><a data-restaurant-map hidden target="_blank" rel="noopener noreferrer">Check this location on a map ↗</a></p>
+                    <label class="rm-check"><input type="checkbox" name="listed" value="true" checked="@(editor.Directory?.Listed == true)" /><span>Show this restaurant and its address in nearby search.</span></label>
+                    <p class="ordering-note">Your restaurant appears after launch, with ordering enabled and pickup or delivery set up. Turn off this checkbox to hide it.</p>
+                    <button class="bt-one-button" type="submit">Save search listing</button>
+                </form>
+            </section>
             <div class="rm-editor-grid">
                 <section class="ordering-panel" aria-labelledby="categories-title">
                     <h2 id="categories-title">Menu categories</h2><p class="ordering-note">Group your dishes and drinks so guests can find what they want.</p>

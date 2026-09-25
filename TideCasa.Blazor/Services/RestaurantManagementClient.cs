@@ -7,6 +7,8 @@ namespace TideCasa.Blazor.Services;
 
 public sealed partial class RestaurantManagementClient(HttpClient client, OrderingRequestContext requestContext)
 {
+    public Task<RestaurantApiResult<RestaurantMenuEditor>> SaveDirectoryAsync(string tenant, SaveRestaurantDirectoryRequest body, string token, CancellationToken ct) =>
+        SendAsync<RestaurantMenuEditor>(HttpMethod.Post, Path(tenant, "menu/directory"), body, token, ct);
     public Task<RestaurantApiResult<RestaurantMenuEditor>> GetMenuAsync(string tenant, string token, CancellationToken ct) =>
         SendAsync<RestaurantMenuEditor>(HttpMethod.Get, Path(tenant, "menu"), null, token, ct);
     public Task<RestaurantApiResult<RestaurantMenuEditor>> SaveProfileAsync(string tenant, SaveRestaurantProfileRequest body, string token, CancellationToken ct) =>

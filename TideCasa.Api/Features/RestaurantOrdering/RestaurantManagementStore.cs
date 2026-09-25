@@ -27,7 +27,7 @@ public sealed partial class RestaurantOrderingStore
         }
         await tx.CommitAsync(ct);
         return new(id, venue.Slug, venue.MenuVersion, new(venue.Name, String(profile, "area"), String(profile, "tagline"),
-            String(profile, "hours_text"), String(profile, "website_url"), String(profile, "service_note")), venue.Categories, items, photos);
+            String(profile, "hours_text"), String(profile, "website_url"), String(profile, "service_note")), venue.Categories, items, photos, DirectoryLocation(profile));
     }
 
     public async Task<RestaurantMenuEditor> SaveProfileAsync(string id, AuthUser user, SaveRestaurantProfileRequest request, CancellationToken ct)

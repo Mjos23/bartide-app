@@ -10,6 +10,12 @@ public static class RestaurantOrderingEndpoints
 {
     public static void MapRestaurantOrdering(this WebApplication app)
     {
+        app.MapPost("/api/v1/restaurants/nearby", async (NearbyRestaurantRequest request, HttpContext context, RestaurantOrderingStore store, CancellationToken ct) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(await store.NearbyAsync(request, ct));
+        }).RequireRateLimiting("restaurant-ordering").WithMetadata(new TideCasa.Api.Infrastructure.ApiBodyLimit(4096))
+            .AddEndpointFilter<OrderingRequestFilter>();
         var guest = app.MapGroup("/api/v1/restaurants/{slug}").WithTags("Restaurant ordering")
             .RequireRateLimiting("restaurant-ordering").AddEndpointFilter<OrderingRequestFilter>();
         guest.MapGet("/menu", async (string slug, string? table, RestaurantOrderingStore store, CancellationToken ct) =>

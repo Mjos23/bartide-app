@@ -3,7 +3,8 @@ namespace TideCasa.Contracts;
 public sealed record RestaurantProfile(string Name, string Area, string Tagline, string Hours, string Website, string ServiceNote);
 public sealed record RestaurantPhotoOption(string Id, string CreatedAt);
 public sealed record RestaurantMenuEditor(string TenantId, string Slug, int Version, RestaurantProfile Profile,
-    IReadOnlyList<RestaurantCategory> Categories, IReadOnlyList<RestaurantMenuItem> Items, IReadOnlyList<RestaurantPhotoOption>? Photos = null);
+    IReadOnlyList<RestaurantCategory> Categories, IReadOnlyList<RestaurantMenuItem> Items, IReadOnlyList<RestaurantPhotoOption>? Photos = null,
+    RestaurantDirectoryLocation? Directory = null);
 public sealed record SaveRestaurantProfileRequest(int ExpectedVersion, RestaurantProfile Profile);
 public sealed record SaveRestaurantCategoryRequest(int ExpectedVersion, RestaurantCategory Category);
 public sealed record SaveRestaurantItemRequest(int ExpectedVersion, RestaurantMenuItem Item, string? PhotoId = null);

@@ -20,13 +20,26 @@ public static partial class RestaurantManagementFlow
 
     private static async Task<IResult> SaveAsync(string tenantId, string operation, HttpContext context, IAntiforgery antiforgery, RestaurantManagementClient api)
     {
-        if (!Identifier().IsMatch(tenantId) || operation is not ("profile" or "categories" or "items" or "settings")) return Results.NotFound();
+        if (!Identifier().IsMatch(tenantId) || operation is not ("profile" or "directory" or "categories" or "items" or "settings")) return Results.NotFound();
         var read = await ReadAsync(context, antiforgery);
         if (read.Failure is { } failedRead) return failedRead;
         try
         {
             var form = read.Form!;
             var version = Version(form);
+            if (operation == "directory")
+            {
+                double? Coordinate(string key, double limit)
+                {
+                    var text = Text(form, key, 32);
+                    if (text.Length == 0) return null;
+                    if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
+                        || !double.IsFinite(number) || Math.Abs(number) > limit) throw new FormFailure("location");
+                    return number;
+                }
+                var location = new RestaurantDirectoryLocation(Checkbox(form, "listed"), Text(form, "address", 300), Coordinate("latitude", 90), Coordinate("longitude", 180));
+                return Response(tenantId, "menu", await api.SaveDirectoryAsync(tenantId, new(version, location), read.Token!, context.RequestAborted));
+            }
             if (operation == "profile")
             {
                 var website = Text(form, "website", 2048);
@@ -132,6 +145,7 @@ public static partial class RestaurantManagementFlow
 
     private static IResult Response<T>(string tenant, string page, RestaurantApiResult<T> result) => Redirect(tenant, page,
         result.Succeeded ? "saved" : result.Code is "stale_menu" or "stale_settings" or "stale_order" ? "changed"
+        : result.Code == "invalid_location" ? "location"
         : (int)result.Status is 401 or 403 ? "denied" : result.Uncertain ? "unconfirmed"
         : result.Code is "category_in_use" or "category_not_empty" ? "category-in-use" : (int)result.Status == 409 ? "conflict" : "invalid");
 
@@ -180,6 +194,7 @@ public static partial class RestaurantManagementFlow
         "website" => "Use a complete HTTPS website address, such as https://example.com.",
         "amount" => "Use a non-negative amount with no more than two decimal places, within the limits shown on the form.",
         "delivery" => "Use five-digit delivery ZIP codes and a delivery capacity from 1 to 30.",
+        "location" => "Enter the restaurant address and valid latitude and longitude before listing it in nearby search.",
         "invalid" => "The change was not saved. Check the field lengths, menu category and ordering settings, then try again.",
         _ => null
     };

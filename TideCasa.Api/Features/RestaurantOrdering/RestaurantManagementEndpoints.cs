@@ -11,6 +11,7 @@ public static class RestaurantManagementEndpoints
             .RequireAuthorization().WithMetadata(new TideCasa.Api.Infrastructure.ApiBodyLimit(64 * 1024))
             .AddEndpointFilter<OrderingRequestFilter>();
         group.MapGet("/menu", async (string id, HttpContext c, RestaurantOrderingStore s, CancellationToken ct) => Results.Ok(await s.EditorAsync(id, User(c), ct)));
+        group.MapPost("/menu/directory", async (string id, SaveRestaurantDirectoryRequest r, HttpContext c, RestaurantOrderingStore s, CancellationToken ct) => Results.Ok(await s.SaveDirectoryAsync(id, User(c), r, ct)));
         group.MapPost("/menu/profile", async (string id, SaveRestaurantProfileRequest r, HttpContext c, RestaurantOrderingStore s, CancellationToken ct) => Results.Ok(await s.SaveProfileAsync(id, User(c), r, ct)));
         group.MapPost("/menu/categories", async (string id, SaveRestaurantCategoryRequest r, HttpContext c, RestaurantOrderingStore s, CancellationToken ct) => Results.Ok(await s.SaveCategoryAsync(id, User(c), r, ct)));
         group.MapPost("/menu/items", async (string id, SaveRestaurantItemRequest r, HttpContext c, RestaurantOrderingStore s, CancellationToken ct) => Results.Ok(await s.SaveItemAsync(id, User(c), r, ct)));
