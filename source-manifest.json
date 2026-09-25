@@ -641,8 +641,8 @@
   },
   "TideCasa.Blazor/Components/App.razor": {
     "bytes": 3618,
-    "sha256": "6bcfc0fda8312aae71ab50a34c4220b55d9d1d6e6b5b4d74c9928fa5e8719ab7",
-    "gitBlobSha": "30ae180c096e13b0c4c70763f2c9b537cc968c94"
+    "sha256": "4f06d3d2bb711febd8b138a63e31e474ca123b0895d7e02dbb92537ffa809516",
+    "gitBlobSha": "7b2631c1020fe507d89bbfc8344cad83aa7d367d"
   },
   "TideCasa.Blazor/Components/Marketing/BarTideHome.razor": {
     "bytes": 10335,
@@ -720,9 +720,9 @@
     "gitBlobSha": "1d6147048e66846998b00517e07a0734c4aac12d"
   },
   "TideCasa.Blazor/Components/Marketing/SiteFooter.razor": {
-    "bytes": 1031,
-    "sha256": "b9dd87c13df3d61f1c2aec8735a609dcbbab2e67e724ed6fda020afd7bebbe3d",
-    "gitBlobSha": "0d6aa18a25da429fb35812992371d2af09d396ea"
+    "bytes": 1041,
+    "sha256": "9feed3ac58a24d91e14a849093dffe05c46d02684a11f1768646e409ce64a0cc",
+    "gitBlobSha": "bab516c458e3af7e25ab6f6e982753f135b61bcc"
   },
   "TideCasa.Blazor/Components/Marketing/SiteHeader.razor": {
     "bytes": 1153,
