@@ -276,8 +276,17 @@ public partial class RestaurantOrder
     private async Task LinkRewardsAsync()
     {
         if (rewardsLinked || receipt is null || pending is null) return;
-        try { rewardsLinked = await JS.InvokeAsync<bool>("tideOrderRewards.link", Slug, receipt.OrderId, pending.TrackingKey); }
-        catch (JSException) { rewardsLinked = false; }
+        var revision = menuRevision;
+        var slug = Slug;
+        var orderId = receipt.OrderId;
+        var trackingKey = pending.TrackingKey;
+        try
+        {
+            var linked = await JS.InvokeAsync<bool>("tideOrderRewards.link", slug, orderId, trackingKey);
+            if (linked && revision == menuRevision && slug == Slug && receipt?.OrderId == orderId && pending?.TrackingKey == trackingKey)
+                rewardsLinked = true;
+        }
+        catch (JSException) { }
     }
 
     private static string FriendlyError(string? code, int status) => code switch

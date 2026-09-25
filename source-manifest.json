@@ -900,9 +900,9 @@
     "gitBlobSha": "12230f4eee06926e0ce70e6997bedfb4cb626671"
   },
   "TideCasa.Blazor/Components/Pages/RestaurantOrder.razor.cs": {
-    "bytes": 19044,
-    "sha256": "3a93fdabd216659c4b098ac4e28aa8467aaf546f8c52095329ab765740408621",
-    "gitBlobSha": "4f14ad75daa9f4ba24b7aaced73d78ec5b36c7c9"
+    "bytes": 19352,
+    "sha256": "6864e0d82992c96c35f66bdc47ec48d2ed63acf05fa80354503e814d3a5643dd",
+    "gitBlobSha": "c528502c62d74f315e00b33303f693748c58df28"
   },
   "TideCasa.Blazor/Components/Pages/RestaurantOrderingWorkspace.razor": {
     "bytes": 9170,
@@ -2473,5 +2473,10 @@
     "bytes": 12029,
     "sha256": "c81342b540e3e17d7ae00efd2907ee5f766783fe8246ccf4efbacec26e924250",
     "gitBlobSha": "b225da5181fe53d35cb9353d0ded066f20150290"
+  },
+  "scripts/verify-order-rewards-race.cs": {
+    "bytes": 4214,
+    "sha256": "13ccb6ef9c2e643a4b16d7b510318e928a4e9186d20510c24d9dc762c5db0e04",
+    "gitBlobSha": "85c4b07adc2686ae3c57704287ae9cbfe5e24a08"
   }
 }
