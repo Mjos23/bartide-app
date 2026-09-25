@@ -23,15 +23,22 @@ public static class AuthFlow
         if (string.IsNullOrWhiteSpace(input) || input.Length > 2048) return "/account";
         var local = input.Split('#')[0];
         var path = local.Split('?')[0];
-        // Keep redirects local; only explicit purchase choices may cross authentication.
+        // Keep redirects local; preserve only explicit purchase choices and valid table context.
         if (!Regex.IsMatch(path, "^/[A-Za-z0-9_/-]*$", RegexOptions.CultureInvariant)
             || path.StartsWith("//", StringComparison.Ordinal) || path.StartsWith("/auth/session/", StringComparison.OrdinalIgnoreCase)) return "/account";
         var purchase = path is "/purchase/restaurant" or "/purchase/business";
         var checkout = path is "/start/restaurant" or "/start/business"
             || Regex.IsMatch(path, "^/workspace/[A-Za-z0-9_-]{1,128}/billing$", RegexOptions.CultureInvariant);
-        if ((!purchase && !checkout) || !local.Contains('?')) return path;
+        var restaurantOrder = Regex.IsMatch(path, "^/order/[a-z0-9-]{1,200}$", RegexOptions.CultureInvariant);
+        if ((!purchase && !checkout && !restaurantOrder) || !local.Contains('?')) return path;
         var query = QueryHelpers.ParseQuery(local[(local.IndexOf('?') + 1)..]);
         var allowed = new Dictionary<string, string?>();
+        if (restaurantOrder)
+        {
+            if (query.TryGetValue("table", out var table) && table.Count == 1 && table[0] is { } token
+                && Regex.IsMatch(token, "^[a-f0-9]{64}$", RegexOptions.CultureInvariant)) allowed["table"] = token;
+            return QueryHelpers.AddQueryString(path, allowed);
+        }
         if (checkout && query.TryGetValue("appStores", out var stores) && stores.Count == 1 && stores[0] is "true" or "false")
             allowed["appStores"] = stores[0];
         var referralKey = purchase ? "ref" : "referralCode";
@@ -76,7 +83,11 @@ public static class AuthFlow
         catch (Exception error) when (error is AntiforgeryValidationException or InvalidDataException or BadHttpRequestException)
         { return Failure(400, "The form has expired. Reload the page and try again."); }
 
-        var returnTo = SafeReturnPath(form["return_to"].ToString());
+        if (form["entry"].ToString() is not ("" or "customer")) return Failure(400, "Please open the form again.");
+        var customer = CustomerExperience.IsHost(context.Request.Host.Host) || form["entry"] == "customer"
+            || CustomerExperience.IsCustomerPath(SafeReturnPath(form["return_to"].ToString()));
+        var returnTo = CustomerExperience.ReturnPath(form["return_to"].ToString(), customer);
+        string EntryPage(string page) => CustomerExperience.AuthPage(page, customer);
         if (action == "signout")
         {
             var auth = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -87,7 +98,7 @@ public static class AuthFlow
                 if (!string.IsNullOrEmpty(token)) confirmed = (await api.SignOutAsync(token, context.RequestAborted)).Succeeded;
             }
             finally { await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); }
-            return Results.LocalRedirect("/signin?notice=" + (confirmed ? "signed-out" : "local-signout"));
+            return Results.LocalRedirect(EntryPage("/signin") + "?notice=" + (confirmed ? "signed-out" : "local-signout"));
         }
 
         var email = form["email"].ToString().Trim();
@@ -96,7 +107,7 @@ public static class AuthFlow
         // Confirm before contacting the API, so a typo cannot consume a recovery code.
         if (action == "reset" && (string.IsNullOrEmpty(form["confirm_password"])
             || !string.Equals(password, form["confirm_password"].ToString(), StringComparison.Ordinal)))
-            return Redirect("/reset-password", "password-mismatch", returnTo);
+            return Redirect(EntryPage("/reset-password"), "password-mismatch", returnTo);
         object request = action switch
         {
             "signin" => new SignInRequest(email, password),
@@ -105,7 +116,7 @@ public static class AuthFlow
             "reset" => new ResetPasswordRequest(email, code, password),
             _ => new EmailRequest(email)
         };
-        var page = action switch { "signup" => "/signup", "verify" or "resend" => "/verify-email", "forgot" => "/forgot-password", "reset" => "/reset-password", _ => "/signin" };
+        var page = EntryPage(action switch { "signup" => "/signup", "verify" or "resend" => "/verify-email", "forgot" => "/forgot-password", "reset" => "/reset-password", _ => "/signin" });
         if (!Validator.TryValidateObject(request, new ValidationContext(request), null, true)) return Redirect(page, "invalid", returnTo);
         if (action is "signin" or "verify")
         {
@@ -134,9 +145,9 @@ public static class AuthFlow
         if (action == "reset")
         {
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return Redirect("/signin", "password-reset", returnTo);
+            return Redirect(EntryPage("/signin"), "password-reset", returnTo);
         }
-        return action == "forgot" ? Redirect("/reset-password", "reset-email", returnTo) : Redirect("/verify-email", "check-email", returnTo);
+        return action == "forgot" ? Redirect(EntryPage("/reset-password"), "reset-email", returnTo) : Redirect(EntryPage("/verify-email"), "check-email", returnTo);
     }
 
     private static bool ValidSession(AuthSession session) =>

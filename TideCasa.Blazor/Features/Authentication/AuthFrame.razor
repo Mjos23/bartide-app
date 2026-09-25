@@ -1,6 +1,17 @@
 @namespace TideCasa.Blazor.Features.Authentication
 @using Microsoft.AspNetCore.Components
 @using TideCasa.Blazor.Components.Marketing
+@using TideCasa.Blazor.Components.Customers
+@if (Customer)
+{
+    <div class="customer-site" data-enhance-nav="false">
+        <CustomerHeader ReturnTo="@ReturnTo" />
+        <main class="customer-auth-main"><section class="customer-auth-copy"><p class="customer-eyebrow">YOUR BARTIDE ACCOUNT</p><h1>@Title</h1><p>@Description</p><p class="customer-auth-note">Already signed up through a restaurant’s app? You already have a BarTide account. Use the same email and password here.</p></section><section class="customer-auth-card" aria-label="BarTide account form">@ChildContent</section></main>
+        <CustomerFooter />
+    </div>
+}
+else
+{
 <div class="bt-unified" data-enhance-nav="false">
     <SiteHeader IsBarTide="false" />
     <main class="bt-contact-main">
@@ -9,7 +20,10 @@
     </main>
     <SiteFooter IsBarTide="false" />
 </div>
+}
 @code {
+    [Parameter] public bool Customer { get; set; }
+    [Parameter] public string? ReturnTo { get; set; }
     [Parameter] public string Title { get; set; } = "Welcome back.";
     [Parameter] public string Description { get; set; } = "A little closer to your business.";
     [Parameter] public RenderFragment? ChildContent { get; set; }

@@ -1,15 +1,17 @@
 @page "/signin"
 @page "/auth/signin"
 @page "/driver/signin"
+@page "/customer/signin"
 @attribute [ExcludeFromInteractiveRouting]
 @inherits AuthPageBase
 
-<PageTitle>@(DriverEntry ? "Driver sign-in" : "Welcome back.") | Tide Casa</PageTitle>
-<AuthFrame Title="@(DriverEntry ? "Driver sign-in." : "Welcome back.")" Description="@(DriverEntry ? "Your deliveries, shifts and availability in one place." : "Sign in to your business workspace.")">
+<PageTitle>@(DriverEntry ? "Driver sign-in" : "Welcome back.") | @AccountBrand</PageTitle>
+<AuthFrame Customer="@CustomerEntry" ReturnTo="@DriverReturnPath" Title="@(DriverEntry ? "Driver sign-in." : "Welcome back.")" Description="@(DriverEntry ? "Your deliveries, shifts and availability in one place." : CustomerEntry ? "Log in to find food and order with your BarTide account." : "Sign in to your business workspace.")">
     @if (NoticeText is not null) { <p role="status">@NoticeText</p> }
     @if (DriverEntry) { <p>Join the BarTide driver network or sign in to your client’s delivery team. New drivers can create an account below and verify their email before setting up a driver profile. If a client already added you, verify that same email to connect to their team.</p> }
     <form method="post" action="/auth/session/signin" data-enhance="false">
         <AntiforgeryToken />
+        <input type="hidden" name="entry" value="@(CustomerEntry ? "customer" : "")" />
         <input type="hidden" name="return_to" value="@DriverReturnPath" />
         <label class="desk-field" for="email">Email address<input id="email" name="email" type="email" autocomplete="username" maxlength="254" required /></label>
 <label class="desk-field" for="password">Password<input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" required /></label>
@@ -21,5 +23,5 @@
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
     private bool DriverEntry => HttpContext.Request.Path == "/driver/signin";
     private string DriverReturnPath => DriverEntry && string.IsNullOrWhiteSpace(ReturnTo) ? "/driver" : ReturnPath;
-    private string DriverAuthLink(string page) => page + "?return_to=" + Uri.EscapeDataString(DriverReturnPath);
+    private string DriverAuthLink(string page) => CustomerExperience.AuthPage(page, CustomerEntry) + "?return_to=" + Uri.EscapeDataString(DriverReturnPath);
 }

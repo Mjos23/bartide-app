@@ -372,6 +372,8 @@ try:
     check('Reset form requires a masked confirmation with password autofill support', confirmation is not None and all(part in confirmation.group(0) for part in ['type="password"','autocomplete="new-password"','minlength="12"','maxlength="128"','required']))
     status, _, completed=call(reset_action,{**reset_fields,'confirm_password':reset_fields['password']},base=WEB,client=browser,form=True,headers={'Origin':WEB})
     check('Matching reset confirmation updates password and returns to sign-in', status in (302,303) and completed.get('Location','').startswith('/signin?notice=password-reset') and users['alice@example.invalid']['password']==reset_fields['password'])
+    from customer_entry_checks import run as run_customer_entry_checks
+    run_customer_entry_checks(globals())
     if '--browser-preview' in sys.argv:
         # Optional real-browser checks use only this isolated fake-provider setup.
         # Create browser-finished.flag in the evidence directory to cleanly stop.

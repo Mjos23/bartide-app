@@ -1,17 +1,19 @@
 @page "/signup"
 @page "/auth/signup"
+@page "/customer/signup"
 @attribute [ExcludeFromInteractiveRouting]
 @inherits AuthPageBase
 
-<PageTitle>Make yourself at home. | Tide Casa</PageTitle>
-<AuthFrame Title="Make yourself at home." Description="Create your account, then verify your email.">
+<PageTitle>@(CustomerEntry ? "Create your BarTide account" : "Make yourself at home.") | @AccountBrand</PageTitle>
+<AuthFrame Customer="@CustomerEntry" ReturnTo="@ReturnPath" Title="@(CustomerEntry ? "One account. More local." : "Make yourself at home.")" Description="@(CustomerEntry ? "Create your free BarTide account to start ordering from nearby restaurants." : "Create your account, then verify your email.")">
     @if (NoticeText is not null) { <p role="status">@NoticeText</p> }
     <form method="post" action="/auth/session/signup" data-enhance="false">
         <AntiforgeryToken />
+        <input type="hidden" name="entry" value="@(CustomerEntry ? "customer" : "")" />
         <input type="hidden" name="return_to" value="@ReturnPath" />
         <label class="desk-field" for="email">Email address<input id="email" name="email" type="email" autocomplete="username" maxlength="254" required /></label>
 <label class="desk-field" for="password">New password<input id="password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required /></label><p>Use at least 12 characters.</p>
-        <button class="bt-one-button" type="submit">Create account</button>
+        <button class="bt-one-button" type="submit">@(CustomerEntry ? "Create my BarTide account" : "Create account")</button>
     </form>
-    <p>Already have an account? <a href="@AuthLink("/signin")">Sign in</a>.</p><p>Creating an account does not enroll or charge you.</p>
+    <p>Already have an account? <a href="@AuthLink("/signin")">Sign in</a>.</p><p>@(CustomerEntry ? "Your account is free. Choose a restaurant’s rewards program separately to earn its perks." : "Creating an account does not enroll or charge you.")</p>
 </AuthFrame>

@@ -35,7 +35,8 @@ public sealed class FreshCookieEvents(AccountApiClient api) : CookieAuthenticati
     {
         if (context.HttpContext.Items.ContainsKey(AuthFlow.UnavailableItem))
         { await AuthFlow.ServiceUnavailable().ExecuteAsync(context.HttpContext); return; }
-        context.Response.Redirect("/signin?return_to=" + Uri.EscapeDataString(AuthFlow.SafeReturnPath(context.Request.Path + context.Request.QueryString)));
+        var customer = CustomerExperience.IsHost(context.Request.Host.Host) || CustomerExperience.IsCustomerPath(context.Request.Path);
+        context.Response.Redirect(CustomerExperience.AuthPage("/signin", customer) + "?return_to=" + Uri.EscapeDataString(CustomerExperience.ReturnPath(context.Request.Path + context.Request.QueryString, customer)));
     }
 
     public override Task RedirectToAccessDenied(RedirectContext<CookieAuthenticationOptions> context)

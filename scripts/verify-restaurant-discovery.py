@@ -92,6 +92,11 @@ try:
     driver_entry = w.web('/driver/signin?return_to=%2Fdriver')
     s.check('Driver registration entry returns to driver workspace', 'Create your driver account' in driver_entry[1] and '/signup?return_to=%2Fdriver' in driver_entry[1])
     s.check('Discovery has no automatic location request on initial render', 'restaurantDiscovery.locate' not in page[1])
+    order_page = w.web('/order/bistro?table=' + s.TABLE)
+    expected_return = s.urllib.parse.quote('/order/bistro?table=' + s.TABLE, safe='')
+    s.check('Restaurant menu offers a shared BarTide signup preserving table context', order_page[0] == 200
+        and '/customer/signup?return_to=' + expected_return in order_page[1] and 'You scanned Table 1' in order_page[1])
+    s.check('Menu login preserves the same restaurant and table', '/customer/signin?return_to=' + expected_return in order_page[1])
     owner = w.login('alice')
     forms, _ = w.forms_for(owner, '/workspace/bistro/menu')
     form = w.find_form(forms, '/directory')

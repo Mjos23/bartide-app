@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="/bartide-pitch.css?v=20260924" />
     <link rel="stylesheet" href="/install.css" />
     <link rel="stylesheet" href="/app.css" />
+    <link rel="stylesheet" href="/customer-entrance.css?v=20260925" />
     <link rel="stylesheet" href="/restaurant-management.css" />
     <link rel="stylesheet" href="/delivery-location.css?v=20260924" />
     <link rel="stylesheet" href="/driver-delivery.css?v=20260924" />
@@ -48,13 +49,14 @@
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
     private IComponentRenderMode? PageRenderMode => HttpContext.AcceptsInteractiveRouting() ? InteractiveServer : null;
     private string? protectedOrderingContext;
-    private bool IsBarHost => HttpContext.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase);
+    private bool IsBarHost => HttpContext.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase) || CustomerExperience.IsHost(HttpContext.Request.Host.Host);
     private string ManifestHref
     {
         get
         {
             var restaurant = System.Text.RegularExpressions.Regex.Match(HttpContext.Request.Path.Value ?? "", "^/bar/([a-z0-9-]{1,200})/?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             if (restaurant.Success) return "/bar/" + Uri.EscapeDataString(restaurant.Groups[1].Value) + "/manifest.webmanifest";
+            if (CustomerExperience.IsHost(HttpContext.Request.Host.Host) || HttpContext.Request.Path.StartsWithSegments("/customer")) return "/customer.webmanifest";
             var updates = System.Text.RegularExpressions.Regex.Match(HttpContext.Request.Path.Value ?? "", "^/updates/([A-Za-z0-9_-]{1,128})/?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             return updates.Success ? TideCasa.Blazor.Features.BusinessPosts.BusinessPostsFlow.Manifest(updates.Groups[1].Value)
                 : IsBarHost ? "/bartide.webmanifest" : "/tide-casa.webmanifest";

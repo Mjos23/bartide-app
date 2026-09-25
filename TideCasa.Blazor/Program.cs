@@ -164,9 +164,16 @@ app.UsePublicSeo();
 app.UseStaticFiles();
 app.Use(async (context, next) =>
 {
+    if (CustomerExperience.IsHost(context.Request.Host.Host) && HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/account")
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Redirect(CustomerExperience.AccountPath);
+        return;
+    }
     context.RequestServices.GetRequiredService<OrderingRequestContext>().CaptureConnection(context.Connection.RemoteIpAddress);
     // Account/auth responses must not survive logout in a shared browser cache.
-    if (context.Request.Path.StartsWithSegments("/account") || context.Request.Path.StartsWithSegments("/auth")
+    if (CustomerExperience.IsHost(context.Request.Host.Host) || context.Request.Path.StartsWithSegments("/customer")
+        || context.Request.Path.StartsWithSegments("/account") || context.Request.Path.StartsWithSegments("/auth")
         || context.Request.Path.StartsWithSegments("/workspace") || context.Request.Path.StartsWithSegments("/ordering")
         || context.Request.Path.StartsWithSegments("/order") || context.Request.Path.StartsWithSegments("/menu")
         || context.Request.Path.StartsWithSegments("/rewards") || context.Request.Path.StartsWithSegments("/events")

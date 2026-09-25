@@ -2,11 +2,12 @@
 @page "/menu/{Slug}/order"
 @inject RestaurantOrderingClient Api
 <PageTitle>@(menu?.Name ?? "Your order") | BarTide</PageTitle>
-<div class="bt-unified restaurant-ordering">
-    <header class="ordering-nav"><a href="/" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="140" height="47" /></a><span>Good food. Your way.</span></header>
+<div class="bt-unified restaurant-ordering customer-site">
+    <TideCasa.Blazor.Components.Customers.CustomerHeader ReturnTo="@CustomerReturnPath" />
     <main class="ordering-main">
         <p><a href="/restaurants">← Find nearby restaurants</a></p>
-        <p class="ordering-note"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")" data-enhance-nav="false">Join or sign in to rewards before ordering</a>. Eligible paid purchases earn rewards automatically.</p>
+        <AuthorizeView><NotAuthorized><p class="ordering-notice"><strong>One BarTide account for all your local favorites.</strong> <a href="@CustomerExperience.SignUp(CustomerReturnPath)" data-enhance-nav="false">Create your free account</a> or <a href="@CustomerExperience.SignIn(CustomerReturnPath)" data-enhance-nav="false">log in</a> before ordering.</p></NotAuthorized></AuthorizeView>
+        <p class="ordering-note"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")" data-enhance-nav="false">Your rewards</a> · Join this restaurant’s rewards before ordering. Eligible paid purchases connected to your account earn rewards automatically.</p>
         @if (loading)
         {
             <h1>Your menu.</h1><p role="status">Loading the restaurant’s menu…</p>

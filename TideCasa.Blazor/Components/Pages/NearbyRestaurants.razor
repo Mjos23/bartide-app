@@ -5,8 +5,8 @@
 @inject IJSRuntime JS
 <PageTitle>Restaurants near you | BarTide</PageTitle>
 <HeadContent><link rel="stylesheet" href="/restaurant-discovery.css?v=20260925" /><meta name="description" content="Find BarTide restaurants near you, closest first. Open a menu and order directly from the restaurant." /></HeadContent>
-<div class="bt-unified restaurant-ordering nearby-restaurants">
-    <header class="ordering-nav"><a href="/" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="140" height="47" /></a><nav aria-label="Customer navigation"><a href="/account">Your account</a><a href="/driver">Drive with BarTide</a></nav></header>
+<div class="bt-unified restaurant-ordering nearby-restaurants customer-site">
+    <TideCasa.Blazor.Components.Customers.CustomerHeader ReturnTo="/restaurants" />
     <main class="ordering-main">
         <section class="nearby-intro">
             <p class="bt-one-kicker">GOOD FOOD, CLOSE BY</p>
@@ -45,6 +45,7 @@
         }
         <section class="ordering-panel nearby-driver"><h2>Deliver for the places you know.</h2><p>Sign up as a BarTide driver. Each restaurant must offer you work and you must accept before you can handle its deliveries. Joining alone does not give access to orders.</p><a class="bt-one-link" href="/driver/signin?return_to=%2Fdriver">Create your driver profile →</a></section>
     </main>
+    <TideCasa.Blazor.Components.Customers.CustomerFooter />
 </div>
 @code {
     private readonly CancellationTokenSource lifetime = new();

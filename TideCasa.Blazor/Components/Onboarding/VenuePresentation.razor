@@ -1,9 +1,10 @@
 @using System.Globalization
 @using System.Text.RegularExpressions
+@inject NavigationManager Navigation
 <div class="@("venue-site venue-" + SafeStyle)" style="@("--venue-accent:" + SafeAccent)">
     <header class="venue-nav">
         <a class="venue-logo" href="#venue-home">@if (Brand.LogoChoice == "photo" && PhotoPath(Brand.LogoPhotoId) is { } logo) { <img src="@logo" alt="@Business.Name" /> } else { <span>@Business.Name</span> }</a>
-        <nav aria-label="Restaurant"><a href="#venue-menu">Menu</a><a href="#venue-visit">Visit us</a>@if (OrderingAvailable && !Private) { <a class="venue-order-link" href="@OrderPath">Order</a> }</nav>
+        <nav aria-label="Restaurant"><a href="#venue-menu">Menu</a><a href="#venue-visit">Visit us</a>@if (OrderingAvailable && !Private) { <a class="venue-order-link" href="@OrderPath">Order</a> }@if (!Private) { <a href="@CustomerExperience.SignIn(OrderingAvailable ? OrderPath : $"/bar/{Uri.EscapeDataString(Slug)}")">Log in</a> }</nav>
     </header>
     <main id="venue-home">
         <section class="@("venue-hero " + (PhotoPath(Brand.CoverPhotoId) is null ? "venue-hero-text" : ""))">
@@ -23,7 +24,8 @@
         </section>
         <section class="venue-visit" id="venue-visit" aria-labelledby="venue-visit-title"><div><p class="venue-eyebrow">COME ON OVER</p><h2 id="venue-visit-title">Find us here</h2><address>@Business.Address<br />@Business.City@(!string.IsNullOrWhiteSpace(Business.Region) ? ", " + Business.Region : "") @Business.PostalCode</address><div class="venue-contact">@if (!string.IsNullOrWhiteSpace(Business.Phone)) { <a href="@("tel:" + PhoneTarget)">@Business.Phone</a> }@if (!string.IsNullOrWhiteSpace(Business.PublicEmail)) { <a href="@("mailto:" + Uri.EscapeDataString(Business.PublicEmail))">@Business.PublicEmail</a> }@if (SafeWebsite is { } website) { <a href="@website" target="_blank" rel="noopener noreferrer">Our website ↗</a> }</div></div><div><h3>Opening hours</h3>@if (!Private && PublishedHours is not null) { <div class="venue-hours">@foreach (var line in PublishedHours.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)) { <p>@line</p> }</div> } else { <dl class="venue-hours">@foreach (var day in Enumerable.Range(0, 7)) { var hours = Business.Hours.FirstOrDefault(value => value.Day == day); <div><dt>@DayName(day)</dt><dd>@HoursText(hours)</dd></div> }</dl> }<small>Hours are in the venue’s local time.</small></div></section>
     </main>
-    <footer class="venue-footer"><span>@Business.Name</span><a href="/restaurant">Made with BarTide</a></footer>
+    @if (!Private) { <section class="venue-visit"><div><h2>One account for your local favorites.</h2><p>When you join here, you create a BarTide account you can use across restaurant apps.</p><a class="venue-button" href="@CustomerExperience.SignUp(OrderingAvailable ? OrderPath : $"/bar/{Uri.EscapeDataString(Slug)}")">Create your free BarTide account</a></div></section> }
+    <footer class="venue-footer"><span>@Business.Name</span><a href="@CustomerExperience.Entrance(Navigation.Uri)">Explore BarTide</a></footer>
 </div>
 @code {
     [Parameter, EditorRequired] public OnboardingBusiness Business { get; set; } = default!;

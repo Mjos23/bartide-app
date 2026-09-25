@@ -8,6 +8,14 @@ public sealed record PublicPageSeo(string Title, string Description, string Cano
 // canonical origin from request headers or include account/tenant identifiers.
 public static class PublicSeo
 {
+    private static readonly PublicPageSeo Customer = new(
+        "BarTide | Find Local Restaurants & Order Direct",
+        "Find restaurants near you, explore their menus and order directly. Create one free BarTide account to use across your local restaurant apps.",
+        "https://order.tide.casa/");
+    private static readonly PublicPageSeo Nearby = new(
+        "Restaurants Near You | BarTide",
+        "Find BarTide restaurants closest to you and order directly for pickup or delivery.",
+        "https://order.tide.casa/restaurants");
     private static readonly PublicPageSeo Tide = new(
         "Tide Casa | Custom Apps for Small Businesses",
         "Tide Casa builds and hosts custom apps for small businesses. Explore menus, rewards, team tools and events, then book a personal walkthrough.",
@@ -31,11 +39,14 @@ public static class PublicSeo
 
     public static bool IsPublicHost(string host) =>
         host.Equals("tide.casa", StringComparison.OrdinalIgnoreCase)
-        || host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase);
+        || host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase)
+        || CustomerExperience.IsHost(host);
 
     public static PublicPageSeo? Get(string host, string path) => path.TrimEnd('/').ToLowerInvariant() switch
     {
-        "" => host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase) ? Bar : Tide,
+        "" => CustomerExperience.IsHost(host) ? Customer : host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase) ? Bar : Tide,
+        "/customer" => Customer,
+        "/restaurants" or "/nearby" => Nearby,
         "/restaurant" => Bar,
         "/enhanced-demo" => Sample,
         "/book-a-demo" or "/contact" => Demo,
@@ -47,7 +58,7 @@ public static class PublicSeo
     public static string Link(string currentUrl, string path)
     {
         var uri = new Uri(currentUrl);
-        return IsPublicHost(uri.Host) ? (path == "/" ? Tide.Canonical : Get(uri.Host, path)?.Canonical ?? path) : path;
+        return IsPublicHost(uri.Host) ? (path == "/" ? CustomerExperience.IsHost(uri.Host) ? Customer.Canonical : Tide.Canonical : Get(uri.Host, path)?.Canonical ?? path) : path;
     }
 
     public static void UsePublicSeo(this WebApplication app)
@@ -73,7 +84,7 @@ public static class PublicSeo
         {
             if (!IsPublicHost(context.Request.Host.Host))
                 return Results.Text("User-agent: *\nDisallow: /\n", "text/plain");
-            var origin = context.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase)
+            var origin = CustomerExperience.IsHost(context.Request.Host.Host) ? "https://order.tide.casa" : context.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase)
                 ? "https://bar.tide.casa" : "https://tide.casa";
             const string rules = "Allow: /\nDisallow: /api/\nDisallow: /_blazor\nDisallow: /private-media/\nDisallow: /health\n";
             // OAI-SearchBot governs search. Do not change the separate GPTBot
@@ -83,7 +94,7 @@ public static class PublicSeo
         });
         app.MapGet("/sitemap.xml", (HttpContext context) =>
         {
-            PublicPageSeo[] pages = context.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase)
+            PublicPageSeo[] pages = CustomerExperience.IsHost(context.Request.Host.Host) ? [Customer, Nearby] : context.Request.Host.Host.Equals("bar.tide.casa", StringComparison.OrdinalIgnoreCase)
                 ? [Bar, Sample] : [Tide, Demo, Terms];
             XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
             var document = new XDocument(new XElement(ns + "urlset",

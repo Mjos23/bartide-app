@@ -1,0 +1,28 @@
+<div class="customer-site">
+    <CustomerHeader />
+    <main>
+        <section class="customer-hero">
+            <div class="customer-hero-copy">
+                <p class="customer-eyebrow">YOUR NEIGHBORHOOD, TO GO</p>
+                <h1>Good food.<br /><em>Closer to you.</em></h1>
+                <p class="customer-lead">Find local restaurants, explore their menus, and order straight from the places you love.</p>
+                <AuthorizeView>
+                    <Authorized><div class="customer-actions"><a class="customer-button" href="/restaurants">Find restaurants near me <span aria-hidden="true">↗</span></a><a class="customer-text-link" href="/customer/account">My BarTide account →</a></div></Authorized>
+                    <NotAuthorized><div class="customer-actions"><a class="customer-button" href="@CustomerExperience.SignUp("/restaurants")">Create your free account <span aria-hidden="true">↗</span></a><a class="customer-text-link" href="/restaurants">Explore restaurants →</a></div><p class="customer-returning">Already joined through a restaurant’s app? <a href="@CustomerExperience.SignIn("/restaurants")">Log in with the same email and password.</a></p></NotAuthorized>
+                </AuthorizeView>
+                <div class="customer-promises"><span>Closest restaurants first</span><span>Pickup &amp; delivery</span><span>One BarTide account</span></div>
+            </div>
+            <div class="customer-hero-art" aria-hidden="true"><span class="customer-art-note">A little closer.<br />A lot more local.</span><img src="/customer-meal.svg" width="520" height="480" alt="" /><span class="customer-art-seal">MADE NEAR YOU</span></div>
+        </section>
+        <section class="customer-steps" aria-labelledby="customer-how">
+            <div class="customer-section-title"><p class="customer-eyebrow">FROM “WHAT SOUNDS GOOD?” TO YOUR NEXT MEAL</p><h2 id="customer-how">Make yourself a regular.</h2></div>
+            <div class="customer-step-grid">
+                <article><span>01 / DISCOVER</span><h3>See what’s close.</h3><p>Share your location to find restaurants in BarTide. Results are always sorted by distance.</p></article>
+                <article><span>02 / ORDER</span><h3>Go straight to the menu.</h3><p>Choose your food and order directly. Each restaurant shows its pickup, delivery and payment options.</p></article>
+                <article><span>03 / COME BACK</span><h3>Your account goes with you.</h3><p>Use one BarTide login across restaurant apps. Join each restaurant’s rewards to start earning its perks.</p></article>
+            </div>
+        </section>
+        <section class="customer-account-banner"><div><p class="customer-eyebrow">ONE LOGIN. MORE LOCAL FAVORITES.</p><h2>Your next favorite place<br />might be right around the corner.</h2></div><a class="customer-button customer-button-light" href="/restaurants">Find your next meal ↗</a></section>
+    </main>
+    <CustomerFooter />
+</div>

@@ -1,17 +1,19 @@
 @page "/verify-email"
 @page "/auth/verify-email"
+@page "/customer/verify-email"
 @attribute [ExcludeFromInteractiveRouting]
 @inherits AuthPageBase
 
-<PageTitle>Check your email. | Tide Casa</PageTitle>
-<AuthFrame Title="Check your email." Description="Enter the code sent to your email to finish signing in.">
+<PageTitle>Check your email. | @AccountBrand</PageTitle>
+<AuthFrame Customer="@CustomerEntry" ReturnTo="@ReturnPath" Title="Check your email." Description="Enter the code sent to your email to finish signing in.">
     @if (NoticeText is not null) { <p role="status">@NoticeText</p> }
     <form method="post" action="/auth/session/verify" data-enhance="false">
         <AntiforgeryToken />
+        <input type="hidden" name="entry" value="@(CustomerEntry ? "customer" : "")" />
         <input type="hidden" name="return_to" value="@ReturnPath" />
         <label class="desk-field" for="email">Email address<input id="email" name="email" type="email" autocomplete="username" maxlength="254" required /></label>
 <label class="desk-field" for="code">Email verification code<input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required /></label>
         <button class="bt-one-button" type="submit">Verify email</button>
     </form>
-    <p><a href="@AuthLink("/signin")">Return to sign in</a></p><details><summary>Need another code?</summary><form method="post" action="/auth/session/resend" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="return_to" value="@ReturnPath" /><label class="desk-field" for="resend-email">Email address<input id="resend-email" name="email" type="email" autocomplete="username" maxlength="254" required /></label><button class="bt-one-button" type="submit">Send another code</button></form></details>
+    <p><a href="@AuthLink("/signin")">Return to sign in</a></p><details><summary>Need another code?</summary><form method="post" action="/auth/session/resend" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="entry" value="@(CustomerEntry ? "customer" : "")" /><input type="hidden" name="return_to" value="@ReturnPath" /><label class="desk-field" for="resend-email">Email address<input id="resend-email" name="email" type="email" autocomplete="username" maxlength="254" required /></label><button class="bt-one-button" type="submit">Send another code</button></form></details>
 </AuthFrame>

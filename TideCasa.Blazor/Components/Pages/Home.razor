@@ -1,4 +1,5 @@
 @page "/"
+@page "/customer"
 @attribute [ExcludeFromInteractiveRouting]
 @namespace TideCasa.Blazor.Components.Pages
 @using TideCasa.Blazor.Components.Marketing
@@ -6,7 +7,11 @@
 
 <SeoHead />
 
-@if (IsBarTide)
+@if (CustomerExperience.IsHost(new Uri(Navigation.Uri).Host) || new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/') == "/customer")
+{
+    <TideCasa.Blazor.Components.Customers.CustomerWelcome />
+}
+else if (IsBarTide)
 {
     <BarTideHome />
 }

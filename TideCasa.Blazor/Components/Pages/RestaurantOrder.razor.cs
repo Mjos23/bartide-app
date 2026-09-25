@@ -12,6 +12,8 @@ public partial class RestaurantOrder
     [Parameter] public string Slug { get; set; } = "";
     [SupplyParameterFromQuery(Name = "table")] public string? TableToken { get; set; }
     [SupplyParameterFromQuery(Name = "payment_return")] public string? PaymentReturn { get; set; }
+    private string CustomerReturnPath => Features.Authentication.AuthFlow.SafeReturnPath(
+        "/order/" + Uri.EscapeDataString(Slug) + (TableToken is null ? "" : "?table=" + Uri.EscapeDataString(TableToken)));
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     private sealed record SavedCheckout(int Version, string Slug, RestaurantOrderRequest Request, string? OrderId);

@@ -1,0 +1,31 @@
+@page "/customer/account"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@using TideCasa.Blazor.Components.Customers
+<PageTitle>Your BarTide account</PageTitle>
+<div class="customer-site">
+    <CustomerHeader />
+    <main class="customer-account-main">
+        <p class="customer-eyebrow">YOUR BARTIDE</p><h1>Good to have you here.</h1>
+        @if (account is null) { <p role="alert">We couldn’t load your account. Please try again shortly.</p> }
+        else
+        {
+            <p class="customer-lead">One account for the restaurants you love—and the ones you’re about to find.</p>
+            <div class="customer-account-grid">
+                <section class="customer-panel customer-next-meal"><p class="customer-eyebrow">WHAT SOUNDS GOOD?</p><h2>Something nearby.</h2><p>Find a restaurant, open its menu, and make it your next meal.</p><a class="customer-button" href="/restaurants">Find restaurants near me ↗</a></section>
+                <section class="customer-panel"><h2>Your account</h2><p>@account.User.DisplayName</p><p class="customer-account-email">@account.User.Email</p><p class="customer-small">This is the same BarTide account you use in restaurant apps.</p><a href="/customer/forgot-password?return_to=%2Fcustomer%2Faccount">Reset your password</a><form method="post" action="/auth/session/signout" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="entry" value="customer" /><button class="customer-signout" type="submit">Log out</button></form></section>
+            </div>
+            <section class="customer-rewards-note"><h2>A little thank-you for coming back.</h2><p>Open a restaurant’s menu and choose <strong>Your rewards</strong> to join its program. Eligible paid food and drink purchases connected to your account earn that restaurant’s rewards automatically.</p></section>
+        }
+    </main>
+    <CustomerFooter />
+</div>
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private AccountOverview? account;
+    protected override void OnInitialized()
+    {
+        account = HttpContext.Items[AuthFlow.AccountItem] as AccountOverview;
+        if (account is null) HttpContext.Response.StatusCode = 503;
+    }
+}

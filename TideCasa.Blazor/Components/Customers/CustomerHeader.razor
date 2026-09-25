@@ -1,0 +1,12 @@
+@inject NavigationManager Navigation
+<header class="customer-nav">
+    <a class="customer-logo" href="@CustomerExperience.Home(Navigation.Uri)" aria-label="BarTide customer home"><img src="/assets/bartide-logo.png" alt="BarTide" width="150" height="50" /></a>
+    <nav aria-label="BarTide customers">
+        <a class="customer-find-link" href="/restaurants">Find food</a>
+        <AuthorizeView>
+            <Authorized><a class="customer-button customer-button-small" href="/customer/account">My account</a></Authorized>
+            <NotAuthorized><a href="@CustomerExperience.SignIn(ReturnTo)">Log in</a><a class="customer-button customer-button-small" href="@CustomerExperience.SignUp(ReturnTo)">Sign up</a></NotAuthorized>
+        </AuthorizeView>
+    </nav>
+</header>
+@code { [Parameter] public string? ReturnTo { get; set; } }
