@@ -14,9 +14,13 @@ public sealed class BillingException(string message, int status = 409, string co
 public sealed class ServiceBillingProvider : IDisposable
 {
     public const string ApiVersion = StripeHttpTransport.ApiVersion;
-    public const string TermsVersion = "2026-09-maintenance-v2";
-    public const int MonthlyCents = 14900;
-    public const int MaintenanceDelayDays = 30;
+    public const string TermsVersion = "2026-09-maintenance-v3";
+    public const int SetupCents = 150000;
+    public const int MonthlyCents = 19900;
+    public const int BuildLeadDays = 30;
+    public const string DeferredTermsVersion = "2026-09-maintenance-v2";
+    public const int DeferredMonthlyCents = 14900;
+    public const int DeferredMaintenanceDelayDays = 30;
     public const string Purpose = "tide_service_v2";
     private readonly StripeHttpTransport? transport;
     public string Environment { get; }

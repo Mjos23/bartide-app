@@ -25,6 +25,7 @@ public static class RewardsEndpoints
             .WithTags("Customer rewards").WithMetadata(new ApiBodyLimit(32 * 1024)).AddEndpointFilter<RewardsFilter>();
         customer.MapGet("", async (string slug, HttpContext c, RewardsStore s, CancellationToken ct) => Results.Ok(await s.WalletAsync(slug, User(c), ct)));
         customer.MapPost("/join", async (string slug, JoinRewardsRequest r, HttpContext c, RewardsStore s, CancellationToken ct) => Results.Ok(await s.JoinAsync(slug, User(c), r, ct)));
+        customer.MapPost("/orders", async (string slug, RestaurantTrackingRequest r, HttpContext c, RewardsStore s, CancellationToken ct) => Results.Ok(await s.LinkOrderAsync(slug, User(c), r, ct)));
         customer.MapPost("/redemptions/{rewardId}/request", async (string slug, string rewardId, RequestRewardRedemptionRequest r, HttpContext c, RewardsStore s, CancellationToken ct) => Results.Ok(await s.RequestAsync(slug, rewardId, User(c), r, ct)));
         customer.MapPost("/points-redemptions", async (string slug, RedeemPointsRewardRequest r, HttpContext c, RewardsStore s, CancellationToken ct) => Results.Ok(await s.RedeemPointsAsync(slug, User(c), r, ct)));
     }

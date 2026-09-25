@@ -91,10 +91,10 @@ try:
     check('API and separate Blazor health endpoints', call(API, '/health')[0] == 200 and call(WEB, '/health')[0] == 200)
     status, body, _ = call(API, '/openapi/v1.json')
     check('Versioned reusable API is documented', status == 200 and '/api/v1/demo-requests' in json.loads(body)['paths'])
-    for stores, first in [(False, 60000), (True, 90000)]:
+    for stores, first in [(False, 169900), (True, 199900)]:
         status, body, _ = call(API, '/api/v1/pricing/quote', {'appStores': stores, 'setupCents': 1, 'discountCents': 99999})
         quote = json.loads(body)
-        check(f'Server-owned quote: stores={stores}', status == 200 and quote['firstPaymentCents'] == first and quote['monthlyCents'] == 14900 and quote['firstMonthCents'] == 0 and quote['setupCents'] == 60000 and quote['discountCents'] == 0 and quote['termsVersion'] == '2026-09-maintenance-v2')
+        check(f'Server-owned quote: stores={stores}', status == 200 and quote['firstPaymentCents'] == first and quote['monthlyCents'] == 19900 and quote['firstMonthCents'] == 19900 and quote['setupCents'] == 150000 and quote['discountCents'] == 0 and quote['termsVersion'] == '2026-09-maintenance-v3')
     check('Unvalidated referral never silently applied', call(API, '/api/v1/pricing/quote', {'referralCode': 'NOT-CONNECTED'})[0] == 503)
     status, body, headers = call(API, '/api/v1/demo-requests', request)
     receipt = json.loads(body)
@@ -135,7 +135,7 @@ try:
         status, html, _ = call(WEB, path)
         check('Booking form renders at ' + path, status == 200 and 'Request my demo' in html and 'When works for you?' in html)
     status, html, _ = call(WEB, '/purchase/restaurant')
-    check('Checkout renders API total and optional stores before account setup', status == 200 and '$600' in html and '$300 once' in html and '/service-billing/purchase/guest-checkout' in html and 'Pay $600 securely' in html and '/start/restaurant?appStores=false' not in html)
+    check('Checkout renders API total and optional stores before account setup', status == 200 and '$1,500' in html and '$300 once' in html and '/service-billing/purchase/guest-checkout' in html and 'Pay $1,699 securely' in html and '/start/restaurant?appStores=false' not in html)
     for asset in ['/brand.css', '/tide-casa/homepage.css', '/tide-casa/assets/tide-casa-logo.png', '/assets/coastal-dining.jpg', '/app.js', '/_framework/blazor.web.js']:
         check('Public asset ' + asset, call(WEB, asset)[0] == 200)
     # Restart only our child API process to prove persistence beyond process memory.

@@ -9,7 +9,7 @@
     {
         <section class="rewards-panel"><p class="bt-one-kicker">YOUR NEXT VISIT HAS A LITTLE EXTRA</p><h2>Buy nine coffees. Enjoy the tenth on us.</h2><div class="sample-stamps" aria-label="@($"{stamps} of 9 coffees collected")">@for (var index = 0; index < 9; index++) { <span class="@(index < stamps ? "earned" : "")" aria-hidden="true">☕</span> }</div><p>@stamps of 9 collected</p>
         @if (stamps < 9) { <button @onclick="() => stamps++">Try adding a coffee</button> } else { <p role="status"><strong>Your next coffee is ready to claim.</strong></p><button @onclick="() => stamps = 0">Try claiming your reward</button> }
-        <p class="rewards-note">Your restaurant chooses the items, visit goals and rewards. Real rewards require a verified purchase or visit.</p></section>
+        <p class="rewards-note">Your restaurant chooses the items, visit goals and rewards. Eligible paid orders connected to a customer’s rewards account populate purchase and dine-in visit rewards automatically.</p></section>
         <section class="rewards-panel"><h2>More reasons to return.</h2><p>Visit five times in a month and enjoy a treat chosen by your restaurant.</p><progress max="5" value="3" aria-label="Three of five monthly visits"></progress><p>3 of 5 visits this month</p></section>
     }
     else if (tab == "menu")

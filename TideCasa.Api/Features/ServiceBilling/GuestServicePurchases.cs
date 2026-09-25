@@ -73,11 +73,11 @@ public sealed partial class ServiceBillingStore
                 await Run(db, tx, "INSERT INTO bartide_customers(id,slug,email,user_id,name,menu_json,version,status,enrollment_note,vertical,requested_plan,created_at,updated_at) VALUES(@id,@id,@email,NULL,@name,@menu,0,'draft','Awaiting payment and buyer details',@vertical,'enhanced',@now,@now) ON CONFLICT(id) DO NOTHING", ct,
                     ("@id", tenant), ("@email", hash + "@purchase.invalid"), ("@name", name), ("@menu", menu), ("@vertical", vertical), ("@now", now));
                 if (await Count(db, tx, "SELECT COUNT(*) FROM bartide_customers WHERE id=@id AND user_id IS NULL AND email=@email AND status='draft'", ct, ("@id", tenant), ("@email", hash + "@purchase.invalid")) != 1) throw Review();
-                var initial = 60000 + (request.AppStores ? 30000 : 0);
+                var initial = SetupCents + (request.AppStores ? 30000 : 0);
                 var snapshot = JsonSerializer.Serialize(new { guest = true, checkoutHash = hash, plan = request.Plan, origin = provider.Origin, expires = DateTimeOffset.UtcNow.AddHours(23).ToUnixTimeSeconds(), termsVersion = TermsVersion, consentedAt = now, appStores = request.AppStores,
-                    methodConfigurationId = provider.MethodConfiguration, quote = new { setupCents = 60000, storesCents = request.AppStores ? 30000 : 0, initialCents = initial, monthlyCents = MonthlyCents, maintenanceDelayDays = MaintenanceDelayDays, firstCents = initial, discountCents = 0 } });
+                    methodConfigurationId = provider.MethodConfiguration, quote = new { setupCents = SetupCents, storesCents = request.AppStores ? 30000 : 0, initialCents = initial, monthlyCents = MonthlyCents, maintenanceDelayDays = 0, buildLeadDays = BuildLeadDays, firstCents = initial + MonthlyCents, discountCents = 0 } });
                 await Run(db, tx, "INSERT INTO tide_service_orders(id,tenant_id,environment,request_json,initial_cents,monthly_cents,total_cents,app_stores,created_at,updated_at) VALUES(@id,@tenant,@environment,@request,@initial,@monthly,@total,@stores,@now,@now)", ct,
-                    ("@id", id), ("@tenant", tenant), ("@environment", provider.Environment), ("@request", snapshot), ("@initial", initial), ("@total", initial), ("@monthly", MonthlyCents), ("@stores", request.AppStores ? 1 : 0), ("@now", now));
+                    ("@id", id), ("@tenant", tenant), ("@environment", provider.Environment), ("@request", snapshot), ("@initial", initial), ("@total", initial + MonthlyCents), ("@monthly", MonthlyCents), ("@stores", request.AppStores ? 1 : 0), ("@now", now));
                 order = (await Orders(db, tx, "WHERE id=@id", ct, ("@id", id))).Single();
             }
             await tx.CommitAsync(ct);

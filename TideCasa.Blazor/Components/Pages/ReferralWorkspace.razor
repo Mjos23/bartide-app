@@ -11,7 +11,7 @@ else
 {
     @if (dashboard.Owner)
     {
-        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Existing referral profiles</h2><p>Manage existing profiles and their customer discount. Discounts apply only to initial setup and the optional app-store package. Maintenance stays $149/month.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
+        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Existing referral profiles</h2><p>Manage existing profiles and their customer discount. Discounts apply only to initial setup and the optional app-store package. New purchases require the first month at checkout; maintenance is $199/month and is not discounted. Earlier subscriptions keep their saved rates.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
         @if (dashboard.Applications.Count == 0) { <p>No referral profiles to review.</p> }
         @if (dashboard.Applications.Count == 200) { <p>The latest 200 profiles are shown, with pending reviews first.</p> }
         @foreach (var application in dashboard.Applications)

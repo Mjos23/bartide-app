@@ -26,7 +26,7 @@
         }
         // Compare the same whole-dollar amounts that are shown in the three figures.
         const fees = Math.round(sales * rate / 100);
-        const saving = fees - 149;
+        const saving = fees - 199;
         commission.textContent = money.format(fees);
         difference.textContent = money.format(saving);
         panel.toggleAttribute("data-negative", saving < 0);

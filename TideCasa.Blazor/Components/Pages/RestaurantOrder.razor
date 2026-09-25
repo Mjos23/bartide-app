@@ -5,6 +5,7 @@
 <div class="bt-unified restaurant-ordering">
     <header class="ordering-nav"><a href="/" aria-label="BarTide home"><img src="/assets/bartide-logo.png" alt="BarTide" width="140" height="47" /></a><span>Good food. Your way.</span></header>
     <main class="ordering-main">
+        <p class="ordering-note"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")" data-enhance-nav="false">Join or sign in to rewards before ordering</a>. Eligible paid purchases earn rewards automatically.</p>
         @if (loading)
         {
             <h1>Your menu.</h1><p role="status">Loading the restaurant’s menu…</p>
@@ -55,6 +56,7 @@
                 }
                 @if (receipt.Status == "out_for_delivery") { <DeliveryLocationPanel Location="@deliveryLocation" /> }
                 <p>Save your order number and keep this page open to check its status.</p>
+                <p class="ordering-note">@(rewardsLinked ? "This order is connected to your account. Eligible rewards update automatically after payment." : "Sign in to rewards, then check this order’s status to connect it to your account.") <a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")" target="_blank" rel="noopener">Your rewards →</a></p>
                 <button class="ordering-secondary" type="button" @onclick="RefreshReceiptAsync" disabled="@busy">@(busy ? "Checking…" : "Check order status")</button>
                 @if (checkout?.State == "open")
                 {

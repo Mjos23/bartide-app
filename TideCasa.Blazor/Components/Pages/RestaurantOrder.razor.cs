@@ -25,6 +25,7 @@ public partial class RestaurantOrder
     private string customerName = "", phone = "", address = "", note = "";
     private string? error, loadedSlug, loadedTable;
     private bool loading, quoting, busy, uncertain, reviewing, connected;
+    private bool rewardsLinked;
     private int quoteRevision, menuRevision;
     private bool Locked => !connected || busy || uncertain;
     private bool CanReview => !Locked && !quoting && quote is { CanSubmit: true } && menu?.Checkout.AcceptingOrders == true;
@@ -54,7 +55,7 @@ public partial class RestaurantOrder
                 if (saved.OrderId is not null)
                 {
                     var response = await Api.TrackCheckoutAsync(Slug, new(saved.OrderId, pending.TrackingKey));
-                    if (response.Succeeded && response.Value is { } paymentValue) ApplyCheckout(paymentValue);
+                    if (response.Succeeded && response.Value is { } paymentValue) { ApplyCheckout(paymentValue); await LinkRewardsAsync(); }
                     else { uncertain = true; error = "Your payment result is not confirmed yet. Retry this saved order safely."; }
                 }
                 else { uncertain = true; error = "You have a saved payment request. Retry it to confirm the result safely."; }
@@ -85,7 +86,7 @@ public partial class RestaurantOrder
         busy = true; error = null;
         var response = await Api.CancelCheckoutAsync(Slug, new(receipt.OrderId, pending.TrackingKey));
         busy = false;
-        if (response.Succeeded && response.Value is { } paymentValue) ApplyCheckout(paymentValue);
+        if (response.Succeeded && response.Value is { } paymentValue) { ApplyCheckout(paymentValue); await LinkRewardsAsync(); }
         else error = "We could not confirm cancellation. Your order stays reserved until Stripe confirms its payment status.";
     }
 
@@ -95,7 +96,7 @@ public partial class RestaurantOrder
         ++quoteRevision;
         loadedSlug = Slug; loadedTable = TableToken;
         loading = true; error = null; menu = null; quote = null; receipt = null; pending = null;
-        checkout = null; cart.Clear(); reviewing = false; uncertain = false; busy = false; quoting = false;
+        checkout = null; cart.Clear(); reviewing = false; uncertain = false; busy = false; quoting = false; rewardsLinked = false;
         tipChoice = "0"; customTip = ""; payment = "staff"; deliveryZip = ""; address = "";
         if (Slug.Length > 128 || (TableToken?.Length ?? 0) > 128)
         { loading = false; error = "This restaurant or table link could not be found."; return; }
@@ -218,6 +219,7 @@ public partial class RestaurantOrder
             if (phoneResult.Succeeded && phoneResult.Value is { } phoneValue)
             {
                 ApplyCheckout(phoneValue);
+                await LinkRewardsAsync();
                 if (!await SaveCheckoutAsync(phoneValue.Receipt.OrderId))
                 { error = "Keep this page open. Your order is reserved, but its receipt could not be saved for return from payment."; return; }
                 ResumePayment(); return;
@@ -231,7 +233,7 @@ public partial class RestaurantOrder
         var result = await Api.OrderAsync(Slug, pending);
         busy = false;
         if (result.Succeeded && result.Value is { } value)
-        { receipt = value; uncertain = false; reviewing = false; return; }
+        { receipt = value; uncertain = false; reviewing = false; await LinkRewardsAsync(); return; }
         if (result.Uncertain || result.Code == "request_conflict")
         { uncertain = true; error = "We couldn’t confirm whether the restaurant received your order. Retry this same order to confirm it safely."; return; }
         pending = null; uncertain = false; reviewing = false;
@@ -253,13 +255,13 @@ public partial class RestaurantOrder
         {
             var response = await Api.TrackCheckoutAsync(Slug, new(receipt.OrderId, pending.TrackingKey));
             busy = false;
-            if (response.Succeeded && response.Value is { } paymentValue) ApplyCheckout(paymentValue);
+            if (response.Succeeded && response.Value is { } paymentValue) { ApplyCheckout(paymentValue); await LinkRewardsAsync(); }
             else error = "We could not refresh your payment. Keep this receipt and try again shortly.";
             return;
         }
         var result = await Api.TrackAsync(Slug, new(receipt.OrderId, pending.TrackingKey));
         busy = false;
-        if (result.Succeeded && result.Value is { } value) receipt = value;
+        if (result.Succeeded && result.Value is { } value) { receipt = value; await LinkRewardsAsync(); }
         else error = "We couldn’t refresh the order’s status. Your saved receipt is still shown. Please try again or ask staff.";
     }
 
@@ -269,6 +271,13 @@ public partial class RestaurantOrder
         try { await JS.InvokeVoidAsync("tideMerchantCheckout.clear", Slug); } catch (JSException) { }
         customerName = ""; phone = ""; note = "";
         await LoadMenuAsync();
+    }
+
+    private async Task LinkRewardsAsync()
+    {
+        if (rewardsLinked || receipt is null || pending is null) return;
+        try { rewardsLinked = await JS.InvokeAsync<bool>("tideOrderRewards.link", Slug, receipt.OrderId, pending.TrackingKey); }
+        catch (JSException) { rewardsLinked = false; }
     }
 
     private static string FriendlyError(string? code, int status) => code switch

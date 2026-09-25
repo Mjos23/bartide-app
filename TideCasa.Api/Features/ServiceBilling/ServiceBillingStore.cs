@@ -56,7 +56,7 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
     public async Task<ServiceCheckoutLink> CheckoutAsync(string tenant, AuthUser user, ServiceCheckoutRequest request, CancellationToken ct)
     {
         if (!Guid.TryParseExact(request.RequestId, "D", out _) || !request.AcceptedTerms || request.TermsVersion != TermsVersion)
-            throw new BillingException("Review and accept the first payment and $149 automatic monthly renewal beginning 30 days after purchase.", 400, "terms_required");
+            throw new BillingException("Review and accept the first payment and $199 first month due with the build and automatic monthly renewal until canceled.", 400, "terms_required");
         if (!provider.CheckoutReady) throw Unavailable();
         await using (var db = await database.OpenAsync(ct)) { using var tx = db.BeginTransaction(deferred: true); await Owner(db, tx, tenant, user, ct); }
         await provider.CheckMethodsAsync(ct);
@@ -78,7 +78,7 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
                     termsVersion = TermsVersion, consentedAt = now, appStores = request.AppStores, requestId = request.RequestId, fingerprint = quote.Fingerprint,
                     methodConfigurationId = provider.MethodConfiguration,
                     referral = quoted.Referral is { } referral ? new { profileId = referral.ProfileId, code = referral.Code, discountPercent = referral.DiscountPercent } : null,
-                    quote = new { setupCents = quote.SetupCents, storesCents = quote.StoresCents, initialCents = quote.SetupCents + quote.StoresCents, monthlyCents = MonthlyCents, maintenanceDelayDays = MaintenanceDelayDays, firstCents = quote.FirstPaymentCents, discountCents = quote.DiscountCents } });
+                    quote = new { setupCents = quote.SetupCents, storesCents = quote.StoresCents, initialCents = quote.SetupCents + quote.StoresCents, monthlyCents = MonthlyCents, maintenanceDelayDays = 0, buildLeadDays = BuildLeadDays, firstCents = quote.FirstPaymentCents, discountCents = quote.DiscountCents } });
                 await Run(db, tx, "INSERT INTO tide_service_orders(id,tenant_id,environment,request_json,initial_cents,monthly_cents,total_cents,app_stores,created_at,updated_at) VALUES(@id,@tenant,@environment,@request,@initial,@monthly,@total,@stores,@now,@now)", ct,
                     ("@id", ident), ("@tenant", tenant), ("@environment", provider.Environment), ("@request", saved), ("@initial", quote.SetupCents + quote.StoresCents), ("@monthly", MonthlyCents), ("@total", quote.FirstPaymentCents), ("@stores", request.AppStores ? 1 : 0), ("@now", now));
                 existing = (await Orders(db, tx, "WHERE id=@id", ct, ("@id", ident))).Single();
@@ -174,9 +174,9 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
             if (referral is null) throw new BillingException("This referral code is unavailable. You cannot use your own code.", 400, "referral_unavailable");
         }
         var discount = referral?.DiscountPercent ?? 0;
-        var setup = 60000 - 60000 * discount / 100; var addon = stores ? 30000 - 30000 * discount / 100 : 0;
-        var fingerprint = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { tenant = tenant.Id, environment = provider.Environment, terms = TermsVersion, stores, profile = referral?.ProfileId, code, setup, addon, monthly = MonthlyCents, maintenanceDelayDays = MaintenanceDelayDays }))));
-        return (new(stores, code.Length == 0 ? null : code, setup, addon, 60000 + (stores ? 30000 : 0) - setup - addon, setup + addon, MonthlyCents, "usd", TermsVersion, fingerprint), referral);
+        var setup = SetupCents - SetupCents * discount / 100; var addon = stores ? 30000 - 30000 * discount / 100 : 0;
+        var fingerprint = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { tenant = tenant.Id, environment = provider.Environment, terms = TermsVersion, stores, profile = referral?.ProfileId, code, setup, addon, monthly = MonthlyCents, maintenanceDelayDays = 0, buildLeadDays = BuildLeadDays }))));
+        return (new(stores, code.Length == 0 ? null : code, setup, addon, SetupCents + (stores ? 30000 : 0) - setup - addon, setup + addon + MonthlyCents, MonthlyCents, "usd", TermsVersion, fingerprint), referral);
     }
 
     private Dictionary<string, string> CheckoutParameters(Order order)
@@ -190,7 +190,7 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
             ["expires_at"] = N(snapshot, "expires").ToString(CultureInfo.InvariantCulture),
             ["success_url"] = provider.Origin + "/workspace/" + Uri.EscapeDataString(order.TenantId) + "/billing?checkout=returned",
             ["cancel_url"] = provider.Origin + "/workspace/" + Uri.EscapeDataString(order.TenantId) + "/billing?checkout=cancelled",
-            ["custom_text[submit][message]"] = "Pay for setup today. Maintenance starts 30 days after purchase at $149/month until canceled. App build lead time: 30 days. Terms: " + provider.Origin + "/service-terms" };
+            ["custom_text[submit][message]"] = "Pay for the build and first month today. The first month is separate from the build price. Maintenance renews at $199/month until canceled. App build lead time: 30 days. Terms: " + provider.Origin + "/service-terms" };
         if (guest)
         {
             values["success_url"] = provider.Origin + "/purchase/complete/" + order.Id + "/{CHECKOUT_SESSION_ID}";
@@ -202,14 +202,13 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
         var index = 0;
         void Add(long amount, string label, bool recurring)
         {
-            if (amount == 0) return; if (amount < 0 || amount > 90000) throw Review();
+            if (amount == 0) return; if (amount < 0 || amount > SetupCents) throw Review();
             var prefix = "line_items[" + index++ + "]";
             values[prefix + "[quantity]"] = "1"; values[prefix + "[price_data][currency]"] = "usd";
             values[prefix + "[price_data][unit_amount]"] = amount.ToString(CultureInfo.InvariantCulture);
             values[prefix + "[price_data][product_data][name]"] = label;
             if (recurring) values[prefix + "[price_data][recurring][interval]"] = "month";
         }
-        values["subscription_data[trial_period_days]"] = MaintenanceDelayDays.ToString(CultureInfo.InvariantCulture);
         values["payment_method_collection"] = "always";
         Add(order.Monthly, "Tide Casa monthly maintenance", true); Add(N(quote, "setupCents"), "Tide Casa app setup — one time", false);
         if (order.AppStores) Add(N(quote, "storesCents"), "App-store submission support — one time; eligible stores, separate fees and approval apply", false);

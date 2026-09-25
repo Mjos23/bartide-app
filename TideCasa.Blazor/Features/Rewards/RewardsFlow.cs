@@ -9,7 +9,11 @@ namespace TideCasa.Blazor.Features.Rewards;
 
 public static partial class RewardsFlow
 {
-    public static void MapRewardForms(this WebApplication app) => app.MapPost("/rewards/forms/{scope}/{id}/{action}", SaveAsync).RequireAuthorization();
+    public static void MapRewardForms(this WebApplication app)
+    {
+        app.MapPost("/rewards/forms/{scope}/{id}/{action}", SaveAsync).RequireAuthorization();
+        MapOrderRewards(app);
+    }
     private static async Task<IResult> SaveAsync(string scope, string id, string action, HttpContext context, IAntiforgery antiforgery, RewardsClient client)
     {
         context.Response.Headers.CacheControl = "no-store";

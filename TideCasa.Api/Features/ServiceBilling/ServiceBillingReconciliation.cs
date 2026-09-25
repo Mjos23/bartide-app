@@ -173,9 +173,14 @@ public sealed partial class ServiceBillingStore
         using var snapshot = JsonDocument.Parse(order.RequestJson);
         if (S(snapshot.RootElement, "termsVersion") == TermsVersion)
         {
+            if (order.Monthly != MonthlyCents || order.Total != order.Initial + order.Monthly
+                || S(subscription, "status") == "trialing" || N(subscription, "trial_start") > 0 || N(subscription, "trial_end") > 0) throw Review();
+        }
+        else if (S(snapshot.RootElement, "termsVersion") == DeferredTermsVersion)
+        {
             var trialStart = N(subscription, "trial_start"); var trialEnd = N(subscription, "trial_end");
-            if (order.Monthly != MonthlyCents || order.Total != order.Initial || trialStart <= 0
-                || trialEnd - trialStart != MaintenanceDelayDays * 86400L) throw Review();
+            if (order.Monthly != DeferredMonthlyCents || order.Total != order.Initial || trialStart <= 0
+                || trialEnd - trialStart != DeferredMaintenanceDelayDays * 86400L) throw Review();
         }
         return new(session, subscription, customer, firstInvoice, N(items[0], "current_period_end"));
     }
@@ -269,7 +274,7 @@ public sealed partial class ServiceBillingStore
             await Run(db, tx, "UPDATE tide_service_orders SET status='paid',paid_at=COALESCE(paid_at,@paid),updated_at=@now WHERE id=@id", ct, ("@paid", evidence.PaidAt), ("@now", now), ("@id", order.Id));
             if (order.Environment == "live" && refunded == 0 && pending == 0)
                 await Run(db, tx, "UPDATE bartide_customers SET status='building',enrollment_note=@note,enrolled_at=@now,build_ready_at=@ready,version=version+1,updated_at=@now WHERE id=@tenant AND status='draft'", ct,
-                    ("@note", "Stripe verified setup and maintenance schedule: " + invoiceId), ("@now", evidence.PaidAt!), ("@ready", DateTimeOffset.Parse(evidence.PaidAt!, CultureInfo.InvariantCulture).AddDays(order.Monthly == MonthlyCents ? MaintenanceDelayDays : 7).ToString("O")), ("@tenant", order.TenantId));
+                    ("@note", "Stripe verified setup and maintenance schedule: " + invoiceId), ("@now", evidence.PaidAt!), ("@ready", DateTimeOffset.Parse(evidence.PaidAt!, CultureInfo.InvariantCulture).AddDays(order.Monthly is DeferredMonthlyCents or MonthlyCents ? BuildLeadDays : 7).ToString("O")), ("@tenant", order.TenantId));
         }
         using var document = JsonDocument.Parse(order.RequestJson); var referral = P(document.RootElement, "referral"); var profile = S(referral, "profileId");
         if (profile is null) return;

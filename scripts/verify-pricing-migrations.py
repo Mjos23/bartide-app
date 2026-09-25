@@ -11,30 +11,49 @@ try:
     schema = p.create_schema('pricing')
     p.run_api('pricing-fresh', schema)
     ledger = p.rows(schema, 'SELECT version,resource_name,sha256,schema_sha256 FROM tide_postgres_migrations ORDER BY version')
-    p.check('Fresh startup applies immutable baseline and pricing upgrade', [r[0] for r in ledger] == [1, 2])
+    p.check('Fresh startup applies immutable baseline and pricing upgrade', [r[0] for r in ledger] == [1, 2, 3])
     p.modify(schema, "INSERT INTO bartide_customers(id,slug,email,name,menu_json,enrollment_note,created_at,updated_at) VALUES('billing-old','billing-old','old@example.invalid','Old','{}','fixture','2026-01-01','2026-01-01')")
     p.modify(schema, "INSERT INTO tide_service_orders(id,tenant_id,environment,request_json,initial_cents,monthly_cents,total_cents,created_at,updated_at) VALUES('old','billing-old','sandbox','{}',60000,5000,65000,'2026-01-01','2026-01-01')")
     p.modify(schema, "INSERT INTO tide_service_invoices(id,order_id,kind,amount_cents,status,updated_at) VALUES('in_old','old','initial',65000,'paid','2026-01-01')")
     p.modify(schema, "INSERT INTO tide_service_refunds(id,invoice_id,charge_id,amount_cents,status,updated_at) VALUES('re_old','in_old','ch_old',1000,'succeeded','2026-01-01')")
     # Restore only this synthetic schema to the actual version-1 constraints and ledger.
-    p.modify(schema, '''ALTER TABLE tide_service_orders DROP CONSTRAINT pgck_tide_service_orders_04;
+    p.modify(schema, '''ALTER TABLE tide_service_orders DROP CONSTRAINT pgck_tide_service_orders_03;
+        ALTER TABLE tide_service_orders ADD CONSTRAINT pgck_tide_service_orders_03 CHECK (initial_cents BETWEEN 0 AND 90000);
+        ALTER TABLE tide_service_orders DROP CONSTRAINT pgck_tide_service_orders_04;
         ALTER TABLE tide_service_orders ADD CONSTRAINT pgck_tide_service_orders_04 CHECK (monthly_cents=5000);
         ALTER TABLE tide_service_orders DROP CONSTRAINT pgck_tide_service_orders_05;
         ALTER TABLE tide_service_orders ADD CONSTRAINT pgck_tide_service_orders_05 CHECK (total_cents=initial_cents+monthly_cents);
-        DELETE FROM tide_postgres_migrations WHERE version=2;''')
+        DELETE FROM tide_postgres_migrations WHERE version>=2;''')
     p.run_api('pricing-populated-upgrade', schema)
     p.check('Upgrade preserves legacy order totals and captured invoices/refunds',
         p.rows(schema, 'SELECT monthly_cents,total_cents FROM tide_service_orders') == [(5000, 65000)]
         and p.rows(schema, 'SELECT amount_cents FROM tide_service_invoices') == [(65000,)]
         and p.rows(schema, 'SELECT amount_cents FROM tide_service_refunds') == [(1000,)])
     p.modify(schema, "UPDATE tide_service_orders SET status='expired' WHERE id='old'")
-    p.modify(schema, "INSERT INTO tide_service_orders(id,tenant_id,environment,request_json,initial_cents,monthly_cents,total_cents,created_at,updated_at) VALUES('new','billing-old','sandbox','{}',60000,14900,60000,'2026-01-01','2026-01-01')")
-    p.check('Upgraded PostgreSQL accepts 600 now and 149 per month', p.rows(schema, "SELECT initial_cents,monthly_cents,total_cents FROM tide_service_orders WHERE id='new'") == [(60000,14900,60000)])
-    p.expect_state('Database rejects an immediate new-plan monthly charge', '23514', lambda: p.modify(schema, "UPDATE tide_service_orders SET total_cents=74900 WHERE id='new'"))
+    p.modify(schema, "INSERT INTO tide_service_orders(id,tenant_id,environment,request_json,initial_cents,monthly_cents,total_cents,created_at,updated_at) VALUES('deferred','billing-old','sandbox','{}',60000,14900,60000,'2026-01-01','2026-01-01')")
+    # Recreate the exact v2 constraints to exercise a populated v2 -> v3 upgrade.
+    p.modify(schema, """ALTER TABLE tide_service_orders DROP CONSTRAINT pgck_tide_service_orders_03;
+        ALTER TABLE tide_service_orders ADD CONSTRAINT pgck_tide_service_orders_03 CHECK (initial_cents BETWEEN 0 AND 90000);
+        ALTER TABLE tide_service_orders DROP CONSTRAINT pgck_tide_service_orders_04;
+        ALTER TABLE tide_service_orders ADD CONSTRAINT pgck_tide_service_orders_04 CHECK (monthly_cents IN (5000,14900));
+        ALTER TABLE tide_service_orders DROP CONSTRAINT pgck_tide_service_orders_05;
+        ALTER TABLE tide_service_orders ADD CONSTRAINT pgck_tide_service_orders_05 CHECK ((monthly_cents=5000 AND total_cents=initial_cents+monthly_cents) OR (monthly_cents=14900 AND total_cents=initial_cents));
+        DELETE FROM tide_postgres_migrations WHERE version=3;""")
+    p.run_api('pricing-v2-upgrade', schema)
+    p.check('V2 upgrade preserves deferred 149-dollar contract', p.rows(schema, "SELECT initial_cents,monthly_cents,total_cents FROM tide_service_orders WHERE id='deferred'") == [(60000,14900,60000)])
+    p.expect_state('Earlier contract still rejects an immediate monthly charge', '23514', lambda: p.modify(schema, "UPDATE tide_service_orders SET total_cents=74900 WHERE id='deferred'"))
+    p.expect_state('Earlier contract still rejects a larger build price', '23514', lambda: p.modify(schema, "UPDATE tide_service_orders SET initial_cents=150000,total_cents=150000 WHERE id='deferred'"))
+    p.modify(schema, "UPDATE tide_service_orders SET status='expired' WHERE id='deferred'")
+    p.modify(schema, "INSERT INTO tide_service_orders(id,tenant_id,environment,request_json,initial_cents,monthly_cents,total_cents,created_at,updated_at) VALUES('new','billing-old','sandbox','{}',150000,19900,169900,'2026-01-01','2026-01-01')")
+    p.check('New plan requires 1500-dollar build plus the first 199-dollar month', p.rows(schema, "SELECT initial_cents,monthly_cents,total_cents FROM tide_service_orders WHERE id='new'") == [(150000,19900,169900)])
+    p.expect_state('New contract rejects omission of the first month', '23514', lambda: p.modify(schema, "UPDATE tide_service_orders SET total_cents=150000 WHERE id='new'"))
+    p.expect_state('New contract rejects discounted monthly maintenance', '23514', lambda: p.modify(schema, "UPDATE tide_service_orders SET monthly_cents=19899,total_cents=169899 WHERE id='new'"))
+    p.modify(schema, "UPDATE tide_service_orders SET initial_cents=180000,total_cents=199900,app_stores=1 WHERE id='new'")
+    p.check('App-store package adds 300 dollars only to initial payment', p.rows(schema, "SELECT initial_cents,monthly_cents,total_cents FROM tide_service_orders WHERE id='new'") == [(180000,19900,199900)])
     before = p.snapshot(schema)
     p.run_api('pricing-restart', schema)
     p.check('Restart preserves prices, relationships and immutable migration history', p.snapshot(schema) == before)
-    p.modify(schema, "UPDATE tide_postgres_migrations SET sha256=repeat('f',64) WHERE version=2")
+    p.modify(schema, "UPDATE tide_postgres_migrations SET sha256=repeat('f',64) WHERE version=3")
     p.run_api('pricing-checksum', schema, False, 'pricing migration checksum differs')
 except Exception as error:
     failed = True

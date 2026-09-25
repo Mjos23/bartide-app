@@ -124,7 +124,7 @@ def run():
     check('Building cannot skip into paused state', transition('a-ready', 'paused')[0] == 400)
     now = datetime.now(timezone.utc)
     seed('new-pricing-build')
-    s.sql("INSERT INTO tide_service_orders(id,tenant_id,environment,status,request_json,initial_cents,monthly_cents,total_cents,created_at,updated_at) VALUES('new-pricing-order','new-pricing-build','sandbox','paid','{}',60000,14900,60000,?,?)", (s.NOW, s.NOW))
+    s.sql("INSERT INTO tide_service_orders(id,tenant_id,environment,status,request_json,initial_cents,monthly_cents,total_cents,created_at,updated_at) VALUES('new-pricing-order','new-pricing-build','sandbox','paid','{}',150000,19900,169900,?,?)", (s.NOW, s.NOW))
     check('New pricing cannot launch using a seven-day lead time', transition('new-pricing-build')[0] == 409)
     s.sql('UPDATE bartide_customers SET enrolled_at=?,build_ready_at=? WHERE id=?', ((now-timedelta(days=29)).isoformat(), (now+timedelta(days=1)).isoformat(), 'new-pricing-build'))
     check('New app remains private before its 30-day lead time ends', transition('new-pricing-build')[0] == 409)

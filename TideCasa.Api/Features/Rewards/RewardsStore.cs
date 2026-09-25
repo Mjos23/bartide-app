@@ -15,7 +15,7 @@ public sealed class RewardsException(string message, int status = 400, string co
 }
 
 /// <summary>Tenant-scoped durable reward issuance. All money/payment facts originate in storage.</summary>
-public sealed class RewardsStore(ApplicationDatabase database, TimeProvider clock)
+public sealed partial class RewardsStore(ApplicationDatabase database, TimeProvider clock)
 {
     private sealed record Business(string Id, string Slug, string Name, string Owner);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -54,7 +54,12 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
         var b = await Tenant(db, tx, id, false, ct); Manager(b, user);
         var members = await Rows(db, tx, "SELECT m.id,m.name,COALESCE(SUM(l.delta),0) FROM tide_loyalty_members m LEFT JOIN tide_loyalty_ledger l ON l.member_id=m.id AND l.tenant_id=m.tenant_id WHERE m.tenant_id=@t GROUP BY m.id ORDER BY m.name LIMIT 10000",
             r => new RewardMember(r.GetString(0), r.GetString(1), r.ReadInt64(2)), ct, ("@t", id));
-        foreach (var member in members) await Reconcile(db, tx, id, member.Id, ct);
+        for (var index = 0; index < members.Count; index++)
+        {
+            var member = members[index];
+            await Reconcile(db, tx, id, member.Id, ct);
+            members[index] = new(member.Id, member.Name, await PointsBalance(db, tx, id, member.Id, ct));
+        }
         var rewards = await Rows(db, tx, IssuedSelect + " JOIN tide_loyalty_members m ON m.id=i.member_id AND m.tenant_id=i.tenant_id WHERE i.tenant_id=@t ORDER BY CASE i.state WHEN 'requested' THEN 0 ELSE 1 END,i.earned_at DESC LIMIT 500",
             r => new ManagedCustomerReward(r.GetString(10), r.GetString(11), ReadIssued(r)), ct, ("@t", id));
         var audits = await Rows(db, tx, "SELECT id,member_id,source_kind,note,units,state,occurred_at,actor FROM tide_reward_qualifications WHERE tenant_id=@t ORDER BY occurred_at DESC LIMIT 200",
@@ -233,6 +238,7 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
         Execute(slug, true, user, request?.RequestId, new { operation = "points-redemption", request }, false, async (db, tx, b, token) =>
         {
             Required(request); var member = await RequireOwnMember(db, tx, b.Id, user, token);
+            await Reconcile(db, tx, b.Id, member, token);
             var rule = await CurrentRule(db, tx, b.Id, request!.RuleId, token);
             if (!rule.Active || rule.Kind != "points") throw new RewardsException("Choose an active points reward.");
             if (await PointsBalance(db, tx, b.Id, member, token) < rule.Threshold) throw new RewardsException("You do not have enough points for this reward.", 409, "insufficient_points");
@@ -305,6 +311,7 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
 
     private async Task Reconcile(DbConnection db, DbTransaction tx, string tenant, string member, CancellationToken ct)
     {
+        await ImportPaidOrders(db, tx, tenant, member, ct);
         var groups = await Rows(db, tx, "SELECT DISTINCT q.version_id,q.period,v.kind,v.threshold FROM tide_reward_qualifications q JOIN tide_reward_rule_versions v ON v.id=q.version_id WHERE q.tenant_id=@t AND q.member_id=@m", r => (Version: r.GetString(0), Period: r.GetString(1), Kind: r.GetString(2), Threshold: r.ReadInt32(3)), ct, ("@t", tenant), ("@m", member));
         foreach (var group in groups)
         {
@@ -325,8 +332,8 @@ public sealed class RewardsStore(ApplicationDatabase database, TimeProvider cloc
     }
 
     private Task<long> Qualified(DbConnection db, DbTransaction tx, string member, string version, string period, CancellationToken ct) =>
-        Number(db, tx, db.Sql("SELECT COALESCE(SUM(q.units),0) FROM tide_reward_qualifications q WHERE q.member_id=@m AND q.version_id=@v AND q.period=@p AND q.state='eligible' AND julianday(q.occurred_at)<=julianday(@now) AND (q.source_kind<>'paid-order' OR EXISTS(SELECT 1 FROM bartide_enhanced_orders o WHERE o.id=q.source_reference AND o.tenant_id=q.tenant_id AND o.status<>'cancelled' AND json_extract(o.payload_json,'$.payment_status') IN('paid','paid_in_person')))",
-            "SELECT COALESCE(SUM(q.units),0) FROM tide_reward_qualifications q WHERE q.member_id=@m AND q.version_id=@v AND q.period=@p AND q.state='eligible' AND tide_iso_instant(q.occurred_at)<=tide_iso_instant(@now) AND (q.source_kind<>'paid-order' OR EXISTS(SELECT 1 FROM bartide_enhanced_orders o WHERE o.id=q.source_reference AND o.tenant_id=q.tenant_id AND o.status<>'cancelled' AND (tide_json(o.payload_json)->>'payment_status') IN('paid','paid_in_person')))"), ct,
+        Number(db, tx, db.Sql("SELECT COALESCE(SUM(q.units),0) FROM tide_reward_qualifications q WHERE q.member_id=@m AND q.version_id=@v AND q.period=@p AND q.state='eligible' AND julianday(q.occurred_at)<=julianday(@now) AND (q.source_kind<>'paid-order' OR EXISTS(SELECT 1 FROM bartide_enhanced_orders o WHERE o.id=q.source_reference AND o.tenant_id=q.tenant_id AND o.status NOT IN('cancelled','canceled','payment_review','paid_needs_review') AND json_extract(o.payload_json,'$.payment_status') IN('paid','paid_in_person')))",
+            "SELECT COALESCE(SUM(q.units),0) FROM tide_reward_qualifications q WHERE q.member_id=@m AND q.version_id=@v AND q.period=@p AND q.state='eligible' AND tide_iso_instant(q.occurred_at)<=tide_iso_instant(@now) AND (q.source_kind<>'paid-order' OR EXISTS(SELECT 1 FROM bartide_enhanced_orders o WHERE o.id=q.source_reference AND o.tenant_id=q.tenant_id AND o.status NOT IN('cancelled','canceled','payment_review','paid_needs_review') AND (tide_json(o.payload_json)->>'payment_status') IN('paid','paid_in_person')))"), ct,
             ("@m", member), ("@v", version), ("@p", period), ("@now", Now()));
 
     private static async Task<Business> Tenant(DbConnection db, DbTransaction tx, string key, bool slug, CancellationToken ct)

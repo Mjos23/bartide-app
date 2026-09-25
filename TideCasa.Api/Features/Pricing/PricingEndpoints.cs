@@ -13,7 +13,7 @@ public static class PricingEndpoints
             if (!string.IsNullOrWhiteSpace(request.ReferralCode))
                 return Results.Problem(statusCode: 503, title: "Referral validation is not connected yet. Your code has not been applied.");
             var stores = request.AppStores ? 30000 : 0;
-            return Results.Ok(new PackageQuote(60000, stores, 0, 0, 60000 + stores, ServiceBillingProvider.MonthlyCents, "usd", ServiceBillingProvider.TermsVersion));
+            return Results.Ok(new PackageQuote(ServiceBillingProvider.SetupCents, stores, 0, ServiceBillingProvider.MonthlyCents, ServiceBillingProvider.SetupCents + stores + ServiceBillingProvider.MonthlyCents, ServiceBillingProvider.MonthlyCents, "usd", ServiceBillingProvider.TermsVersion));
         }).WithName("QuotePackage").WithTags("Pricing").Produces<PackageQuote>().ProducesProblem(503);
     }
 }
