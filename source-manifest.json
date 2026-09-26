@@ -2255,9 +2255,9 @@
     "gitBlobSha": "b225da5181fe53d35cb9353d0ded066f20150290"
   },
   "deploy/app-platform/20260926-collect-preview.sql": {
-    "bytes": 4566,
-    "sha256": "10f824c8dbc7e9665332f0d23c23f964dd8e34b5871502095e23edc2097cd673",
-    "gitBlobSha": "fada60775a4fe6bd1a9e6e613767fd348d4d4129"
+    "bytes": 4906,
+    "sha256": "ef309dbc9ff180e98593286ba2b3e1b3defdeeac0e4b9cba4d2068436ee31fe1",
+    "gitBlobSha": "db7eef11c9b30c3cd13fe99513836ce657558705"
   },
   "deploy/app-platform/Dockerfile.api": {
     "bytes": 1210,

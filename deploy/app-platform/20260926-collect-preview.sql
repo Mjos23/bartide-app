@@ -1,6 +1,6 @@
 -- Collect fictional-preview storage. Run as the existing application schema owner.
--- Open the hosted debtor preview once first, so its restricted database session
--- is visible. This script refuses to guess the runtime role or create credentials.
+-- Select the unique existing restricted Web role by its key-table permissions.
+-- Poolers may not preserve application_name; no credentials are created.
 -- Additive: touches only the new tide_collect schema and its two preview tables.
 BEGIN;
 SET LOCAL lock_timeout = '10s';
@@ -18,10 +18,15 @@ BEGIN
   IF NOT pg_has_role(current_user,(SELECT nspowner FROM pg_namespace WHERE nspname='tide_casa'),'USAGE') THEN
     RAISE EXCEPTION 'Run this update as the existing application schema owner';
   END IF;
-  SELECT count(DISTINCT usename), min(usename::text)::name INTO candidates, runtime_role
-    FROM pg_stat_activity WHERE datname=current_database() AND application_name='TideCasa.Collect';
+  SELECT count(*), min(rolname::text)::name INTO candidates, runtime_role
+    FROM pg_roles WHERE rolcanlogin AND NOT rolsuper AND NOT rolbypassrls
+      AND NOT rolcreatedb AND NOT rolcreaterole
+      AND rolname::text NOT IN ('anon','authenticated','service_role','postgres','supabase_admin')
+      AND has_table_privilege(rolname,'tide_casa.tide_data_protection_keys','SELECT')
+      AND has_table_privilege(rolname,'tide_casa.tide_data_protection_keys','INSERT')
+      AND NOT has_table_privilege(rolname,'tide_casa.demo_requests','SELECT');
   IF candidates <> 1 THEN
-    RAISE EXCEPTION 'Open the hosted Collect preview once, then rerun: expected exactly one observable Collect runtime role';
+    RAISE EXCEPTION 'Expected exactly one existing restricted Web role; inspect key-table permissions before applying';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=runtime_role AND rolcanlogin
       AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreatedb AND NOT rolcreaterole)
@@ -62,7 +67,7 @@ BEGIN
      OR has_table_privilege('authenticated','tide_collect.preview_workspaces','SELECT') THEN
     RAISE EXCEPTION 'Unexpected preview permissions; transaction rolled back';
   END IF;
-  RAISE NOTICE 'Collect preview tables provisioned for observed Web role %',runtime_role;
+  RAISE NOTICE 'Collect preview tables provisioned for existing Web role %',runtime_role;
 END
 $migration$;
 COMMIT;
