@@ -1065,9 +1065,9 @@
     "gitBlobSha": "0f422af9439d4d584c8bf4d01dd3d7991785306d"
   },
   "TideCasa.Blazor/Features/Collect/CollectApplication.cs": {
-    "bytes": 22685,
-    "sha256": "e96880659e174020cf9a9996138ee64dc7f6dc0a40c7676d1ce64448414afbdf",
-    "gitBlobSha": "e74cce44719a5f17140a95185364ddfafee32880"
+    "bytes": 22787,
+    "sha256": "c49d553934f67c3890b7c05687021f3a5c2f93ff4855d5274dd40864166d2d30",
+    "gitBlobSha": "d99dd5d6c0d49d06cf66772152eaefaf9e75a69b"
   },
   "TideCasa.Blazor/Features/Collect/CollectModel.cs": {
     "bytes": 24572,
@@ -1080,9 +1080,9 @@
     "gitBlobSha": "8bc2deb6847285c7b7c57094a3c5bf8b0b5ac2a2"
   },
   "TideCasa.Blazor/Features/Collect/CollectRepository.cs": {
-    "bytes": 10909,
-    "sha256": "fd9ef9086db617927424cad2501bed9bba3e449d86950691bd6f9d093e4207e3",
-    "gitBlobSha": "89059d5bbcb47f5ef91954675ef0d2d35c295183"
+    "bytes": 11340,
+    "sha256": "36f0061d276aa291110702c0cbe53af03069f8c96e1f040faad15eab65a0caba",
+    "gitBlobSha": "f2b9137dea8a14df8cec55f14e32672a329b9e2f"
   },
   "TideCasa.Blazor/Features/DemoInbox/DemoInboxFlow.cs": {
     "bytes": 2554,
@@ -1975,14 +1975,14 @@
     "gitBlobSha": "cd961fa3209974968ef0113482b176799d2f5cdd"
   },
   "TideCasa.Collect.Checks/Program.cs": {
-    "bytes": 34595,
-    "sha256": "5602d0eed1b3f242b35093b985a18efc83a19d4baa6e591a90a0f8f5966561e8",
-    "gitBlobSha": "8ef54a90ee7f89a32e73da2cd7db6e24e25e62d0"
+    "bytes": 40836,
+    "sha256": "cd593609de941e98261d3b38745a647d0d35b6897c2c2f84252ac0c490395b6a",
+    "gitBlobSha": "870775831417a37e122210c4eb9b4cb0199e3017"
   },
   "TideCasa.Collect.Checks/README.md": {
-    "bytes": 2138,
-    "sha256": "162294462c0b72318199adfbe1b8dfa880b48acbed9f6296d05dd3b3d0b49ce0",
-    "gitBlobSha": "356f40ae083b03cc5adeddbbcf6f18d70561cc8c"
+    "bytes": 2611,
+    "sha256": "0ee7703c285cd8dad59beef81af2aec7293ebec694a073546c3ab5c842a71eac",
+    "gitBlobSha": "5e276d611eca88ebafcc07d5a24283878d7770de"
   },
   "TideCasa.Collect.Checks/TideCasa.Collect.Checks.csproj": {
     "bytes": 780,
@@ -2254,6 +2254,11 @@
     "sha256": "c81342b540e3e17d7ae00efd2907ee5f766783fe8246ccf4efbacec26e924250",
     "gitBlobSha": "b225da5181fe53d35cb9353d0ded066f20150290"
   },
+  "deploy/app-platform/20260926-collect-preview.sql": {
+    "bytes": 4566,
+    "sha256": "10f824c8dbc7e9665332f0d23c23f964dd8e34b5871502095e23edc2097cd673",
+    "gitBlobSha": "fada60775a4fe6bd1a9e6e613767fd348d4d4129"
+  },
   "deploy/app-platform/Dockerfile.api": {
     "bytes": 1210,
     "sha256": "37bd8c844974aa39f601136eade11d5981904259860118d3d74ef17e8f4a7fdc",
@@ -2315,9 +2320,9 @@
     "gitBlobSha": "acdd1a41a617567f8b827c3d3a68bfb4b402aad6"
   },
   "docs/collect-preview.md": {
-    "bytes": 8183,
-    "sha256": "d15620c7ff8c1308ad22e6a3415083604509d785c326f93ed5a4a19144391cc3",
-    "gitBlobSha": "ba3df0b7231faad1a30317310306b4c254b6c3b0"
+    "bytes": 8569,
+    "sha256": "5fde6f280f80e58617353aeb34f9ea7dd7c9363d4632aca42c308fe02c228395",
+    "gitBlobSha": "f38712125dae2d333494a9b4d18a0fc9166fd2cd"
   },
   "docs/customer-discovery.md": {
     "bytes": 3138,

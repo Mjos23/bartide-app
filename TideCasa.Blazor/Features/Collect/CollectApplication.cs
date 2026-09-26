@@ -140,7 +140,7 @@ public sealed class CollectApplication(CollectRepository repository, IDataProtec
         { await Html(context, CollectPages.Error("The form expired or contains invalid details. Reload the page and try again.", 400), 400); }
         catch (Exception error) when (error is Npgsql.NpgsqlException or IOException or CryptographicException)
         {
-            context.RequestServices.GetRequiredService<ILogger<CollectApplication>>().LogWarning("Collect storage unavailable: {Type}", error.GetType().Name);
+            context.RequestServices.GetRequiredService<ILogger<CollectApplication>>().LogWarning("Collect storage unavailable: {Type}; SQL state {SqlState}", error.GetType().Name, error is Npgsql.PostgresException postgres ? postgres.SqlState : "unavailable");
             await Html(context, CollectPages.Error("The workspace is temporarily unavailable. Please try again shortly.", 503), 503);
         }
     }

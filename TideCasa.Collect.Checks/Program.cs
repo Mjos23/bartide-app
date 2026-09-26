@@ -13,18 +13,23 @@ internal static class Program
     private static string EvidenceRoot = "";
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static string? PgConnection;
+    private static string? RestrictedPgConnection;
+    private static string? MissingPgConnection;
     public static async Task<int> Main()
     {
         var project = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../.."));
         EvidenceRoot = Path.Combine(project, ".evidence", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(EvidenceRoot);
         PgConnection = Environment.GetEnvironmentVariable("CollectCheckPostgres");
-        if (PgConnection != null)
+        RestrictedPgConnection = Environment.GetEnvironmentVariable("CollectCheckRestrictedPostgres");
+        MissingPgConnection = Environment.GetEnvironmentVariable("CollectCheckMissingPostgres");
+        foreach (var connection in new[] { PgConnection, RestrictedPgConnection, MissingPgConnection }.Where(x=>x!=null))
         {
-            var settings = new NpgsqlConnectionStringBuilder(PgConnection);
+            var settings = new NpgsqlConnectionStringBuilder(connection);
             if (settings.Host is not ("127.0.0.1" or "localhost" or "::1") || !settings.Database!.StartsWith("collect_check_", StringComparison.Ordinal))
                 throw new InvalidOperationException("PostgreSQL verification requires a loopback, uniquely named collect_check_ database.");
         }
+        await RestrictedRuntimeChecks();
         await Batch1();
         Batch2();
         Batch3();
@@ -38,6 +43,7 @@ internal static class Program
             completed = true, passed = Results.All(x => x.Passed), checks = Results.Count,
             failures = Results.Count(x => !x.Passed), fixedClock = Now,
             persistence = PgConnection == null ? "encrypted local file" : "isolated loopback PostgreSQL",
+            restrictedRuntimeChecked = RestrictedPgConnection != null && MissingPgConnection != null,
             scope = "Core and persistence checks. Linked exact production files; no HTTP, browser, legal, live provider, or real-data launch claim.",
             sourceSha256 = new Dictionary<string,string>
             {
@@ -84,14 +90,73 @@ internal static class Program
         var item=c.Cases[0]; CollectRules.Negotiate(c,Actor(c,"debtor"),item,amount,installments,First,"Synthetic settlement terms",Now);
         CollectRules.Accept(c,Actor(c,"negotiator"),item,item.Offers[^1].Id,Now); return item;
     }
-    private static (CollectRepository Repo,IDataProtectionProvider Keys,string Folder) Repo(string label,string? folder=null)
+    private static (CollectRepository Repo,IDataProtectionProvider Keys,string Folder) Repo(string label,string? folder=null,string? connection=null,bool createSchema=true)
     {
         folder ??= Path.Combine(EvidenceRoot,label+"-"+Guid.NewGuid().ToString("N")[..8]); Directory.CreateDirectory(folder);
         var keys=DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(folder,"keys")),b=>b.SetApplicationName("Collect.Checks"));
-        var values=new Dictionary<string,string?> {["Collect:DevelopmentPath"]=Path.Combine(folder,"data")};
-        if(PgConnection!=null) values["ConnectionStrings:Application"]=PgConnection;
+        var values=new Dictionary<string,string?> {["Collect:DevelopmentPath"]=Path.Combine(folder,"data"),["Collect:CreateSchema"]=createSchema.ToString()};
+        if((connection??PgConnection) is {} database) values["ConnectionStrings:Application"]=database;
         var cfg=new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         return (new CollectRepository(cfg,new TestEnvironment(folder),keys),keys,folder);
+    }
+    private static async Task RestrictedRuntimeChecks()
+    {
+        if(RestrictedPgConnection==null&&MissingPgConnection==null)return;
+        if(RestrictedPgConnection==null||MissingPgConnection==null||PgConnection==null)
+            throw new InvalidOperationException("Restricted verification requires all three isolated loopback connection variables.");
+        await TestAsync(1,"Restricted runtime missing tables fails closed without attempting schema creation",async()=>{
+            var p=Repo("restricted-missing",connection:MissingPgConnection,createSchema:false);using var repo=p.Repo;
+            try { await repo.Create(Fixture(),Now);throw new InvalidOperationException("Missing tables were silently created or ignored"); }
+            catch(PostgresException error)when(error.SqlState is "42P01" or "3F000"){}
+            var owner=new NpgsqlConnectionStringBuilder(PgConnection){Database=new NpgsqlConnectionStringBuilder(MissingPgConnection).Database};
+            await using var connection=new NpgsqlConnection(owner.ConnectionString);await connection.OpenAsync();
+            await using var command=new NpgsqlCommand("SELECT count(*) FROM pg_tables WHERE schemaname='tide_collect'",connection);
+            Check(Convert.ToInt32(await command.ExecuteScalarAsync())==0,"Missing-table probe changed the schema");
+        });
+        await TestAsync(1,"Restricted runtime has neither database nor schema CREATE privilege",async()=>{
+            await RestrictedPrivileges();
+            await using var connection=new NpgsqlConnection(RestrictedPgConnection);await connection.OpenAsync();
+            await using var command=new NpgsqlCommand("CREATE SCHEMA collect_runtime_forbidden",connection);
+            try {await command.ExecuteNonQueryAsync();throw new InvalidOperationException("Restricted runtime unexpectedly created a schema");}
+            catch(PostgresException error)when(error.SqlState=="42501"){}
+        });
+        await TestAsync(1,"Preprovisioned restricted runtime supports encrypted CRUD revisions access log and delete",async()=>{
+            var p=Repo("restricted-crud",connection:RestrictedPgConnection,createSchema:false);var c=Fixture();
+            using(p.Repo){
+                await p.Repo.Create(c,Now);var first=(await p.Repo.Read(c.Id,Now))!;var stale=Copy(first);
+                first.Name="Restricted runtime persisted update";await p.Repo.Save(first,0,Now);
+                await DeniedAsync(()=>p.Repo.Save(stale,0,Now),409);
+                await p.Repo.RecordAccess(c.Id,new(Guid.NewGuid().ToString("N"),Now,Actor(c,"debtor").Id,"account.viewed",c.Cases[0].Id));
+            }
+            var restart=Repo("restricted-crud",p.Folder,RestrictedPgConnection,false);
+            using(restart.Repo){
+                var read=(await restart.Repo.Read(c.Id,Now))!;Check(read.Revision==1&&read.Name=="Restricted runtime persisted update");
+                await using var owner=new NpgsqlConnection(PgConnection);await owner.OpenAsync();
+                await using var log=new NpgsqlCommand("SELECT count(*),min(ciphertext) FROM tide_collect.preview_access_log WHERE workspace_id=@id",owner);log.Parameters.AddWithValue("id",c.Id);
+                await using(var result=await log.ExecuteReaderAsync()){Check(await result.ReadAsync()&&result.GetInt64(0)==1);var ciphertext=result.GetString(1);Check(!ciphertext.Contains("account.viewed")&&!ciphertext.Contains(Actor(c,"debtor").Id));}
+                await restart.Repo.Delete(c.Id);Check(await restart.Repo.Read(c.Id,Now)==null);
+                log.CommandText="SELECT count(*) FROM tide_collect.preview_access_log WHERE workspace_id=@id";
+                Check(Convert.ToInt32(await log.ExecuteScalarAsync())==0,"Deleting preview failed to cascade private access log");
+            }
+            await RestrictedPrivileges();
+        });
+        await TestAsync(1,"Preprovisioned runtime schema keeps RLS enabled and public access revoked",async()=>{
+            await using var owner=new NpgsqlConnection(PgConnection);await owner.OpenAsync();
+            await using var command=new NpgsqlCommand("""
+                SELECT count(*)=2 AND bool_and(c.relrowsecurity)
+                FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                WHERE n.nspname='tide_collect' AND c.relname IN ('preview_workspaces','preview_access_log');
+                """,owner);
+            Check((bool)(await command.ExecuteScalarAsync())!,"Both private preview tables require RLS");
+            command.CommandText="SELECT NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname='tide_collect' AND c.relname IN ('preview_workspaces','preview_access_log') AND a.grantee=0)";
+            Check((bool)(await command.ExecuteScalarAsync())!,"Public table privileges must remain revoked");
+        });
+    }
+    private static async Task RestrictedPrivileges()
+    {
+        await using var connection=new NpgsqlConnection(RestrictedPgConnection);await connection.OpenAsync();
+        await using var command=new NpgsqlCommand("SELECT has_database_privilege(current_user,current_database(),'CREATE'),has_schema_privilege(current_user,'tide_collect','CREATE'),has_schema_privilege(current_user,'tide_collect','USAGE')",connection);
+        await using var result=await command.ExecuteReaderAsync();Check(await result.ReadAsync()&&!result.GetBoolean(0)&&!result.GetBoolean(1)&&result.GetBoolean(2),"Runtime privileges broadened or required schema usage absent");
     }
     private static async Task Batch1()
     {

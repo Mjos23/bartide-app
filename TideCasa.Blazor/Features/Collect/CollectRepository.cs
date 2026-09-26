@@ -11,11 +11,13 @@ public sealed class CollectRepository : IDisposable
     private readonly IDataProtector protector;
     private readonly NpgsqlDataSource? source;
     private readonly string? folder;
+    private readonly bool createSchema;
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool initialized;
     public CollectRepository(IConfiguration config, IWebHostEnvironment environment, IDataProtectionProvider protection)
     {
         protector = protection.CreateProtector("TideCasa.Collect.Aggregates.v1");
+        createSchema = environment.IsDevelopment() && config.GetValue("Collect:CreateSchema", true);
         var connection = config.GetConnectionString("Application");
         if (!string.IsNullOrWhiteSpace(connection))
         {
@@ -39,7 +41,7 @@ public sealed class CollectRepository : IDisposable
             if (initialized) return;
             if (source != null)
             {
-                await using var command = source.CreateCommand("""
+                await using var command = source.CreateCommand(createSchema ? """
                     CREATE SCHEMA IF NOT EXISTS tide_collect;
                     CREATE TABLE IF NOT EXISTS tide_collect.preview_workspaces (
                       id text PRIMARY KEY, revision integer NOT NULL CHECK(revision>=0), expires_at timestamptz NOT NULL,
@@ -49,6 +51,9 @@ public sealed class CollectRepository : IDisposable
                       id text PRIMARY KEY, workspace_id text NOT NULL REFERENCES tide_collect.preview_workspaces(id) ON DELETE CASCADE,
                       accessed_at timestamptz NOT NULL, ciphertext text NOT NULL);
                     CREATE INDEX IF NOT EXISTS collect_preview_access_workspace ON tide_collect.preview_access_log(workspace_id);
+                    """ : """
+                    SELECT id, revision, expires_at, ciphertext, created_at FROM tide_collect.preview_workspaces WHERE false;
+                    SELECT id, workspace_id, accessed_at, ciphertext FROM tide_collect.preview_access_log WHERE false;
                     """);
                 await command.ExecuteNonQueryAsync(ct);
             }
