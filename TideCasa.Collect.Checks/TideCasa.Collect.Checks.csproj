@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <Compile Include="../TideCasa.Blazor/Features/Collect/CollectModel.cs" Link="Source/CollectModel.cs" />
+    <Compile Include="../TideCasa.Blazor/Features/Collect/CollectRepository.cs" Link="Source/CollectRepository.cs" />
+    <Using Include="Microsoft.AspNetCore.Hosting" />
+    <Using Include="Microsoft.Extensions.Configuration" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+</Project>
+

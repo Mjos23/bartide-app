@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD_ROOT = Path(os.environ.get('TIDE_TEST_BUILD_ROOT', str(ROOT)))
 RUN = ROOT / '.tools/auth-verification' / time.strftime('%Y%m%d-%H%M%S')
 RUN.mkdir(parents=True, exist_ok=False)
-SDK = ROOT / '.tools/dotnet-10.0.401/dotnet.exe'
+SDK = Path(os.environ.get('TIDE_TEST_DOTNET', str(ROOT / '.tools/dotnet-10.0.401/dotnet.exe')))
 DB = RUN / 'synthetic.db'
 PASSWORD = 'local-test-password-only'
 KEY = 'sb_publishable_localverification000000000'
@@ -374,6 +374,8 @@ try:
     check('Matching reset confirmation updates password and returns to sign-in', status in (302,303) and completed.get('Location','').startswith('/signin?notice=password-reset') and users['alice@example.invalid']['password']==reset_fields['password'])
     from customer_entry_checks import run as run_customer_entry_checks
     run_customer_entry_checks(globals())
+    from collect_auth_checks import run as run_collect_auth_checks
+    run_collect_auth_checks(globals())
     if '--browser-preview' in sys.argv:
         # Optional real-browser checks use only this isolated fake-provider setup.
         # Create browser-finished.flag in the evidence directory to cleanly stop.

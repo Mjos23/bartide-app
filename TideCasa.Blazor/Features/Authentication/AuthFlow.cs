@@ -87,7 +87,8 @@ public static class AuthFlow
         var customer = CustomerExperience.IsHost(context.Request.Host.Host) || form["entry"] == "customer"
             || CustomerExperience.IsCustomerPath(SafeReturnPath(form["return_to"].ToString()));
         var returnTo = CustomerExperience.ReturnPath(form["return_to"].ToString(), customer);
-        string EntryPage(string page) => CustomerExperience.AuthPage(page, customer);
+        var collect = TideCasa.Blazor.Features.Collect.CollectApplication.IsEntry(context.Request.Host.Host, returnTo);
+        string EntryPage(string page) => collect ? TideCasa.Blazor.Features.Collect.CollectApplication.AuthPage(page) : CustomerExperience.AuthPage(page, customer);
         if (action == "signout")
         {
             var auth = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);

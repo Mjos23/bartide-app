@@ -17,6 +17,7 @@ using TideCasa.Blazor.Features.BusinessPosts;
 using TideCasa.Blazor.Features.SalesPipeline;
 using TideCasa.Blazor.Features.EmailTracking;
 using TideCasa.Blazor.Features.ClientOnboarding;
+using TideCasa.Blazor.Features.Collect;
 using TideCasa.Blazor.Components;
 using TideCasa.Blazor.Services;
 using System.Net;
@@ -26,6 +27,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using TideCasa.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton<CollectRepository>();
+builder.Services.AddSingleton<CollectApplication>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 var protection = builder.Services.AddDataProtection().SetApplicationName("TideCasa.Blazor");
 if (builder.Configuration["DataProtection:Provider"] == "PostgreSql")
@@ -203,6 +206,7 @@ app.Use(async (context, next) =>
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
+app.Use((context, next) => context.RequestServices.GetRequiredService<CollectApplication>().Handle(context, next));
 app.MapTideCasaAuthentication();
 app.MapRestaurantOrdering();
 app.MapRestaurantManagement();
