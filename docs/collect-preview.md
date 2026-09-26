@@ -10,7 +10,7 @@ The creditor evaluates submitted documents. Planned document intake includes pay
 
 ## Implemented experience
 
-- `/` or `/collect`: fee-comparison homepage; calculator runs entirely in the browser without storage or requests.
+- `/` or `/collect`: two-door homepage, creditors on the left and debtors on the right; stacked phone entrances include quick audience links. Each door leads to its existing office or free-registration route. The fee calculator appears below and runs entirely in the browser without storage or requests.
 - `/collect/signup`, `/collect/signin`: existing global verified-email identity, host-only session cookies, same-origin/antiforgery forms and fresh API identity checks.
 - `/collect/profile`: fictional independent debtor profile, kept separate from case data.
 - `/collect/directory` and `/c/{slug}`: fictional creditor discovery and office preview. Searching discloses no profile. An inquiry may include an explicit, immutable profile snapshot.
@@ -31,6 +31,8 @@ Limits: 500 concurrent preview workspaces, 24-hour access lifetime, expired reco
 These limits describe a pilot. A 10,000-row deterministic in-memory variance check is not a database-load, large-portfolio, or predictive-model benchmark.
 
 ## Fee comparison basis
+
+The creditor headline is “Stop relying on a middleman. See for yourself.” It names Beyond Finance in the supporting comparison without asserting that the company mishandles customer data. The debtor headline is “Debt relief shouldn’t leave you deeper in debt.” A linked [CFPB explanation](https://www.consumerfinance.gov/ask-cfpb/what-is-a-debt-relief-program-and-how-do-i-know-if-i-should-use-one-en-1457/) describes debt-settlement risks if payments stop, including added fees/interest, credit damage and lawsuits. The page distinguishes settlement from a consolidation loan and does not claim every provider causes financial ruin.
 
 The homepage uses Beyond Finance's own [program pricing](https://www.beyondfinance.com/program/), checked September 26, 2026: typical program fees of 15–25% of enrolled debt, varying by debt and state, charged on a success basis after an accepted offer and a payment toward it. The default is an illustrative 25%; 30% is an editable hypothetical rate, not a claim about their usual pricing. At $20,000 and 25%, the calculated program fee is $5,000 versus Collect's $0 debtor access. The comparison does not assume equal settlement outcomes, include all repayment costs, or allege misconduct by the competitor. Beyond provides a managed service; Collect intends to provide direct-negotiation tools.
 
