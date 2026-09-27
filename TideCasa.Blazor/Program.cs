@@ -163,6 +163,7 @@ app.UseForwardedHeaders();
 app.UseEmailTracking();
 app.UseGuestPurchaseCookie();
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error", createScopeForErrors: true);
+app.UseVerticalMarketing();
 app.UsePublicSeo();
 app.UseStaticFiles();
 app.Use(async (context, next) =>

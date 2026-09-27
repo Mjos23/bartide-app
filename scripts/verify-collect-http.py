@@ -46,7 +46,7 @@ def start(browser,role):
 try:
  b=Browser();page,headers=get(b,'/collect')
  check('Private pages prohibit caching and framing','no-store' in headers.get('Cache-Control','') and headers.get('X-Frame-Options')=='DENY')
- check('Homepage fee comparison has primary citation and local calculator','beyondfinance.com/program/' in page and 'collect-calculator.js' in page)
+ check('API homepage explains the stack and keeps checkout pending','What is an API?' in page and 'learn.tide.casa/csharp/' in page and 'checkout is pending' in page and 'href="https://tide.casa/purchase/' not in page)
  check('Missing CSRF rejected',b.request('/collect/start',{'role':'debtor'})[0]==400)
  token=Inputs(page).values['__RequestVerificationToken']
  check('Cross-origin start rejected',b.request('/collect/start',{'role':'debtor','__RequestVerificationToken':token},{'Origin':'https://elsewhere.invalid'})[0]==400)
@@ -87,7 +87,7 @@ try:
  post(b,path,'dispute',{'case_id':case,'category':'dispute'});post(b,path,'payment',{'case_id':case,'installment':'2'},409)
  post(b,path,'preference',{'case_id':case,'opt_out':'true'})
  switch(b,'admin');page,_=get(b,'/collect/analytics');check('Analytics distinguishes missing comparison evidence','missing' in page.lower() or 'not comparable' in page.lower())
- page,_=get(b,'/collect/client');check('Client pricing matches authorized existing prices','$1,500' in page and '$199' in page)
+ page,_=get(b,'/collect/client');check('Client pricing matches authorized prices','$150' in page and '$199' in page and '$349' in page and '$1,500' not in page)
  stale=Inputs(page).values;post(b,'/collect/client','brand',{'name':'Harbor <script>alert(1)</script>','slug':'harbor-pilot','accent':'#245c4f','kind':'collection-agency'})
  status,_,_=b.request('/collect/action/brand',{**stale,'name':'Old edit','slug':'old','accent':'#245c4f','kind':'collection-agency'});check('Stale form cannot overwrite office',status==409)
  page,_=get(b,'/collect/client');check('Office text is HTML encoded','<script>alert(1)</script>' not in page and '&lt;script&gt;' in page)
@@ -95,8 +95,10 @@ try:
  for slug in ['signin','signup','verify-email','forgot-password','reset-password']:
   page,_=get(Browser(),'/collect/'+slug);check('Auth form preserves Collect return: '+slug,'/collect/account' in html.unescape(page))
  for host in ['bar.tide.casa','order.tide.casa']:
-  status,page,_=b.request('/',headers={'Host':host});check('Existing host homepage preserved: '+host,status==200 and 'collect-calculator.js' not in page)
- status,page,_=b.request('/',headers={'Host':'collect.tide.casa'});check('Collect domain opens own homepage',status==200 and 'collect-calculator.js' in page)
+  status,page,_=b.request('/',headers={'Host':host});check('Existing host homepage preserved: '+host,status==200 and 'Your creditor workflow API.' not in page)
+ status,page,_=b.request('/',headers={'Host':'collect.tide.casa'});check('Collect domain opens own homepage',status==200 and 'Your creditor workflow API.' in page)
+ for host,label in [('fit.tide.casa','Your fitness API.'),('driver.tide.casa','Your delivery API.')]:
+  status,page,_=b.request('/',headers={'Host':host});check('Public vertical host routes correctly: '+host,status==200 and label in page and 'learn.tide.casa/csharp/' in page and 'purchase/business' in page)
  check('Collect host does not expose restaurant workspace',b.request('/restaurants',headers={'Host':'collect.tide.casa'})[0] in (302,404))
  for cookie in b.jar:
   if cookie.name=='Tide.Collect.Preview':check('Preview identity is HttpOnly and cannot select external domain',(cookie.has_nonstandard_attr('HttpOnly') or cookie.has_nonstandard_attr('httponly')) and not cookie.domain_specified)
