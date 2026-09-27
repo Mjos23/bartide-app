@@ -68,7 +68,7 @@ public sealed partial class ServiceBillingStore
             {
                 var now = Now(); var id = Guid.NewGuid().ToString("D");
                 var vertical = request.Plan == "restaurant" ? "bartide" : "tide-casa";
-                var name = request.Plan == "restaurant" ? "New BarTide app purchase" : "New Tide Casa app purchase";
+                var name = request.Plan == "restaurant" ? "New BarTide API purchase" : "New Tide Casa API purchase";
                 var menu = JsonSerializer.Serialize(new { schema = "bartide-menu/1", venue = new { name, vertical, currency = "USD", area = "", website_url = "", tagline = "", hours_text = "", service_note = "" }, categories = new[] { new { id = vertical == "bartide" ? "food" : "services", label = vertical == "bartide" ? "Food" : "Services" } }, items = Array.Empty<object>() });
                 await Run(db, tx, "INSERT INTO bartide_customers(id,slug,email,user_id,name,menu_json,version,status,enrollment_note,vertical,requested_plan,created_at,updated_at) VALUES(@id,@id,@email,NULL,@name,@menu,0,'draft','Awaiting payment and buyer details',@vertical,'enhanced',@now,@now) ON CONFLICT(id) DO NOTHING", ct,
                     ("@id", tenant), ("@email", hash + "@purchase.invalid"), ("@name", name), ("@menu", menu), ("@vertical", vertical), ("@now", now));

@@ -1,7 +1,7 @@
 @page "/purchase/complete/{OrderId}/{SessionId}"
 @attribute [ExcludeFromInteractiveRouting]
 @inject ServiceBillingClient Billing
-<PageTitle>Finish your app setup | Tide Casa</PageTitle>
+<PageTitle>Finish your API setup | Tide Casa</PageTitle>
 @if (purchase?.Status is "pending" or "processing" && Poll is >= 0 and < 10)
 {
     <HeadContent><meta http-equiv="refresh" content="@($"8;url={CurrentPath}?poll={Poll + 1}")" /></HeadContent>
@@ -9,7 +9,7 @@
 <div class="bt-unified rewards-page">
     <SiteHeader IsBarTide="@(purchase?.Plan == "restaurant")" />
     <main class="rewards-main">
-        <p class="bt-one-kicker">YOUR APP · NEXT STEPS</p>
+        <p class="bt-one-kicker">YOUR API · NEXT STEPS</p>
         @if (purchase is null)
         {
             <h1>Check your purchase.</h1><p role="alert">We couldn’t load this purchase. Use the link returned by checkout, or contact <a href="mailto:hello@tide.casa">hello@tide.casa</a>. Please don’t pay again to recover an existing purchase.</p>
@@ -40,7 +40,7 @@
                     <label>Business name<input name="businessName" required maxlength="120" autocomplete="organization" /></label>
                     <label>Your name<input name="contactName" required maxlength="120" autocomplete="name" value="@account.User.DisplayName" /></label>
                     <label>City and state<input name="area" required maxlength="120" autocomplete="address-level2" /></label>
-                    <button type="submit">Save details and continue my setup</button><p>Your purchase is already paid. Saving these details does not charge you again. @(purchase.Plan == "restaurant" ? "Continue from billing to your saved setup checklist and private preview." : "Review your saved purchase and app setup next.")</p>
+                    <button type="submit">Save details and continue my setup</button><p>Your purchase is already paid. Saving these details does not charge you again. @(purchase.Plan == "restaurant" ? "Continue from billing to your saved setup checklist and private preview." : "Review your saved purchase and API setup next.")</p>
                 </form>
                 <p><a href="@("/signin?return_to=" + Uri.EscapeDataString(CurrentPath))">Use a different account</a></p>
             }

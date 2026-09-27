@@ -20,7 +20,7 @@
         else if (workspace is not null)
         {
             <p class="billing-intro">@workspace.Name · Your Tide Casa service payments, invoices and monthly renewal.</p>
-            @if (CanContinueSetup) { <p><a class="bt-one-button secondary" href="@SetupPath">Continue your app setup and private preview →</a></p> }
+            @if (CanContinueSetup) { <p><a class="bt-one-button secondary" href="@SetupPath">Continue your API setup and private preview →</a></p> }
             @if (workspace.Environment == "sandbox") { <p class="billing-notice">Payment testing is separate from live billing. Sandbox payments do not start a live build.</p> }
             @if (ServiceBillingFlow.Notice(NoticeCode) is { } notice) { <p class="billing-notice" role="status">@notice</p> }
             @if (Checkout == "returned") { <p class="billing-notice" role="status">Your saved payment status is shown below. If confirmation is still pending, this page checks again for a short time. Returning from checkout alone does not confirm payment. <a href="@CurrentPath">Refresh billing</a></p> }
@@ -29,7 +29,7 @@
                 <section class="billing-panel" aria-labelledby="service-options">
                     <h2 id="service-options">Choose your setup</h2>
                     <form method="get" action="@CurrentPath" data-enhance="false" class="billing-options">
-                        <label class="billing-choice"><input type="checkbox" name="appStores" value="true" checked="@AppStores" /><span>Add app-store submission support · $300 one time</span></label>
+                        <label class="billing-choice"><input type="checkbox" name="appStores" value="true" checked="@AppStores" /><span>Add front-end store submission support · $300 one time</span></label>
                         <p class="billing-note">Support for eligible stores. Store approval and separate developer-account fees still apply.</p>
                         <label class="desk-field">Referral code, if you have one<input name="referralCode" value="@ReferralCode" maxlength="32" autocomplete="off" /></label>
                         <button class="bt-one-button secondary" type="submit">Review my total</button>
@@ -38,19 +38,19 @@
                     @if (quote is not null)
                     {
                         <dl class="billing-total">
-                            <div><dt>App setup · one time</dt><dd>@Money(quote.SetupCents)</dd></div>
-                            @if (quote.AppStores) { <div><dt>App-store submission support · one time</dt><dd>@Money(quote.StoresCents)</dd></div> }
+                            <div><dt>API setup · one time</dt><dd>@Money(quote.SetupCents)</dd></div>
+                            @if (quote.AppStores) { <div><dt>Front-end store submission support · one time</dt><dd>@Money(quote.StoresCents)</dd></div> }
                             <div><dt>First month of maintenance · due today</dt><dd>@Money(quote.MonthlyCents)</dd></div>
                             @if (quote.DiscountCents > 0) { <div class="billing-discount"><dt>Referral savings included</dt><dd>@Money(quote.DiscountCents)</dd></div> }
                             <div class="billing-grand"><dt>First payment</dt><dd>@Money(quote.FirstPaymentCents)</dd></div>
                         </dl>
-                        <p class="billing-renewal">The first month is separate from the build price and must be purchased at checkout. Maintenance renews at <strong>$199 each month</strong> for hosting and basic app upkeep, until you cancel renewal.</p>
+                        <p class="billing-renewal">The first month is separate from the build price and must be purchased at checkout. Maintenance renews at <strong>$199 each month</strong> for hosting and basic API upkeep, until you cancel renewal.</p>
                         <form method="post" action="@($"/service-billing/{TenantId}/checkout")" data-enhance="false" class="billing-consent">
                             <AntiforgeryToken /><input type="hidden" name="requestId" value="@RequestId" />
                             <input type="hidden" name="appStores" value="@(quote.AppStores ? "true" : "false")" />
                             <input type="hidden" name="referralCode" value="@(quote.ReferralCode ?? "")" />
                             <input type="hidden" name="quoteFingerprint" value="@quote.Fingerprint" /><input type="hidden" name="termsVersion" value="@quote.TermsVersion" />
-                            <label class="billing-choice"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I agree to pay @Money(quote.FirstPaymentCents) now for the build and first month, followed by automatic $199 monthly payments until canceled. My app has a 30-day build lead time. I have reviewed the <a href="/service-terms" target="_blank" rel="noopener">service terms</a>.</span></label>
+                            <label class="billing-choice"><input type="checkbox" name="acceptedTerms" value="true" required /><span>I agree to pay @Money(quote.FirstPaymentCents) now for the build and first month, followed by automatic $199 monthly payments until canceled. My API has a 30-day build lead time. I have reviewed the <a href="/service-terms" target="_blank" rel="noopener">service terms</a>.</span></label>
                             <button class="bt-one-button" type="submit" disabled="@(!workspace.CheckoutAvailable)">Continue to secure checkout</button>
                         </form>
                         @if (!workspace.CheckoutAvailable) { <p class="billing-note">@workspace.AvailabilityMessage</p> }
@@ -62,7 +62,7 @@
                 <section class="billing-panel" aria-labelledby="@("purchase-" + order.Id)">
                     <div class="billing-heading"><h2 id="@("purchase-" + order.Id)">Your setup and maintenance</h2><span class="billing-badge">@(order.Environment == "sandbox" ? "Sandbox" : "Live") · @Status(order.Status)</span></div>
                     <p>@Money(order.FirstPaymentCents) first payment · @Money(order.MonthlyCents) monthly maintenance</p>
-                    @if (order.AppStores) { <p class="billing-note">Includes the one-time app-store submission support package.</p> }
+                    @if (order.AppStores) { <p class="billing-note">Includes the one-time front-end store submission support package.</p> }
                     @if (order.CancelAtPeriodEnd) { <p class="billing-notice">Renewal canceled. The current paid period continues@(Period(order.PeriodEnd) is { } period ? " through " + period : "").</p> }
                     else if (order.SubscriptionStatus == "canceled") { <p>Maintenance has ended. Refunds are shown separately below.</p> }
                     else if (order.SubscriptionStatus is "past_due" or "unpaid") { <p class="billing-notice">The latest maintenance payment needs attention. Open its invoice or contact <a href="mailto:hello@tide.casa">hello@tide.casa</a>.</p> }
@@ -94,7 +94,7 @@
                     @foreach (var invoice in order.Invoices)
                     {
                         <article class="billing-invoice">
-                            <div><strong>@(invoice.Kind == "initial" ? (order.FirstPaymentCents == order.InitialCents ? "App setup" : "Setup and first month") : "Monthly maintenance")</strong><p>@Status(invoice.Status) · @Money(invoice.AmountCents)</p></div>
+                            <div><strong>@(invoice.Kind == "initial" ? (order.FirstPaymentCents == order.InitialCents ? "API setup" : "Setup and first month") : "Monthly maintenance")</strong><p>@Status(invoice.Status) · @Money(invoice.AmountCents)</p></div>
                             @if (invoice.Url is not null) { <a href="@invoice.Url" target="_blank" rel="noopener noreferrer">Open invoice ↗</a> }
                             @if (invoice.RefundedCents > 0) { <p class="billing-note">Refunded: @Money(invoice.RefundedCents)</p> }
                             @if (invoice.RefundPendingCents > 0) { <p class="billing-note">Refund pending: @Money(invoice.RefundPendingCents)</p> }
@@ -117,7 +117,7 @@
                 </section>
             }
             @if (!workspace.CanPurchase && workspace.Orders.Count == 0 && workspace.HistoricalOrders.Count == 0) { <p class="billing-notice">No payments are recorded for this workspace. Contact us if you need help with your setup or maintenance.</p> }
-            <p class="billing-note">Pausing an app does not cancel billing. To stop future monthly charges, use Cancel monthly renewal above. For billing help, email <a href="mailto:hello@tide.casa">hello@tide.casa</a>.</p>
+            <p class="billing-note">Pausing an API does not cancel billing. To stop future monthly charges, use Cancel monthly renewal above. For billing help, email <a href="mailto:hello@tide.casa">hello@tide.casa</a>.</p>
         }
     </main>
 </div>

@@ -1,0 +1,30 @@
+@namespace TideCasa.Blazor.Components.Marketing
+
+<section class="pitch-api pitch-wrap" id="api-explained" aria-labelledby="api-title">
+    <div class="pitch-section-heading">
+        <div><p class="pitch-kicker">THE TECHNOLOGY, WITHOUT THE MYSTERY</p><h2 id="api-title">What is an API?<br /><em>The connection behind the screen.</em></h2></div>
+        <p>API stands for <strong>Application Programming Interface</strong>: a defined way for software to ask other software for information or an action. You do not need to write code to use BarTide.</p>
+    </div>
+    <ol class="pitch-api-flow" aria-label="How the front end and back end work together">
+        <li><span>01 / FRONT END</span><h3>What your customers see</h3><p>Your branded menu, order screen and rewards experience in a browser. Your team has its own workspace.</p></li>
+        <li><span>02 / BACK-END API</span><h3>Where the rules run</h3><p>The front end asks the server to load a menu or submit an order. The back end checks the request, permissions and business rules.</p></li>
+        <li><span>03 / DATABASE</span><h3>What the system remembers</h3><p>Approved changes are saved. The API returns a result, and the front end shows the updated information.</p></li>
+    </ol>
+    <div class="pitch-api-scope"><strong>What you are buying</strong><p>A managed API service with a branded browser front end for the workflows we agree on. Customers use the front end; they do not need an API key. External developer access and custom integrations are scoped separately.</p></div>
+    <div class="pitch-api-grid">
+        <section aria-labelledby="stack-title"><p class="pitch-kicker">OUR CODING STACK</p><h3 id="stack-title">The tools behind BarTide</h3><p>A <strong>stack</strong> is the group of technologies that work together to deliver a service.</p><dl>
+            <div><dt>C# + ASP.NET Core on .NET 10</dt><dd>C# is the main programming language. .NET runs the code; ASP.NET Core provides the web server and back-end API framework.</dd></div>
+            <div><dt>Blazor + HTML + CSS + JavaScript</dt><dd>Blazor builds the front-end screens with C#. HTML gives a page structure, CSS styles it, and JavaScript handles browser features where needed.</dd></div>
+            <div><dt>PostgreSQL + Supabase</dt><dd>PostgreSQL stores structured records. Supabase supplies the hosted database and account sign-in used by this system.</dd></div>
+            <div><dt>DigitalOcean + Cloudflare + Stripe</dt><dd>DigitalOcean hosts the running services. Cloudflare manages domain DNS. Stripe handles BarTide service checkout and recurring billing.</dd></div>
+        </dl></section>
+        <section aria-labelledby="jargon-title"><p class="pitch-kicker">A SMALL TECH DICTIONARY</p><h3 id="jargon-title">Words you will hear</h3><dl>
+            <div><dt>Endpoint</dt><dd>A particular address an API uses for an operation, such as requesting menu information. BarTide's back-end endpoints are accessed through its managed front end.</dd></div>
+            <div><dt>Request, response &amp; JSON</dt><dd>A request asks for something; a response answers. JSON is a structured text format often used to carry that information between systems.</dd></div>
+            <div><dt>Authentication &amp; authorization</dt><dd>Authentication checks who you are. Authorization checks what you are allowed to do, such as editing your restaurant's menu.</dd></div>
+            <div><dt>Hosting, deployment &amp; integration</dt><dd>Hosting keeps the service running. Deployment publishes a reviewed version. An integration connects another service to a specific workflow.</dd></div>
+            <div><dt>Webhook</dt><dd>A notification one service sends to another. Stripe uses verified notifications to report billing changes to BarTide.</dd></div>
+        </dl></section>
+    </div>
+    <p class="pitch-api-note">Included workflows and any outside-provider fees are agreed before launch. Restaurant customer-card checkout is currently disabled; it is separate from paying for BarTide. Learn more from <a href="https://learn.microsoft.com/aspnet/core/blazor" target="_blank" rel="noopener noreferrer">Microsoft's Blazor documentation</a> or explore our <a href="https://learn.tide.casa/csharp/">free C#/.NET course</a>.</p>
+</section>

@@ -13,7 +13,7 @@ self.addEventListener('push', event => {
     }
   } catch { /* Never follow a supplied external notification URL. */ }
   event.waitUntil(self.registration.showNotification(safeText(data.title, 'A new update from your local spot', 120), {
-    body: safeText(data.body, 'Open the app to see what’s happening.', 240),
+    body: safeText(data.body, 'Open the website to see what’s happening.', 240),
     icon: '/app-icons/icon-192.png', badge: '/app-icons/icon-192.png',
     tag: safeText(data.tag, 'business-update', 90), renotify: false, data: { url }
   }));

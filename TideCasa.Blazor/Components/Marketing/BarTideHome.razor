@@ -8,6 +8,7 @@
         <nav aria-label="Main navigation">
             <a href="@CustomerExperience.Entrance(Navigation.Uri)">Order nearby</a>
             <a class="pitch-nav-detail" href="@SectionHref("included")">What you get</a>
+            <a class="pitch-nav-detail" href="@SectionHref("api-explained")">What is an API?</a>
             <a href="/account">Log in</a>
             <a class="pitch-nav-demo" href="/book-a-demo">Book a demo <span aria-hidden="true">↗</span></a>
         </nav>
@@ -15,9 +16,9 @@
 
     <main id="main">
         <section class="pitch-hero pitch-wrap" aria-labelledby="pitch-title">
-            <p class="pitch-kicker"><span aria-hidden="true"></span> YOUR BAR. YOUR CUSTOMERS. YOUR APP.</p>
-            <h1 id="pitch-title">Stop losing money<br />to <span>DoorDash.</span></h1>
-            <p class="pitch-lead">BarTide puts your customers on <strong>your app</strong><br class="pitch-desktop-break" /> so you can keep more of your money.</p>
+            <p class="pitch-kicker"><span aria-hidden="true"></span> YOUR BAR. YOUR API. YOUR CUSTOMER CONNECTION.</p>
+            <h1 id="pitch-title">Your restaurant API.<br /><span>Your direct connection.</span></h1>
+            <p class="pitch-lead">A managed <strong>back end for your business</strong>, with a branded front end your customers can use. Menus, ordering, rewards and team tools, connected under your name.</p>
             <BarTideSavings />
         </section>
 
@@ -31,7 +32,7 @@
                 <div class="pitch-product">
                     <figure class="pitch-product-scene">
                         <div class="pitch-scene-top"><span>MADE FOR YOUR PLACE</span><span aria-hidden="true">↗</span></div>
-                        <div class="pitch-phone" role="img" aria-label="Illustrative customer app showing a bar's menu, a nine-of-ten visit reward and a live music event">
+                        <div class="pitch-phone" role="img" aria-label="Illustrative customer front end showing a bar's menu, a nine-of-ten visit reward and a live music event">
                             <div class="pitch-phone-status" aria-hidden="true"><span>9:41</span><span>● ▰</span></div>
                             <div class="pitch-phone-welcome" aria-hidden="true"><span>YOUR NEIGHBORHOOD BAR</span><strong>The usual?<br />We've got you.</strong><span class="pitch-phone-sun">☀</span></div>
                             <div class="pitch-phone-tabs" aria-hidden="true"><span>Menu</span><span>Rewards</span><span>What's on</span></div>
@@ -39,30 +40,32 @@
                             <div class="pitch-phone-event" aria-hidden="true"><span>FRIDAY · 8 PM</span><strong>Live music.<br />Good company.</strong><span>See what's on ↗</span></div>
                             <div class="pitch-phone-home" aria-hidden="true"></div>
                         </div>
-                        <figcaption>Your name on their home screen.<br /><strong>Your people, a little closer.</strong><small>Illustrative app. Your branding and content go here.</small></figcaption>
+                        <figcaption>Your name on their home screen.<br /><strong>Your people, a little closer.</strong><small>Illustrative front end. Your branding and content go here.</small></figcaption>
                     </figure>
                     <div class="pitch-benefits">
                         <article><span class="pitch-feature-number">01</span><div><h3>Your menu. Always current.</h3><p>Drinks, food, photos and prices in one easy place. Change a special yourself, without waiting on someone else.</p><span class="pitch-feature-tag">MENU &amp; CONTENT EDITOR</span></div></article>
                         <article><span class="pitch-feature-number">02</span><div><h3>Make regulars feel like regulars.</h3><p>Reward another visit. Celebrate a monthly goal. You choose the offer and give customers a reason to return.</p><span class="pitch-feature-tag">CUSTOMER REWARDS</span></div></article>
-                        <article><span class="pitch-feature-number">03</span><div><h3>Turn “maybe” into plans.</h3><p>Live music, trivia, game day. Put your events and updates where your customers can find them, with RSVPs and a guest list.</p><span class="pitch-feature-tag">EVENTS, RSVP &amp; APP POSTS</span></div></article>
+                        <article><span class="pitch-feature-number">03</span><div><h3>Turn “maybe” into plans.</h3><p>Live music, trivia, game day. Put your events and updates where your customers can find them, with RSVPs and a guest list.</p><span class="pitch-feature-tag">EVENTS, RSVP &amp; UPDATES</span></div></article>
                         <article><span class="pitch-feature-number">04</span><div><h3>Keep the whole team in sync.</h3><p>Schedules, private messages, employee rewards and onboarding videos. Less chasing people. More time for your guests.</p><span class="pitch-feature-tag">TEAM TOOLS &amp; TRAINING</span></div></article>
                     </div>
                 </div>
 
                 <div class="pitch-toolkit">
                     <article><span aria-hidden="true">↗</span><h3>Explore the order flow</h3><p>Menu browsing and order management, with table, pickup and delivery workflows to explore in the sample.</p></article>
-                    <article><span aria-hidden="true">▦</span><h3>Easy to find. Easy to keep.</h3><p>Share your app by link or table QR code. Customers can save it to their phone. Keep your existing website.</p></article>
+                    <article><span aria-hidden="true">▦</span><h3>Easy to find. Easy to keep.</h3><p>Share your customer front end by link or table QR code. Customers can save a shortcut to their phone. Keep your existing website.</p></article>
                     <article><span aria-hidden="true">✳</span><h3>We keep it running</h3><p>Hosting, routine upkeep and your content editor are covered by the monthly plan. Real people build it with you.</p></article>
                 </div>
-                <div class="pitch-sample-link"><a class="pitch-link" href="@PublicSeo.Link(Navigation.Uri, "/enhanced-demo")">Take the sample app for a spin <span aria-hidden="true">↗</span></a><span>No purchase needed. Sample orders are simulated.</span></div>
+                <div class="pitch-sample-link"><a class="pitch-link" href="@PublicSeo.Link(Navigation.Uri, "/enhanced-demo")">Explore the sample front end <span aria-hidden="true">↗</span></a><span>No purchase needed. Sample orders are simulated.</span></div>
             </div>
         </section>
 
+        <BarTideApiExplainer />
+
         <section class="pitch-build pitch-wrap" id="process" aria-labelledby="build-title">
-            <div><p class="pitch-kicker">WE BUILD IT WITH YOU</p><h2 id="build-title">Your next chapter.<br /><em>Thirty days to build it.</em></h2><p>We turn your menu, your photos and your ideas into an app that feels like your bar.</p></div>
+            <div><p class="pitch-kicker">WE BUILD IT WITH YOU</p><h2 id="build-title">Your next chapter.<br /><em>Thirty days to build it.</em></h2><p>We turn your menu, your photos and your ideas into a connected back end and a front end that feels like your bar.</p></div>
             <ol>
-                <li><span>01</span><div><h3>Start with your place.</h3><p>Pay $1,699 for the build and first month, create your account and share your business details. We agree on your app's scope together.</p></div></li>
-                <li><span>02</span><div><h3>Build it. Make it yours.</h3><p>Your confirmed payment starts 30 calendar days of building and review. You approve your app with us before launch.</p></div></li>
+                <li><span>01</span><div><h3>Start with your place.</h3><p>Pay $349 for the build and first month, create your account and share your business details. We agree on your API and front-end scope together.</p></div></li>
+                <li><span>02</span><div><h3>Build it. Make it yours.</h3><p>Your confirmed payment starts 30 calendar days of building and review. You review the customer experience and API-backed workflows with us before launch.</p></div></li>
                 <li><span>03</span><div><h3>Put it in their hands.</h3><p>Share your link and QR code. Keep your content fresh. The $199 monthly plan starts at purchase and renews each month.</p></div></li>
             </ol>
         </section>
@@ -71,19 +74,19 @@
             <div class="pitch-wrap">
                 <p class="pitch-kicker">LESS EXPLAINING. MORE SEEING IT.</p>
                 <h2 id="close-title">Let's put your bar<br />on their phone.</h2>
-                <p><strong>$1,500</strong> to build it. <strong>$199/month</strong> to keep it running.<br />The first month is separate: both are required at checkout. $1,699 due today.</p>
-                <div class="pitch-actions"><a class="pitch-button pitch-button-light" href="/purchase/restaurant">Purchase your app <span aria-hidden="true">↗</span></a><a class="pitch-button pitch-button-ghost" href="/book-a-demo">Book a demo</a></div>
-                <p class="pitch-close-note">Optional app-store submission support is $300 once. Store-account fees and approval are separate.</p>
+                <p><strong>$150</strong> to build it. <strong>$199/month</strong> to keep it running.<br />The first month is separate: both are required at checkout. $349 due today.</p>
+                <div class="pitch-actions"><a class="pitch-button pitch-button-light" href="/purchase/restaurant">Build with BarTide <span aria-hidden="true">↗</span></a><a class="pitch-button pitch-button-ghost" href="/book-a-demo">Book a demo</a></div>
+                <p class="pitch-close-note">Optional front-end store submission support is $300 once. Store-account fees and approval are separate.</p>
             </div>
         </section>
 
         <section class="pitch-faq pitch-wrap" aria-labelledby="faq-title">
             <div><p class="pitch-kicker">BEFORE YOU GET STARTED</p><h2 id="faq-title">Clear answers.<br />No guesswork.</h2></div>
             <div>
-                <details><summary>Does BarTide replace DoorDash delivery?</summary><p>BarTide gives your business its own app. The comparison above shows potential commission avoided on sales you could move to your own channel, less BarTide's monthly fee. Delivery, payment processing and other outside costs are separate.</p></details>
-                <details><summary>Can I use my preferred payment method?</summary><p>We work with you to integrate your preferred payment method into your app. We confirm provider compatibility and any processing fees together during setup.</p></details>
-                <details><summary>What is included in $199 a month?</summary><p>Hosting, routine app upkeep and access to your content editor. The first month costs $199 in addition to the $1,500 build, and both are due at checkout. Monthly billing starts at purchase and renews until canceled. Cancel before your next renewal; service continues through the paid period. Major new features and outside services are agreed separately. <a href="/service-terms">Read the service and billing details.</a></p></details>
-                <details><summary>Can I keep my website?</summary><p>Yes. Link to your BarTide app from your existing website and social pages, or let guests scan a QR code at your bar.</p></details>
+                <details><summary>Does BarTide replace DoorDash delivery?</summary><p>BarTide provides a managed API service and branded customer front end. The comparison above shows potential commission avoided on sales you could move to your own channel, less BarTide's monthly fee. Delivery, payment processing and other outside costs are separate.</p></details>
+                <details><summary>Can I use my preferred payment method?</summary><p>We work with you to integrate your preferred payment method into your API. We confirm provider compatibility and any processing fees together during setup.</p></details>
+                <details><summary>What is included in $199 a month?</summary><p>Hosting, routine API upkeep and access to your content editor. The first month costs $199 in addition to the $150 build, and both are due at checkout. Monthly billing starts at purchase and renews until canceled. Cancel before your next renewal; service continues through the paid period. Major new features and outside services are agreed separately. <a href="/service-terms">Read the service and billing details.</a></p></details>
+                <details><summary>Can I keep my website?</summary><p>Yes. Link to your BarTide front end from your existing website and social pages, or let guests scan a QR code at your bar.</p></details>
             </div>
         </section>
     </main>

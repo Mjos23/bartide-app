@@ -10,7 +10,7 @@ public static class PublicSeo
 {
     private static readonly PublicPageSeo Customer = new(
         "BarTide | Find Local Restaurants & Order Direct",
-        "Find restaurants near you, explore their menus and order directly. Create one free BarTide account to use across your local restaurant apps.",
+        "Find restaurants near you, explore their menus and order directly. Create one free BarTide account to use across your local restaurant websites.",
         "https://order.tide.casa/");
     private static readonly PublicPageSeo Nearby = new(
         "Restaurants Near You | BarTide",
@@ -21,20 +21,20 @@ public static class PublicSeo
         "Tide Casa builds and hosts custom apps for small businesses. Explore menus, rewards, team tools and events, then book a personal walkthrough.",
         "https://tide.casa/");
     private static readonly PublicPageSeo Bar = new(
-        "BarTide | Your Bar, Your Own App",
-        "Put your bar on your customers' phones with your own app. Explore direct ordering, customer tools and potential savings on delivery-app commissions.",
+        "BarTide | Restaurant API & Branded Front End",
+        "A managed restaurant API with a branded customer front end. $150 one-time build plus $199/month. Explore menus, ordering, rewards and the technology behind them.",
         "https://bar.tide.casa/");
     private static readonly PublicPageSeo Sample = new(
-        "Explore the BarTide Restaurant App | Tide Casa",
-        "Try BarTide's illustrative restaurant app: menus, rewards, team tools and events. Sample orders are simulated; restaurant payment checkout is not enabled.",
+        "Explore the BarTide Front End | Tide Casa",
+        "Try BarTide's illustrative restaurant front end: menus, rewards, team tools and events. Sample orders are simulated; restaurant payment checkout is not enabled.",
         "https://bar.tide.casa/enhanced-demo");
     private static readonly PublicPageSeo Demo = new(
-        "Book a Small Business App Demo | Tide Casa",
-        "Book a personal Tide Casa or BarTide walkthrough. Discuss your small business, explore the app tools and agree on the features that fit your needs.",
+        "Book an API & Front-End Demo | Tide Casa",
+        "Book a personal Tide Casa or BarTide walkthrough. Discuss your small business, explore the API-backed tools and agree on the features that fit your needs.",
         "https://tide.casa/book-a-demo");
     private static readonly PublicPageSeo Terms = new(
-        "App Pricing, Maintenance and Service Terms | Tide Casa",
-        "Review Tide Casa and BarTide app setup, monthly maintenance, build and launch steps, cancellation terms and optional app-store submission support.",
+        "API Pricing, Maintenance and Service Terms | Tide Casa",
+        "Review Tide Casa and BarTide API and front-end setup, monthly maintenance, build and launch steps, cancellation terms and optional front-end store submission support.",
         "https://tide.casa/service-terms");
 
     public static bool IsPublicHost(string host) =>

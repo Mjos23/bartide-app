@@ -15,7 +15,7 @@
             <nav class="rm-workspace-nav" aria-label="Business"><a href="@($"/rewards/{Uri.EscapeDataString(Slug)}")">Customer rewards</a><a href="@($"/events/{Uri.EscapeDataString(Slug)}")">Events and RSVP</a></nav>
             <section class="ordering-panel posts-follow">
                 <h2>Get the next update on your phone.</h2><p>Music, specials and news from @feed.Name. Turn on alerts for this device, and choose to stop them whenever you like.</p>
-                @if (!feed.PushAvailable) { <p class="ordering-note">Phone notifications aren’t available for this app yet. You can read every published update below.</p> }
+                @if (!feed.PushAvailable) { <p class="ordering-note">Phone notifications aren’t available for this website yet. You can read every published update below.</p> }
                 else if (!signedIn) { <a class="bt-one-button" href="@("/signin?return_to=" + Uri.EscapeDataString(BusinessPostsFlow.Public(Slug)))">Sign in to get updates</a> }
                 else if (subscriptions is not null)
                 {
@@ -27,7 +27,7 @@
                         @foreach (var item in subscriptions.Subscriptions) { <span hidden data-push-id="@item.Id" data-push-hash="@item.EndpointHash"></span> }
                     </div>
                 }
-                <p class="ordering-note">On iPhone or iPad, first add this app to your Home Screen, open it there, then allow notifications. On other supported devices, allow them in your browser. Device settings can delay or silence alerts.</p>
+                <p class="ordering-note">On iPhone or iPad, first add this website to your Home Screen, open it there, then allow notifications. On other supported devices, allow them in your browser. Device settings can delay or silence alerts.</p>
             </section>
             <section aria-labelledby="updates-title"><h2 id="updates-title">Latest from @feed.Name</h2>
                 @if (feed.Posts.Count == 0) { <p>No updates yet. Check back for what’s next.</p> }

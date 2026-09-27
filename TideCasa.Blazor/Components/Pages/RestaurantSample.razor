@@ -30,7 +30,7 @@
             <label>Optional tip<select @bind="tip"><option value="0">No tip</option><option value="15">15%</option><option value="20">20%</option><option value="25">25%</option></select></label>
             <dl class="tide-price-breakdown"><div><dt>Food</dt><dd>@Money(Subtotal)</dd></div><div><dt>Example tax · 7%</dt><dd>@Money(Tax)</dd></div>@if (DeliveryFee > 0) { <div><dt>Example delivery fee</dt><dd>@Money(DeliveryFee)</dd></div> }<div><dt>Tip</dt><dd>@Money(Tip)</dd></div><div><dt>Example total</dt><dd>@Money(Subtotal + Tax + DeliveryFee + Tip)</dd></div></dl>
             <button @onclick="() => orderShown = true">Preview order confirmation</button>
-            @if (orderShown) { <p role="status">Your example order is received. In your restaurant app, the kitchen tracks progress and customers see their order status. No payment or real order was created here.</p> }
+            @if (orderShown) { <p role="status">Your example order is received. In your restaurant front end, the kitchen tracks progress and customers see their order status. No payment or real order was created here.</p> }
         }
         <p class="rewards-note">A table QR code identifies the table automatically. Restaurant payment checkout is currently disabled; this sample does not collect payments.</p></section>
     }
@@ -46,10 +46,10 @@
     }
     else
     {
-        <section class="rewards-panel"><p class="bt-one-kicker">MAKE AN EVENING OF IT</p><h2>Friday acoustic night.</h2><p>Example event · 7–9 pm on the patio</p><p>Live music, familiar faces and a little coastal company.</p><p>Reserve one place with your signed-in account.</p><button @onclick="() => reserved = !reserved">@(reserved ? "Cancel example RSVP" : "Try an RSVP")</button>@if (reserved) { <p role="status">Your example RSVP is saved for one guest. The real app checks remaining capacity before confirming a reservation.</p> }<p class="rewards-note">Real guest lists are private to the restaurant. An RSVP is separate from ticket sales.</p></section>
+        <section class="rewards-panel"><p class="bt-one-kicker">MAKE AN EVENING OF IT</p><h2>Friday acoustic night.</h2><p>Example event · 7–9 pm on the patio</p><p>Live music, familiar faces and a little coastal company.</p><p>Reserve one place with your signed-in account.</p><button @onclick="() => reserved = !reserved">@(reserved ? "Cancel example RSVP" : "Try an RSVP")</button>@if (reserved) { <p role="status">Your example RSVP is saved for one guest. The back end checks remaining capacity before confirming a reservation.</p> }<p class="rewards-note">Real guest lists are private to the restaurant. An RSVP is separate from ticket sales.</p></section>
     }
     <section class="sample-feature-flow" id="feature-flow" aria-labelledby="feature-flow-title">
-        <p class="bt-one-kicker">THE WHOLE APP, AT A GLANCE</p>
+        <p class="bt-one-kicker">THE API & FRONT END, AT A GLANCE</p>
         <h2 id="feature-flow-title">Six tools. One connected business.</h2>
         <p class="sample-flow-intro">A reason to come back. An easier way to order. A team that’s ready for the night. Here’s how it all fits together.</p>
         <ol class="sample-flow-list" role="list">
@@ -61,7 +61,7 @@
             <li><span class="sample-flow-number" aria-hidden="true">02</span><div>
                 <h3>Menu display</h3>
                 <p>Put your food, drinks and late-night favorites in their pocket. Add your own photos, descriptions and prices, and keep availability current from your login.</p>
-                <p class="sample-flow-detail">A menu that feels like your place, ready whenever a guest opens the app.</p>
+                <p class="sample-flow-detail">A menu that feels like your place, ready whenever a guest opens your front end.</p>
             </div></li>
             <li><span class="sample-flow-number" aria-hidden="true">03</span><div>
                 <h3>Ordering, delivery &amp; payments</h3>
@@ -81,7 +81,7 @@
             <li><span class="sample-flow-number" aria-hidden="true">06</span><div>
                 <h3>Live events &amp; RSVP</h3>
                 <p>Give people their next night out to look forward to. Share live music, trivia and special events, accept RSVPs and keep a private guest list for your team.</p>
-                <p class="sample-flow-detail">Businesses can publish app updates. Phone notification sending is currently disabled.</p>
+                <p class="sample-flow-detail">Businesses can publish business updates. Phone notification sending is currently disabled.</p>
             </div></li>
         </ol>
     </section>

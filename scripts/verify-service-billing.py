@@ -281,13 +281,13 @@ def run():
     for person in ['bob', 'staff']:
         s.check(person + ' cannot read another owner billing', api('basic', token=tokens[person])[0] == 403)
     s.check('Paused owner can see billing', api('paused')[0] == 200 and not api('paused')[1]['canPurchase'])
-    for stores, expected in [(False, 169900), (True, 199900)]:
+    for stores, expected in [(False, 34900), (True, 64900)]:
         q = api('basic', '/quote', {'appStores': stores})
         s.check('Server prices first charge ' + str(expected), q[0] == 200 and q[1]['firstPaymentCents'] == expected and q[1]['monthlyCents'] == 19900)
     s.sql("INSERT INTO tide_referral_profiles(id,user_id,email,name,introduction,status,code,discount_percent,terms_version,terms_accepted_at,created_at,updated_at) VALUES(?,?,?,?,?,'active',?,10,'fixture',?,?,?)",
           ('rep', 'supabase:' + s.BOB, 'bob@example.invalid', 'Synthetic Representative', 'Synthetic', 'SAVE10', s.NOW, s.NOW, s.NOW))
     q = api('referral', '/quote', {'appStores': True, 'referralCode': 'save10'})
-    s.check('Referral discounts setup and add-on, never maintenance', q[1]['firstPaymentCents'] == 181900 and q[1]['monthlyCents'] == 19900 and q[1]['discountCents'] == 18000)
+    s.check('Referral discounts setup and add-on, never maintenance', q[1]['firstPaymentCents'] == 60400 and q[1]['monthlyCents'] == 19900 and q[1]['discountCents'] == 4500)
     s.check('Self referral rejected by verified identity', api('foreign', '/quote', {'referralCode': 'SAVE10'}, tokens['bob'])[0] == 400)
     before = len(IDEMPOTENCY)
     s.check('Unchecked recurring terms rejected', checkout('basic', acceptedTerms=False)[0][0] == 400)
@@ -305,10 +305,10 @@ def run():
     result, body = checkout('basic', amountCents=1)
     s.check('Basic checkout created through SDK', result[0] == 200, result[:3])
     basic = result[1]['orderId']; basic_session = session_for(basic)
-    s.check('Forged client price ignored', OBJECTS[basic_session]['amount_total'] == 169900)
+    s.check('Forged client price ignored', OBJECTS[basic_session]['amount_total'] == 34900)
     saved = next(v for v in IDEMPOTENCY.values() if v['id'] == basic_session)
     wire = urllib.parse.parse_qs(saved['raw'])
-    s.check('A required 199-dollar first month and 1500-dollar one-time setup', wire['line_items[0][price_data][unit_amount]'] == ['19900'] and wire['line_items[0][price_data][recurring][interval]'] == ['month'] and wire['line_items[1][price_data][unit_amount]'] == ['150000'] and not any('recurring' in k and '[0]' not in k for k in wire))
+    s.check('A required 199-dollar first month and 150-dollar one-time setup', wire['line_items[0][price_data][unit_amount]'] == ['19900'] and wire['line_items[0][price_data][recurring][interval]'] == ['month'] and wire['line_items[1][price_data][unit_amount]'] == ['15000'] and not any('recurring' in k and '[0]' not in k for k in wire))
     s.check('Trusted returns and reviewed method configuration only', wire['success_url'][0].startswith('https://tide.example.invalid/workspace/basic/') and 'payment_method_types' not in wire and not any(x in key for key in wire for x in ['transfer_data', 'application_fee', 'automatic_tax']))
     s.check('First month is charged at checkout without a trial and with a saved card', not any('trial' in key for key in wire) and wire['payment_method_collection'] == ['always'])
     s.check('Repeated checkout returns same provider session', api('basic', '/checkout', body)[1]['orderId'] == basic and len([x for x in OBJECTS.values() if x['object'] == 'checkout.session']) == 1)
@@ -324,7 +324,7 @@ def run():
     attempts_before = len([r for r in REQUESTS if r['method'] == 'POST' and r['path'] == '/v1/checkout/sessions'])
     s.check('Uncertain checkout beyond idempotency window requires review', action('review', review_id, 'resume-checkout')[0] == 409 and len([r for r in REQUESTS if r['method'] == 'POST' and r['path'] == '/v1/checkout/sessions']) == attempts_before)
     add, _ = checkout('stores', True); add_id = add[1]['orderId']
-    s.check('App-store add-on belongs only to first charge', OBJECTS[session_for(add_id)]['amount_total'] == 199900)
+    s.check('App-store add-on belongs only to first charge', OBJECTS[session_for(add_id)]['amount_total'] == 64900)
     s.check('Discard unpaid checkout verified and stored', action('stores', add_id, 'discard-checkout')[0] == 200 and s.sql('SELECT status FROM tide_service_orders WHERE id=?', (add_id,))[0][0] == 'expired')
     s.check('Discard permits newly consented options', checkout('stores', False)[0][0] == 200)
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
@@ -374,6 +374,23 @@ def run():
     s.check('Earlier v2 149-dollar renewal is not repriced', event(deferred_renewal)[0] == 200 and s.sql('SELECT amount_cents FROM tide_service_invoices WHERE id=?', (deferred_renewal,))[0][0] == 14900)
     s.check('Earlier v2 customer can still cancel renewal', action('deferred-service', deferred_id, 'cancel-renewal')[0] == 200)
 
+    # Earlier paid build contracts keep their saved first charge and renewal.
+    s.seed('upfront-v3', status='draft')
+    previous, _ = checkout('upfront-v3'); previous_id = previous[1]['orderId']; previous_session = session_for(previous_id)
+    snapshot = json.loads(s.sql('SELECT request_json FROM tide_service_orders WHERE id=?', (previous_id,))[0][0])
+    snapshot['termsVersion'] = '2026-09-maintenance-v3'
+    snapshot['quote'].update(setupCents=150000, initialCents=150000, firstCents=169900)
+    s.sql('UPDATE tide_service_orders SET initial_cents=150000,total_cents=169900,request_json=? WHERE id=?', (json.dumps(snapshot), previous_id))
+    OBJECTS[previous_session]['amount_total'] = 169900
+    s.check('Unpaid v3 checkout requires current-price review', action('upfront-v3', previous_id, 'resume-checkout')[0] == 409)
+    previous_invoice, previous_sub, _, _ = settle(previous_session)
+    s.check('Completed v3 contract keeps its saved initial charge', event(previous_invoice)[0] == 200 and s.sql('SELECT status,initial_cents,total_cents FROM tide_service_orders WHERE id=?', (previous_id,))[0] == ('paid',150000,169900))
+    OBJECTS[previous_sub].update(trial_start=int(time.time()),trial_end=int(time.time())+86400)
+    s.check('Previous upfront contract still rejects an unexpected trial', event(previous_invoice)[0] == 422)
+    OBJECTS[previous_sub].pop('trial_start'); OBJECTS[previous_sub].pop('trial_end')
+    previous_renewal, _, _, _ = settle(previous_session, amount=19900, renewal=True)
+    s.check('Existing 199-dollar renewal is unchanged', event(previous_renewal)[0] == 200)
+
     ref, _ = checkout('referral', True, 'SAVE10'); ref_id = ref[1]['orderId']; ref_session = session_for(ref_id)
     invoice, sub, charge, intent = settle(ref_session)
     for title, kwargs in [('Bad signature', {'bad': True}), ('Stale signature', {'stale': True}), ('Wrong event version', {'overrides': {'api_version': '2020-01-01'}}), ('Wrong live context', {'overrides': {'livemode': True}}), ('Connect event on service endpoint', {'overrides': {'account': 'acct_foreign'}})]:
@@ -407,16 +424,16 @@ def run():
     retry = event(invoice, event_id=failed_event[2])
     s.check('Identical signed event retry commits captured invoice', retry[0] == 200 and s.sql('SELECT status FROM tide_service_orders WHERE id=?', (ref_id,))[0][0] == 'paid', retry)
     s.check('Sandbox verified purchase never starts a live build', s.sql("SELECT status FROM bartide_customers WHERE id='referral'")[0][0] == 'draft')
-    s.check('Initial invoice credits discounted setup and separately paid first maintenance month', s.sql('SELECT kind,gross_cents,commission_cents FROM tide_referral_sales WHERE order_id=? ORDER BY kind', (ref_id,)) == [('initial', 162000, 32400), ('recurring', 19900, 1990)])
+    s.check('Initial invoice credits discounted setup and separately paid first maintenance month', s.sql('SELECT kind,gross_cents,commission_cents FROM tide_referral_sales WHERE order_id=? ORDER BY kind', (ref_id,)) == [('initial', 40500, 8100), ('recurring', 19900, 1990)])
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         duplicates = list(pool.map(lambda _: event(invoice, event_id=failed_event[2]), range(2)))
     s.check('Concurrent signed replay has one ledger and event', all(r[0] == 200 for r in duplicates) and s.sql('SELECT COUNT(*) FROM tide_referral_sales WHERE order_id=?', (ref_id,))[0][0] == 2 and s.sql('SELECT COUNT(*) FROM tide_service_events WHERE id=?', (failed_event[2],))[0][0] == 1)
     pending_refund = refund(charge, 8600, 'pending')
     s.check('Pending refund reconciles independently of payment', event(pending_refund, 'refund.created')[0] == 200 and s.sql('SELECT status,refunded_cents,refund_pending_cents FROM tide_service_invoices WHERE id=?', (invoice,))[0] == ('paid', 0, 8600))
     OBJECTS[pending_refund]['status'] = 'failed'
-    s.check('Failed refund clears pending without reducing earned commission', event(pending_refund, 'refund.failed')[0] == 200 and s.sql('SELECT refund_pending_cents,refund_failed_cents FROM tide_service_invoices WHERE id=?', (invoice,))[0] == (0, 8600) and s.sql('SELECT SUM(commission_cents) FROM tide_referral_sales WHERE order_id=?', (ref_id,))[0][0] == 34390)
+    s.check('Failed refund clears pending without reducing earned commission', event(pending_refund, 'refund.failed')[0] == 200 and s.sql('SELECT refund_pending_cents,refund_failed_cents FROM tide_service_invoices WHERE id=?', (invoice,))[0] == (0, 8600) and s.sql('SELECT SUM(commission_cents) FROM tide_referral_sales WHERE order_id=?', (ref_id,))[0][0] == 10090)
     successful = refund(charge, 8600, 'succeeded')
-    s.check('Initial refund adjusts setup and paid maintenance commissions proportionally', event(successful, 'refund.updated')[0] == 200 and s.sql('SELECT kind,refunded_cents,commission_cents FROM tide_referral_sales WHERE order_id=? ORDER BY kind', (ref_id,)) == [('initial', 7659, 30868), ('recurring', 941, 1895)])
+    s.check('Initial refund adjusts setup and paid maintenance commissions proportionally', event(successful, 'refund.updated')[0] == 200 and s.sql('SELECT kind,refunded_cents,commission_cents FROM tide_referral_sales WHERE order_id=? ORDER BY kind', (ref_id,)) == [('initial', 5766, 6946), ('recurring', 2834, 1706)])
     renew, _, renew_charge, _ = settle(ref_session, renewal=True, status='open')
     OBJECTS[sub]['status'] = 'past_due'
     s.check('Failed renewal records open invoice without a new commission', event(renew, 'invoice.payment_failed')[0] == 200 and s.sql('SELECT status FROM tide_service_invoices WHERE id=?', (renew,))[0][0] == 'open' and s.sql('SELECT COUNT(*) FROM tide_referral_sales WHERE order_id=?', (ref_id,))[0][0] == 2)
@@ -436,16 +453,16 @@ def run():
     # Recover provider success before local session binding using signed subscription association.
     rec, _ = checkout('recover'); rec_id = rec[1]['orderId']; rec_session = session_for(rec_id)
     rec_invoice, rec_sub, rec_charge, _ = settle(rec_session)
-    refund(rec_charge, 60000, 'succeeded')
+    refund(rec_charge, 30000, 'succeeded')
     s.sql('UPDATE tide_service_orders SET session_id=NULL WHERE id=?', (rec_id,))
-    s.check('Refund-before-paid event recovers missing session via subscription', event(rec_charge, 'charge.refunded')[0] == 200 and session_for(rec_id) == rec_session and s.sql('SELECT refunded_cents FROM tide_service_invoices WHERE id=?', (rec_invoice,))[0][0] == 60000)
+    s.check('Refund-before-paid event recovers missing session via subscription', event(rec_charge, 'charge.refunded')[0] == 200 and session_for(rec_id) == rec_session and s.sql('SELECT refunded_cents FROM tide_service_invoices WHERE id=?', (rec_invoice,))[0][0] == 30000)
     s.check('Custom transport uses pinned stable version without Connect header', all(r['version'] == VERSION and not r['account'] for r in REQUESTS) and all(r['agent'] == 'TideCasa-StripeHttp/1.0' for r in REQUESTS))
     # SSR forms share the real API session and CSRF protections.
     launch('TideCasa.Blazor', WEB, {'Api__BaseUrl': s.API, 'Auth__AllowLocalHttp': 'true', 'DataProtection__KeyPath': str(RUN / 'keys')})
     owner_browser = w.login('alice')
     forms, page = w.forms_for(owner_browser, '/workspace/web/billing?appStores=true')
     form = w.find_form(forms, '/checkout')
-    s.check('Checkout add-on query changes reviewed total only', '$1999.00' in page[1] and '$199 each month' in page[1] and not s.sql("SELECT id FROM tide_service_orders WHERE tenant_id='web'"))
+    s.check('Checkout add-on query changes reviewed total only', '$649.00' in page[1] and '$199 each month' in page[1] and not s.sql("SELECT id FROM tide_service_orders WHERE tenant_id='web'"))
     consent = [c for c in form['controls'] if c.get('name') == 'acceptedTerms'][0]
     s.check('Renewal consent initially unchecked and required', 'checked' not in consent and 'required' in consent)
     s.check('No raw billing secret in rendered page', SECRET not in page[1] and 'rk_test_' not in page[1] and OWNER not in page[1])
@@ -458,7 +475,7 @@ def run():
     s.sql('UPDATE tide_service_orders SET session_id=NULL WHERE id=?', (web_id,))
     forms, resumed_page = w.forms_for(owner_browser, '/workspace/web/billing')
     resume = w.find_form(forms, '/resume-checkout')
-    s.check('Uncertain saved checkout offers owner recovery', '$1999.00' in resumed_page[1] and 'confirmed' not in resume['fields'])
+    s.check('Uncertain saved checkout offers owner recovery', '$649.00' in resumed_page[1] and 'confirmed' not in resume['fields'])
     s.check('Native resume reuses provider session', w.post(owner_browser, resume, {'confirmed': 'true'})[0] == 302)
     foreign_browser = w.login('bob')
     s.check('Foreign signed-in user cannot render owner billing', w.web('/workspace/web/billing', client=foreign_browser)[0] == 403)
@@ -470,7 +487,7 @@ def run():
     # Fresh sessions are registered in durable SQLite and survive this API restart.
     s.check('Disabling checkout preserves authenticated billing history', not api('basic')[1]['checkoutAvailable'])
     s.check('Flag-off rejects new checkout', checkout('wrong')[0][0] == 503)
-    s.check('Disabling checkout also disables public guest creation', not s.call('/api/v1/service-purchases/options')[1]['checkoutAvailable'] and s.call('/api/v1/service-purchases/checkout', {'checkoutKey': 'd'*64, 'plan': 'business', 'appStores': False, 'acceptedTerms': True, 'termsVersion': '2026-09-maintenance-v3'})[0] == 503)
+    s.check('Disabling checkout also disables public guest creation', not s.call('/api/v1/service-purchases/options')[1]['checkoutAvailable'] and s.call('/api/v1/service-purchases/checkout', {'checkoutKey': 'd'*64, 'plan': 'business', 'appStores': False, 'acceptedTerms': True, 'termsVersion': '2026-09-api-v4'})[0] == 503)
     s.check('Flag-off still verifies signed notifications', event(rec_invoice)[0] == 200)
     s.check('Flag-off still permits known subscription cancellation', action('recover', rec_id, 'cancel-renewal')[0] == 200)
     s.check('All provider writes remain only checkout, expiry and period-end subscription update', all(r['method'] == 'GET' or r['path'] == '/v1/checkout/sessions' or r['path'].endswith('/expire') or r['path'].startswith('/v1/subscriptions/') for r in REQUESTS))
@@ -489,7 +506,7 @@ def guest_purchase_checks(tokens):
     guest = w.browser()
     forms, page = w.forms_for(guest, '/purchase/restaurant?appStores=true')
     form = w.find_form(forms, '/guest-checkout')
-    s.check('Anonymous purchase shows total, add-on and payment before account', page[0] == 200 and '$1,999' in page[1] and 'Create your account' in page[1] and form['fields']['appStores'] == 'true' and '/start/restaurant' not in page[1])
+    s.check('Anonymous purchase shows total, add-on and payment before account', page[0] == 200 and '$649' in page[1] and 'Create your account' in page[1] and form['fields']['appStores'] == 'true' and '/start/restaurant' not in page[1])
     s.check('Purchase page cannot be cached or leak return reference externally', 'no-store' in page[2].get('Cache-Control', '') and page[2].get('Referrer-Policy') == 'same-origin')
     s.check('Guest payment consent is required and initially unchecked', all('checked' not in c and 'required' in c for c in form['controls'] if c.get('name') == 'acceptedTerms'))
     before = len([r for r in REQUESTS if r['path'] == '/v1/checkout/sessions' and r['method'] == 'POST'])
@@ -505,7 +522,7 @@ def guest_purchase_checks(tokens):
     s.check('Checkout expiry leaves margin below Stripe maximum for clock skew', all(1800 < int(r['body']['expires_at']) - time.time() < 23.5 * 3600 for r in REQUESTS if r['path'] == '/v1/checkout/sessions' and r['method'] == 'POST'))
     s.check('Stripe collects billing email and returns to post-payment account step', 'customer_email' not in checkout_request and checkout_request['success_url'].endswith('/purchase/complete/' + order + '/{CHECKOUT_SESSION_ID}') and '/signin' not in checkout_request['success_url'])
     s.check('Guest checkout charges maintenance immediately without a trial', checkout_request['line_items[0][price_data][unit_amount]'] == '19900' and not any('trial' in key for key in checkout_request))
-    s.check('Guest package has no owner or business details before payment', s.sql('SELECT user_id,status FROM bartide_customers WHERE id=?', (tenant,))[0] == (None, 'draft') and OBJECTS[session]['amount_total'] == 199900)
+    s.check('Guest package has no owner or business details before payment', s.sql('SELECT user_id,status FROM bartide_customers WHERE id=?', (tenant,))[0] == (None, 'draft') and OBJECTS[session]['amount_total'] == 64900)
     repeated = w.post(guest, form, {'acceptedTerms': 'true'})
     s.check('Repeated guest click resumes same provider session', repeated[2].get('Location') == posted[2].get('Location') and len(s.sql('SELECT id FROM tide_service_orders WHERE tenant_id=?', (tenant,))) == 1)
     s.check('Changing an open checkout cannot create a second charge', 'notice=guest_options_saved' in w.post(guest, form, {'acceptedTerms': 'true', 'appStores': 'false'})[2].get('Location', '') and len(s.sql('SELECT id FROM tide_service_orders WHERE tenant_id=?', (tenant,))) == 1)
@@ -537,12 +554,12 @@ def guest_purchase_checks(tokens):
     resumed = w.post(guest, form, {'acceptedTerms': 'true'})
     s.check('Returning buyer cannot accidentally pay the same purchase again', resumed[2].get('Location') == returned)
     reset_key = 'c' * 64
-    req = {'checkoutKey': reset_key, 'plan': 'business', 'appStores': False, 'acceptedTerms': True, 'termsVersion': '2026-09-maintenance-v3'}
+    req = {'checkoutKey': reset_key, 'plan': 'business', 'appStores': False, 'acceptedTerms': True, 'termsVersion': '2026-09-api-v4'}
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         attempts = list(pool.map(lambda _: s.call(root + '/checkout', req), range(2)))
     s.check('Concurrent anonymous checkout is idempotent', all(x[0] == 200 for x in attempts) and len({x[1]['orderId'] for x in attempts}) == 1, attempts)
     reset_order = attempts[0][1]['orderId']; reset_session = session_for(reset_order)
-    s.check('Base guest price requires the 1500-dollar build and 199-dollar first month', OBJECTS[reset_session]['amount_total'] == 169900)
+    s.check('Base guest price requires the 150-dollar build and 199-dollar first month', OBJECTS[reset_session]['amount_total'] == 34900)
     s.check('Closing unpaid checkout verifies provider expiry', s.call(root + '/discard', {'checkoutKey': reset_key})[0] == 200 and OBJECTS[reset_session]['status'] == 'expired' and s.sql('SELECT status FROM tide_service_orders WHERE id=?', (reset_order,))[0][0] == 'expired')
     s.check('No email or account data accepted as a purchase credential', s.call(root + '/checkout', {**req, 'checkoutKey': 'staff@example.invalid'})[0] == 404)
     s.check('BarTide payment pages consolidate to the return domain', w.web('/purchase/restaurant?appStores=true', headers={'Host': 'bar.tide.casa'})[2].get('Location') == 'https://tide.casa/purchase/restaurant?appStores=true')

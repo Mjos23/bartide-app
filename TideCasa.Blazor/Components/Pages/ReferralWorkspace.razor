@@ -11,7 +11,7 @@ else
 {
     @if (dashboard.Owner)
     {
-        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Existing referral profiles</h2><p>Manage existing profiles and their customer discount. Discounts apply only to initial setup and the optional app-store package. New purchases require the first month at checkout; maintenance is $199/month and is not discounted. Earlier subscriptions keep their saved rates.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
+        <section class="editor-card"><p class="eyebrow">OWNER REVIEW</p><h2>Existing referral profiles</h2><p>Manage existing profiles and their customer discount. Discounts apply only to initial setup and the optional front-end store package. New purchases require the first month at checkout; maintenance is $199/month and is not discounted. Earlier subscriptions keep their saved rates.</p><p>Figures reflect live payments after refunds. Saving a review sends no money.</p>
         @if (dashboard.Applications.Count == 0) { <p>No referral profiles to review.</p> }
         @if (dashboard.Applications.Count == 200) { <p>The latest 200 profiles are shown, with pending reviews first.</p> }
         @foreach (var application in dashboard.Applications)
@@ -35,7 +35,7 @@ else
         @if (own.Status == "paused") { <p>Your code is paused for new purchases. Existing sales and maintenance attribution remain visible below.</p> }
         @if (own.Code is not null)
         {
-            <div class="referral-code"><span>Your referral code</span><strong>@own.Code</strong><p>@(own.DiscountPercent > 0 ? $"{own.DiscountPercent}% off initial setup and the optional app-store package. Monthly maintenance is not discounted." : "This code tracks your referral. No customer discount is currently attached.")</p>
+            <div class="referral-code"><span>Your referral code</span><strong>@own.Code</strong><p>@(own.DiscountPercent > 0 ? $"{own.DiscountPercent}% off initial setup and the optional front-end store package. Monthly maintenance is not discounted." : "This code tracks your referral. No customer discount is currently attached.")</p>
             @if (own.Status == "active") { <label>Your share link<input readonly value="@ShareLink(own.Code)" /></label><p>Copy this link into your flyer or personal introduction. The customer reviews the code and exact price before paying. A shared link alone does not confirm a discount.</p><a href="@ShareLink(own.Code)">Open my referral link →</a> }
             </div>
         }
@@ -47,7 +47,7 @@ else
     }
     @if (dashboard.Profile is not null || dashboard.Owner)
     {
-        <section class="editor-card" id="commission-terms"><h2>Commission terms</h2><p>Initial commission is 20% of the amount collected for app setup and any app-store package, after discounts and refunds. Maintenance commission is 10% of each collected maintenance payment. Taxes are excluded. Processor fees are not deducted from the commission basis.</p><p>Only verified payments count. Canceled or unpaid bills do not earn commission, and refunds reduce the related commission. Self-referrals are not eligible. A paused code cannot be used for new purchases; already attributed maintenance remains on your sales record.</p><p>Your workspace tracks accrued commissions, not money already sent. Payment arrangements are confirmed directly with Tide Casa; the website does not send automatic payouts or promise a payout date. Earnings depend on completed sales.</p></section>
+        <section class="editor-card" id="commission-terms"><h2>Commission terms</h2><p>Initial commission is 20% of the amount collected for API setup and any front-end store package, after discounts and refunds. Maintenance commission is 10% of each collected maintenance payment. Taxes are excluded. Processor fees are not deducted from the commission basis.</p><p>Only verified payments count. Canceled or unpaid bills do not earn commission, and refunds reduce the related commission. Self-referrals are not eligible. A paused code cannot be used for new purchases; already attributed maintenance remains on your sales record.</p><p>Your workspace tracks accrued commissions, not money already sent. Payment arrangements are confirmed directly with Tide Casa; the website does not send automatic payouts or promise a payout date. Earnings depend on completed sales.</p></section>
     }
     <p><a href="/account">My account</a></p>
 }

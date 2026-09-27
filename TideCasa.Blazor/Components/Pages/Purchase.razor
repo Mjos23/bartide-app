@@ -6,29 +6,29 @@
 <div class="bt-unified bt-purchase-process">
     <SiteHeader IsBarTide="@(Plan == "restaurant")" />
     <main class="purchase-main">
-        <p class="bt-one-kicker">@(Plan == "restaurant" ? "BARTIDE · BARS & RESTAURANTS" : "TIDE CASA · SMALL BUSINESS APPS")</p><h1>Choose your package.</h1>
+        <p class="bt-one-kicker">@(Plan == "restaurant" ? "BARTIDE · BARS & RESTAURANTS" : "TIDE CASA · SMALL BUSINESS APIS")</p><h1>Choose your package.</h1>
         <p class="bt-purchase-intro">Pay securely now. Create your account and tell us about your business afterward.</p>
         @if (Environment.IsDevelopment()) { <p class="purchase-preview-note">Local preview · No payment is collected here.</p> }
         <div class="purchase-grid">
             <section class="purchase-package">
-                <h2>Your app starts here.</h2>
+                <h2>Your API and front end start here.</h2>
                 <ol class="bt-purchase-timeline">
-                    <li><h3>Choose and pay.</h3><p>Review your total and optional app-store support. Stripe handles your payment securely.</p></li>
+                    <li><h3>Choose and pay.</h3><p>Review your total and optional front-end store support. Stripe handles your payment securely.</p></li>
                     <li><h3>Set up your account.</h3><p>After payment, use your checkout email to create an account and share your business details.</p></li>
-                    <li><h3>Build and review together.</h3><p>Confirmed initial payment starts 30 calendar days of private building and review. We work with you to prepare the content and approve your app before launch.</p></li>
+                    <li><h3>Build and review together.</h3><p>Confirmed initial payment starts 30 calendar days of private building and review. We work with you to prepare the content and approve your API-backed customer experience before launch.</p></li>
                 </ol>
                 <div class="tide-maintenance-detail"><h3>What the $199/month covers</h3><p>Hosting, basic upkeep and your content editor. Major new features, outside services and store-account fees are separate.</p><p>The first month is not included in the build price. Both the build and the first $199 month must be purchased at checkout. Maintenance renews each month. Cancel before your next renewal; service continues through the paid period.</p></div>
-                <p>This package covers your Tide Casa app setup and maintenance. Restaurant customer-payment checkout is currently disabled and is separate from this purchase.</p>
+                <p>This package covers your managed API, branded browser front end and maintenance. Restaurant customer-payment checkout is currently disabled and is separate from this purchase.</p>
             </section>
             <aside class="purchase-summary" aria-label="Payment details">
-                <p class="bt-one-kicker">YOUR BUSINESS APP</p><h2>$1,500<span>one-time setup</span></h2>
+                <p class="bt-one-kicker">YOUR BUSINESS API</p><h2>$150<span>one-time setup</span></h2>
                 <p class="tide-monthly-line"><strong>+ $199 / month</strong><br />First month due with your build; renews monthly</p>
-                <label class="tide-store-option"><input type="checkbox" @bind="appStores" @bind:after="RefreshQuoteAsync" disabled="@loading" /><span><strong>Add app-store integration · $300 once</strong><small>Packaging and submission support for eligible stores, including Apple and Google. Store approval is separate; developer-account fees are paid by you.</small></span></label>
+                <label class="tide-store-option"><input type="checkbox" @bind="appStores" @bind:after="RefreshQuoteAsync" disabled="@loading" /><span><strong>Add front-end store integration · $300 once</strong><small>Packaging and submission support for eligible stores, including Apple and Google. Store approval is separate; developer-account fees are paid by you.</small></span></label>
                 @if (quote is not null)
                 {
                     <dl class="tide-price-breakdown">
-                        <div><dt>App setup</dt><dd>@Usd(quote.SetupCents)</dd></div>
-                        @if (quote.AppStoresCents > 0) { <div><dt>App-store package</dt><dd>@Usd(quote.AppStoresCents)</dd></div> }
+                        <div><dt>API + front-end build</dt><dd>@Usd(quote.SetupCents)</dd></div>
+                        @if (quote.AppStoresCents > 0) { <div><dt>Front-end store package</dt><dd>@Usd(quote.AppStoresCents)</dd></div> }
                         <div><dt>Maintenance due today</dt><dd>@Usd(quote.FirstMonthCents)</dd></div>
                         <div class="tide-first-total"><dt>First payment</dt><dd>@Usd(quote.FirstPaymentCents)</dd></div>
                         <div><dt>Then each month</dt><dd>@Usd(quote.MonthlyCents)</dd></div>
@@ -36,7 +36,7 @@
                 }
                 @if (loading) { <p role="status">Updating your total…</p> }
                 @if (error is not null) { <p role="alert">@error</p> }
-                <p class="purchase-tax-note">USD. The app-store service is charged once. Monthly maintenance stays $199.</p>
+                <p class="purchase-tax-note">USD. The front-end store service is charged once. Monthly maintenance stays $199.</p>
                 @if (Notice is not null) { <p class="purchase-preview-note" role="status">@PurchaseNotice</p> }
                 @if (Notice is "guest_options_saved" or "checkout_closed")
                 {

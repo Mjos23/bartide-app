@@ -190,7 +190,7 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
             ["expires_at"] = N(snapshot, "expires").ToString(CultureInfo.InvariantCulture),
             ["success_url"] = provider.Origin + "/workspace/" + Uri.EscapeDataString(order.TenantId) + "/billing?checkout=returned",
             ["cancel_url"] = provider.Origin + "/workspace/" + Uri.EscapeDataString(order.TenantId) + "/billing?checkout=cancelled",
-            ["custom_text[submit][message]"] = "Pay for the build and first month today. The first month is separate from the build price. Maintenance renews at $199/month until canceled. App build lead time: 30 days. Terms: " + provider.Origin + "/service-terms" };
+            ["custom_text[submit][message]"] = "Pay for the build and first month today. The first month is separate from the build price. Maintenance renews at $199/month until canceled. API and front-end build lead time: 30 days. Terms: " + provider.Origin + "/service-terms" };
         if (guest)
         {
             values["success_url"] = provider.Origin + "/purchase/complete/" + order.Id + "/{CHECKOUT_SESSION_ID}";
@@ -200,9 +200,9 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
         foreach (var prefix in new[] { "metadata", "subscription_data[metadata]" })
         { values[prefix + "[tide_purpose]"] = Purpose; values[prefix + "[tide_order_id]"] = order.Id; values[prefix + "[tide_tenant_id]"] = order.TenantId; }
         var index = 0;
-        void Add(long amount, string label, bool recurring)
+        void Add(long amount, string label, bool recurring, int maximum)
         {
-            if (amount == 0) return; if (amount < 0 || amount > SetupCents) throw Review();
+            if (amount == 0) return; if (amount < 0 || amount > maximum) throw Review();
             var prefix = "line_items[" + index++ + "]";
             values[prefix + "[quantity]"] = "1"; values[prefix + "[price_data][currency]"] = "usd";
             values[prefix + "[price_data][unit_amount]"] = amount.ToString(CultureInfo.InvariantCulture);
@@ -210,8 +210,8 @@ public sealed partial class ServiceBillingStore(ApplicationDatabase database, Se
             if (recurring) values[prefix + "[price_data][recurring][interval]"] = "month";
         }
         values["payment_method_collection"] = "always";
-        Add(order.Monthly, "Tide Casa monthly maintenance", true); Add(N(quote, "setupCents"), "Tide Casa app setup — one time", false);
-        if (order.AppStores) Add(N(quote, "storesCents"), "App-store submission support — one time; eligible stores, separate fees and approval apply", false);
+        Add(order.Monthly, "Tide Casa API hosting and maintenance — monthly", true, MonthlyCents); Add(N(quote, "setupCents"), "Tide Casa API and front-end build — one time", false, SetupCents);
+        if (order.AppStores) Add(N(quote, "storesCents"), "Front-end store submission support — one time; separate fees and approval apply", false, 30000);
         return values;
     }
 

@@ -16,13 +16,13 @@
     const button = panel.querySelector('[data-push-enable]');
     const appleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     if (appleMobile && !(navigator.standalone || matchMedia('(display-mode: standalone)').matches)) {
-      explain(panel, 'Add this app to your Home Screen, then open it from there to turn on alerts.'); return;
+      explain(panel, 'Add this website to your Home Screen, then open it from there to turn on alerts.'); return;
     }
     if (!window.isSecureContext || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-      explain(panel, 'This browser cannot receive phone notifications here. Try a supported browser on the secure app, or read the updates below.'); return;
+      explain(panel, 'This browser cannot receive phone notifications here. Try a supported browser on the secure website, or read the updates below.'); return;
     }
     if (Notification.permission === 'denied') {
-      explain(panel, 'Notifications are blocked for this app. Allow them in your browser or device settings, then reload.'); return;
+      explain(panel, 'Notifications are blocked for this website. Allow them in your browser or device settings, then reload.'); return;
     }
     try {
       const registration = await navigator.serviceWorker.getRegistration('/');
@@ -67,7 +67,7 @@
         let subscription = await registration.pushManager.getSubscription();
         const applicationServerKey = keyBytes(panel.dataset.vapid);
         if (subscription?.options.applicationServerKey && !Array.from(new Uint8Array(subscription.options.applicationServerKey)).every((b, i) => b === applicationServerKey[i])) {
-          explain(panel, 'This device has an older notification setup. Reset this app’s notification permission in your browser settings, then reload.'); return;
+          explain(panel, 'This device has an older notification setup. Reset this website’s notification permission in your browser settings, then reload.'); return;
         }
         subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
         const details = subscription.toJSON();
@@ -80,7 +80,7 @@
         if (!response.ok) {
           let code;
           try { code = (await response.json()).code; } catch { /* Generic failure is safe. */ }
-          explain(panel, response.status === 401 ? 'Please sign in again, then return to this page.' : code === 'device-account' ? 'This browser’s alerts belong to another account. Use that account, or reset this app’s notification permission in your browser settings before trying again.' : response.status === 503 ? 'Phone alerts are unavailable right now. Your browser permission is saved; try again later.' : response.status === 429 ? 'Too many attempts or saved devices. Stop alerts on an unused device or try again later.' : 'Your notification preference could not be saved. Reload and try again.');
+          explain(panel, response.status === 401 ? 'Please sign in again, then return to this page.' : code === 'device-account' ? 'This browser’s alerts belong to another account. Use that account, or reset this website’s notification permission in your browser settings before trying again.' : response.status === 503 ? 'Phone alerts are unavailable right now. Your browser permission is saved; try again later.' : response.status === 429 ? 'Too many attempts or saved devices. Stop alerts on an unused device or try again later.' : 'Your notification preference could not be saved. Reload and try again.');
           button.disabled = false; return;
         }
         // Reload from server-owned preferences, rather than claiming success from browser permission alone.

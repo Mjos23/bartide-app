@@ -29,7 +29,7 @@
             <label>Follow-up<select name="due">@foreach (var item in DueOptions) { <option value="@item.Key" selected="@(Due == item.Key)">@item.Value</option> }</select></label>
             <button type="submit">Find prospects</button><a href="/owner/sales">Clear filters</a>
         </form>
-        <p class="rewards-note">Follow-up filters use calendar dates in UTC. Agreement recorded is a sales stage; it does not confirm payment or launch an app.</p>
+        <p class="rewards-note">Follow-up filters use calendar dates in UTC. Agreement recorded is a sales stage; it does not confirm payment or launch a service.</p>
         <details class="rewards-panel"><summary>Add a prospect</summary><p>Save a business you plan to contact. This does not send a message or subscribe anyone to marketing.</p>
             <form method="post" action="/owner/sales/create" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="requestKey" value="@requestKey" />
                 <div class="sales-two"><label>Contact name<input name="name" maxlength="120" required /></label><label>Business name<input name="business" maxlength="150" required /></label></div>

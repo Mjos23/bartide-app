@@ -6,7 +6,7 @@
 <PageTitle>Email results | Tide Casa</PageTitle>
 <HeadContent><link rel="stylesheet" href="/email-results.css" /></HeadContent>
 <div class="bt-unified rewards-page email-results"><header class="rewards-nav"><a href="/account">← Your account</a><a href="/owner/sales">Sales pipeline</a></header><main class="rewards-main">
-    <p class="bt-one-kicker">FROM EMAIL TO YOUR APP.</p><h1>Email results.</h1>
+    <p class="bt-one-kicker">FROM EMAIL TO YOUR FRONT END.</p><h1>Email results.</h1>
     <p>See visits from your email links and the next links people select.</p>
     @if (error is not null) { <p role="alert">@error</p> }
     @if (report is not null)
@@ -39,7 +39,7 @@
                 <p class="rewards-note">The 20 most common paths among up to 1,000 recent visits are shown. Totals above cover all visits in the last 90 days. Each visit lasts up to 30 minutes; repeated consecutive clicks are counted once. Selections of Tide Casa and hosted-demo links are included; activity after leaving BarTide is not joined to this visit. Clicks are link selections, not proof of a submitted demo request or completed payment.</p>
             }
         }
-        <section class="rewards-panel email-coverage"><h2>What these results measure</h2><p><strong>Sent, delivered, opened and bounced:</strong> unavailable. Gmail drafts and manual sends do not report those events to this dashboard.</p><p>Visits are anonymous browser sessions, not unique people. Email security scanners and automated traffic may count. Click tracking needs JavaScript and first-party cookies; privacy settings and network failures can leave gaps. No email addresses, page-query details or visitor IP addresses are stored in these reports.</p><p>Only home, pricing, demo, contact, purchase and sample-app links are tracked after an email visit. Demo submissions and completed payments are not reported as conversions here.</p></section>
+        <section class="rewards-panel email-coverage"><h2>What these results measure</h2><p><strong>Sent, delivered, opened and bounced:</strong> unavailable. Gmail drafts and manual sends do not report those events to this dashboard.</p><p>Visits are anonymous browser sessions, not unique people. Email security scanners and automated traffic may count. Click tracking needs JavaScript and first-party cookies; privacy settings and network failures can leave gaps. No email addresses, page-query details or visitor IP addresses are stored in these reports.</p><p>Only home, pricing, demo, contact, purchase and sample front-end links are tracked after an email visit. Demo submissions and completed payments are not reported as conversions here.</p></section>
     }
 </main></div>
 @code {

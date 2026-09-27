@@ -171,7 +171,7 @@ public sealed partial class ServiceBillingStore
             || S(recurring, "interval") != "month" || N(recurring, "interval_count") != 1 || N(items[0], "current_period_end") <= 0) throw Review();
         if (S(subscription, "status") is not ("incomplete" or "incomplete_expired" or "trialing" or "active" or "past_due" or "canceled" or "unpaid" or "paused")) throw Review();
         using var snapshot = JsonDocument.Parse(order.RequestJson);
-        if (S(snapshot.RootElement, "termsVersion") == TermsVersion)
+        if (S(snapshot.RootElement, "termsVersion") is TermsVersion or PreviousUpfrontTermsVersion)
         {
             if (order.Monthly != MonthlyCents || order.Total != order.Initial + order.Monthly
                 || S(subscription, "status") == "trialing" || N(subscription, "trial_start") > 0 || N(subscription, "trial_end") > 0) throw Review();

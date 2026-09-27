@@ -19,11 +19,11 @@
                 <div><h2>@(workspace.Feed.PushAvailable ? "Reach your followers." : "Your public updates are ready.")</h2>
                     <p>@workspace.SubscriberCount opted-in device@(workspace.SubscriberCount == 1 ? "" : "s").</p></div>
                 @if (workspace.Feed.PushAvailable) { <p>Publishing queues a phone notification for customers who follow this business. Delivery depends on their device, browser and notification settings.</p> }
-                else { <p>Phone alerts still need to be enabled for this app. Published updates appear in your feed now; they won’t send old notifications when alerts become available.</p> }
+                else { <p>Phone alerts still need to be enabled for this website. Published updates appear in your feed now; they won’t send old notifications when alerts become available.</p> }
             </section>
             <section class="ordering-panel">
                 <h2>Write an update</h2><p>Save a draft, review it, then publish. Up to four updates an hour and eight a day keeps things useful for your regulars.</p>
-                @if (!workspace.CanPublish) { <p class="ordering-notice">Posting is available once this business’s app is active.</p> }
+                @if (!workspace.CanPublish) { <p class="ordering-notice">Posting is available once this business’s service is active.</p> }
                 <form action="@(BusinessPostsFlow.Manage(TenantId) + "/create")" method="post" data-enhance="false">
                     <fieldset disabled="@(!workspace.CanPublish)">
                     <AntiforgeryToken /><input name="request_key" type="hidden" value="@Guid.NewGuid().ToString("D")" />

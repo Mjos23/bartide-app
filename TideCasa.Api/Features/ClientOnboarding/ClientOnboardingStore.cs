@@ -116,7 +116,7 @@ public sealed partial class ClientOnboardingStore(ApplicationDatabase database)
         var s = await ReadAsync(db, tx, id, user, false, ct); Editable(s);
         if (!s.IsOwner || user.IsPlatformOwner && s.Owner != user.UserId) throw new OnboardingException("The business owner must approve this preview.", 403, "owner_required");
         var release = Release(s);
-        if (!request.Confirmed) throw new OnboardingException("Review and confirm the app details first.");
+        if (!request.Confirmed) throw new OnboardingException("Review and confirm the API and front-end details first.");
         if (release is null || release.Id != request.ReleaseId || release.Fingerprint != request.Fingerprint
             || release.Fingerprint != await Fingerprint(db, tx, s, ct)) throw Stale();
         if (!CoreReady(await Checks(db, tx, s, ct))) throw new OnboardingException("Complete the required setup details before requesting launch review.", 409, "setup_incomplete");
@@ -210,7 +210,7 @@ public sealed partial class ClientOnboardingStore(ApplicationDatabase database)
         var approved = current && Text(s.Workflow, "approvedRelease") == release!.Id && Text(s.Workflow, "approvedBy") == s.Owner;
         checks.Add(new("preview", "launch", current ? "ready" : "needs_attention", current ? "Your private preview matches the saved setup." : "Build a preview of your latest details.", Setup(s.Id, "launch")));
         checks.Add(new("owner_approval", "launch", approved ? "ready" : "needs_attention", approved ? "The owner approved this version for launch review." : "The owner needs to review and approve the current preview.", Setup(s.Id, "launch")));
-        checks.Add(new("publication", "launch", s.Status == "active" ? "ready" : "waiting", s.Status == "active" ? "Your app is published." : "BarTide reviews the approved app with you after the scheduled build period.", Setup(s.Id, "launch")));
+        checks.Add(new("publication", "launch", s.Status == "active" ? "ready" : "waiting", s.Status == "active" ? "Your customer front end is published." : "BarTide reviews the approved front end with you after the scheduled build period.", Setup(s.Id, "launch")));
         return new(s.Id, s.Slug, s.Name, s.Status, s.Revision, s.IsOwner, Text(s.Workflow, "updatedAt"),
             s.Answers.Business, s.Answers.Brand, s.Answers.Service, s.Answers.Team, checks, s.Editor.Items.Count,
             release?.Id, approved, approved ? Text(s.Workflow, "approvedAt") : null, current && CoreReady(checks) && s.IsOwner && s.Status != "active", s.BuildReadyAt);
@@ -244,7 +244,7 @@ public sealed partial class ClientOnboardingStore(ApplicationDatabase database)
             ("@json", json), ("@now", Now()), ("@id", s.Id), ("@version", s.ConfigVersion)) != 1) throw Stale();
     }
 
-    private static void Editable(State s) { if (s.Status == "active") throw new OnboardingException("Use your workspace tools to maintain the published app.", 409, "already_published"); }
+    private static void Editable(State s) { if (s.Status == "active") throw new OnboardingException("Use your workspace tools to maintain the published service.", 409, "already_published"); }
     private static string Now() => DateTimeOffset.UtcNow.ToString("O");
     private static string Setup(string id, string section) => "/workspace/" + Uri.EscapeDataString(id) + "/onboarding#" + section;
     private static JsonObject Parse(string value) => JsonNode.Parse(value, documentOptions: new() { MaxDepth = 32 }) as JsonObject ?? throw Unavailable();

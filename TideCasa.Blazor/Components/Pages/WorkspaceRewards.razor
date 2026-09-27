@@ -29,7 +29,7 @@ else
         <details><summary>Edit rule</summary><form method="post" action="@Action("rule")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><RewardRuleFields Rule="rule" MenuItems="items" /><button type="submit">Save new rule version</button></form></details>
         @if (rule.Active && rule.Kind != "points" && workspace.Members.Count > 0)
         {
-            <details><summary>Record an off-app @(rule.Kind == "monthly-visits" ? "visit" : "purchase")</summary>
+            <details><summary>Manually record a @(rule.Kind == "monthly-visits" ? "visit" : "purchase")</summary>
             <form method="post" action="@Action("qualify")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><input type="hidden" name="rule_id" value="@rule.Id" /><input type="hidden" name="item_id" value="@rule.ItemId" /><input type="hidden" name="source" value="@(rule.Kind == "monthly-visits" ? "verified-visit" : "verified-purchase")" />
             <label>Customer<select name="member_id" required>@foreach (var member in workspace.Members) { <option value="@member.Id">@member.Name</option> }</select></label>
             @if (rule.Kind == "monthly-visits") { <input type="hidden" name="units" value="1" /> }
@@ -45,7 +45,7 @@ else
         }</article>
     }
     <details><summary>Add a reward rule</summary><form method="post" action="@Action("rule")" data-enhance="false"><AntiforgeryToken /><input type="hidden" name="request_id" value="@Guid.NewGuid()" /><RewardRuleFields MenuItems="items" /><button type="submit" disabled="@menuError">Create reward rule</button></form></details></section>
-    <section class="rewards-panel"><h2>Customer points</h2><p>Customers automatically earn 1 point per whole $1 of paid food and drinks per order. Tax, tips and delivery fees are excluded. Refunded or cancelled orders lose their points. Use this form only for additional off-app activity.</p>
+    <section class="rewards-panel"><h2>Customer points</h2><p>Customers automatically earn 1 point per whole $1 of paid food and drinks per order. Tax, tips and delivery fees are excluded. Refunded or cancelled orders lose their points. Use this form only for additional activity outside the website.</p>
     @if (workspace.Members.Count == 0) { <p>No customers have joined yet.</p> }
     else
     {
